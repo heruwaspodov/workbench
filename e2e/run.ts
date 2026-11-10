@@ -225,6 +225,20 @@ await step('Create PGP from an uploaded Excel file, then the same quarter is ref
   await shot('04b-create-quarter-taken')
 })
 
+await step('template editor imports the same Excel file with the same extractor', async () => {
+  await page.goto(`${APP}/pgp/templates/new`)
+  await page.getByRole('tab', { name: 'Upload Excel (.xlsx)' }).click()
+  await page.locator('[data-test="xlsx-file"]').setInputFiles(join(OUT, 'e2e-plan.xlsx'))
+  await page.waitForFunction(() => [...document.querySelectorAll('textarea')].some((t) => t.value === 'Average 40 story points'), undefined, { timeout: 10_000 })
+  if ((await page.getByPlaceholder('2026-Q4').inputValue()) !== '2025-Q1') throw new Error('template period was not read from the tab name')
+  await page.getByRole('button', { name: 'Create template' }).click()
+  await page.waitForURL(/\/pgp\/templates\/[0-9a-f-]{36}$/)
+  const tpl = await api('GET', `/api/pgp/templates/${page.url().split('/').pop()}`)
+  const got = tpl.items.map((i: { weight: number; initiative: string }) => `${i.weight}:${i.initiative}`).join('|')
+  if (tpl.period !== '2025-Q1' || got !== '60:Average 40 story points|40:Zero P0 bugs') throw new Error(`unexpected template ${tpl.period} ${got}`)
+  await shot('04c-template-from-upload')
+})
+
 await step('plan editor shows Confluence evidence card (no page body)', async () => {
   await page.goto(`${APP}/pgp/plans/${planId}`)
   await text(page, 'Created or edited in the last 90 days')

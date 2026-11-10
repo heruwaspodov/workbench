@@ -35,7 +35,7 @@ Status: `TODO` · `IN PROGRESS` · `DONE` · `BLOCKED`
 | 8. Hardening & integrasi nyata | OD-36 … OD-42 | TODO |
 | 9. Rilis MVP internal | OD-43 … OD-44 | TODO |
 | 10. Confluence (read-only) | OD-54 | IN PROGRESS |
-| 11. Create PGP per tahun+kuartal & evidence otomatis | OD-71 … OD-73 (create), OD-68 … OD-70 (saran) | OD-71, OD-72 DONE, sisanya TODO |
+| 11. Create PGP per tahun+kuartal & evidence otomatis | OD-71 … OD-73 (create), OD-68 … OD-70 (saran) | OD-71 … OD-73 DONE, OD-68 … OD-70 TODO |
 
 **Urutan kerja berikutnya (disarankan):** OD-32 → OD-33 → OD-34 → OD-35 → OD-31 → OD-45 … OD-50 → OD-36 → sisanya.
 
@@ -450,10 +450,11 @@ Keamanan (SSRF & data): hanya host `docs.google.com` dengan id `[A-Za-z0-9_-]{20
 **Depends:** OD-71, OD-16.
 **Log:** 2026-11-10 — `/pgp` punya tombol Create PGP → `/pgp/new` dengan dua pilihan (daftar template yang pindah dari home, dan Upload Excel). Upload: preview yang bisa diedit (tab, tahun & kuartal dari nama tab, header dari meta sheet, item lewat `ItemsEditor`), centang "Also import progress and evidence", lalu Create → redirect ke `/pgp/plans/:id`; kuartal yang sama → pesan + link "Open existing PGP". Server: `POST /api/pgp/plans/import/xlsx/preview` (member, baca saja; tab bawaan = tab terbaru yang sudah berisi progress) dan `POST /api/pgp/plans/from-xlsx` (409 `PERIOD_EXISTS`, hanya link http(s) disimpan, achievement ≤ weight). Parser membaca kolom evidence (URL di teks dan hyperlink Excel tersembunyi, termasuk teks richText) dan status sheet dinormalisasi ke enum. Verifikasi: `bun run typecheck`, `bun run test` (101 lulus; `plan-import.test.ts` dengan workbook sintetis berisi sel merge, hyperlink tersembunyi, link `javascript:` yang ditolak, tab kosong vs terisi), `bun run build`, `bun run e2e` 14/14 (upload → preview → create → redirect → upload ulang ditolak; overflow 1440/1024/768 untuk Create PGP dicek pada jalur template). Dicek terhadap `Dwi Heru Waspodo Growth Plan.xlsx` (baca saja, lewat service): tab bawaan = Q3 - 2026 (2026 Q3), 29 item, 19 berstatus, 13 dengan link evidence, peringatan "Total weight is 95%" (angka dari sheet); tab Q4 - 26 = 18 item, 100%, tanpa progress. Belum dicoba lewat browser dengan file itu. Commit: lihat git log.
 
-### OD-73 · Template editor memakai pengekstrak & komponen upload yang sama · `TODO`
+### OD-73 · Template editor memakai pengekstrak & komponen upload yang sama · `DONE`
 **Description:** Tab "Upload Excel (.xlsx)" di editor template (admin) dipindah ke komponen bersama `XlsxImport` yang juga dipakai OD-72, dengan endpoint/parser yang sama (tab, preview, warnings, tebakan periode). Pada template hanya kolom planning yang diambil (progress/evidence diabaikan). Import Google Sheet (OD-19) tetap out of scope; OD-65 tetap usulan.
 **Acceptance:** Membuat template dari upload menghasilkan item & periode yang sama dengan pratinjau di Create-from-upload untuk file yang sama; tidak ada duplikasi kode upload/preview antara dua alur; test & e2e hijau.
 **Depends:** OD-72.
+**Log:** 2026-11-10 — Komponen bersama `XlsxImport.vue` (pilih file, pilih sheet, baca lewat loader) dan tipe `lib/xlsx-import.ts` dipakai Create PGP dan tab Upload Excel di editor template. Endpoint template `POST /api/pgp/templates/import/xlsx/preview` sekarang memanggil `PlanImportService.preview` yang sama (`TemplateService.previewXlsx` dihapus), jadi tab bawaan, tebakan periode, dan hasil parse identik; template hanya mengambil kolom planning dan mengisi periode dari nama tab. Import Google Sheet (OD-19) tidak berubah. Verifikasi: `bun run typecheck`, `bun run test` (101 lulus), `bun run build`, `bun run e2e` 15/15 (langkah baru: file xlsx yang sama diunggah di editor template → periode 2025-Q1, item 60/40 sama dengan Create PGP). Commit: lihat git log.
 
 ### OD-68 · API saran evidence per plan (epic, Confluence, story point per bulan, delivery rate) · `TODO`
 **Description:** Semua endpoint hanya untuk **owner plan** (403 untuk leader/admin karena memakai akun Atlassian si owner), mengembalikan **metadata saja** (key/judul/status/space/tanggal/url; tanpa isi atau deskripsi), memakai `year`/`quarter` plan (OD-71):

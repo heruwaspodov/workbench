@@ -3,7 +3,6 @@ import { db } from '../../db/client'
 import { plans, templateItems, templates, users, type User } from '../../db/schema'
 import { googleSheets, parseSpreadsheetId } from '../../integrations/google-sheets.client'
 import { BadRequestError, NotFoundError } from '../../shared/errors'
-import { ExcelService } from './excel.service'
 import type { TemplateItemInputT } from './model'
 import { parsePgpSheet, type ParsedSheet } from './sheet-parser'
 
@@ -109,12 +108,5 @@ export abstract class TemplateService {
   static async previewSheet(url: string, tab: string) {
     const id = parseSpreadsheetId(url)
     return { sourceRef: `https://docs.google.com/spreadsheets/d/${id}#${tab}`, ...safeParse(await googleSheets.values(id, tab)) }
-  }
-
-  static async previewXlsx(file: File, tab?: string) {
-    const book = await ExcelService.readWorkbook(await file.arrayBuffer())
-    const selected = tab && book.has(tab) ? tab : [...book.keys()][0]
-    if (!selected) throw new BadRequestError('Workbook has no sheets')
-    return { tabs: [...book.keys()], selectedTab: selected, sourceRef: `${file.name}#${selected}`, ...safeParse(book.get(selected)!) }
   }
 }

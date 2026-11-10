@@ -8,10 +8,12 @@ import { computed, onMounted, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import AsyncState from '@/components/AsyncState.vue'
 import ItemsEditor from '@/components/ItemsEditor.vue'
+import XlsxImport from '@/components/XlsxImport.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import { api, notifyError, notifySuccess, unwrap } from '@/lib/api'
 import { type EditableItem, guessPeriod, stripKeys, toEditable, totals } from '@/lib/pgp'
 import { ui } from '@/lib/ui'
+import type { XlsxLoader, XlsxPreview } from '@/lib/xlsx-import'
 import { useAsync } from '@/lib/use-async'
 
 const props = defineProps<{ id?: string }>()
@@ -72,7 +74,7 @@ function applyPreview(p: Preview, from: 'google_sheet' | 'xlsx') {
   warnings.value = p.warnings
   source.value = from
   sourceRef.value = p.sourceRef
-  if (p.meta.period) period.value = guessPeriod(`${p.meta.period} ${sheetTab.value}`)
+  if (from === 'google_sheet' && p.meta.period) period.value = guessPeriod(`${p.meta.period} ${sheetTab.value}`)
   notifySuccess(`${p.items.length} items imported, please review them`)
 }
 
@@ -83,25 +85,13 @@ async function previewSheet() {
   } catch (e) { notifyError(e) } finally { importing.value = false }
 }
 
-// ----- import: xlsx -----
-const xlsxFile = ref<File | null>(null)
-const xlsxTabs = ref<string[]>([])
-const xlsxTab = ref('')
-async function previewXlsx(tab?: string) {
-  if (!xlsxFile.value) return
-  importing.value = true
-  try {
-    const res = await unwrap(api.pgp.templates.import.xlsx.preview.post({ file: xlsxFile.value, tab }))
-    xlsxTabs.value = res.tabs
-    xlsxTab.value = res.selectedTab
-    sheetTab.value = res.selectedTab
-    applyPreview(res, 'xlsx')
-  } catch (e) { notifyError(e) } finally { importing.value = false }
-}
-function onFile(e: Event) {
-  xlsxFile.value = (e.target as HTMLInputElement).files?.[0] ?? null
-  if (!title.value && xlsxFile.value) title.value = xlsxFile.value.name.replace(/\.xlsx$/i, '')
-  previewXlsx()
+// ----- import: xlsx (same extractor and component as Create PGP; a template keeps the planning columns only) -----
+const loadXlsx: XlsxLoader = (file, tab) => unwrap(api.pgp.templates.import.xlsx.preview.post({ file, tab }))
+function onXlsx(p: XlsxPreview, file: File) {
+  sheetTab.value = p.selectedTab
+  if (!title.value) title.value = file.name.replace(/\.xlsx$/i, '')
+  if (p.suggestedPeriod) period.value = `${p.suggestedPeriod.year}-Q${p.suggestedPeriod.quarter}`
+  applyPreview(p, 'xlsx')
 }
 
 // ----- save -----
@@ -198,18 +188,7 @@ const row = css({ display: 'flex', gap: '2', alignItems: 'flex-end', flexWrap: '
             </div>
           </MpTabPanel>
           <MpTabPanel>
-            <div :class="row">
-              <MpFormControl>
-                <MpFormLabel>File .xlsx (Google Sheets → File → Download → Microsoft Excel)</MpFormLabel>
-                <input type="file" accept=".xlsx" @change="onFile" />
-              </MpFormControl>
-              <MpFormControl v-if="xlsxTabs.length > 1" :class="css({ minWidth: '220px' })">
-                <MpFormLabel>Sheet</MpFormLabel>
-                <MpSelect :model-value="xlsxTab" @change="(e: Event) => previewXlsx((e.target as HTMLSelectElement).value)">
-                  <option v-for="t in xlsxTabs" :key="t" :value="t">{{ t }}</option>
-                </MpSelect>
-              </MpFormControl>
-            </div>
+            <XlsxImport :load="loadXlsx" @loaded="onXlsx" />
           </MpTabPanel>
         </MpTabPanels>
       </MpTabs>

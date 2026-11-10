@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import {
-  MpBadge, MpBanner, MpBannerDescription, MpBannerTitle, MpButton, MpFormControl, MpFormHelpText, MpFormLabel, MpIcon, MpInput, MpSelect, MpText, css,
+  MpBadge, MpBanner, MpBannerDescription, MpBannerTitle, MpButton, MpFormControl, MpFormLabel, MpIcon, MpInput, MpSelect, MpText, css,
 } from '@mekari/pixel3'
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
@@ -8,8 +8,10 @@ import AsyncState from '@/components/AsyncState.vue'
 import ItemsEditor from '@/components/ItemsEditor.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import SegmentedControl from '@/components/SegmentedControl.vue'
+import XlsxImport from '@/components/XlsxImport.vue'
 import { ApiError, api, notifyError, unwrap } from '@/lib/api'
 import { type EditableItem, newKey, stripKeys, totals } from '@/lib/pgp'
+import type { XlsxLoader, XlsxPreview } from '@/lib/xlsx-import'
 import { ui } from '@/lib/ui'
 import { useAsync } from '@/lib/use-async'
 
@@ -49,45 +51,31 @@ async function start(templateId: string) {
 }
 
 // ----- from an Excel upload -----
-type Preview = Awaited<ReturnType<typeof loadPreview>>
-const loadPreview = async (file: File, tab?: string) => unwrap(api.pgp.plans.import.xlsx.preview.post({ file, tab }))
+const loadPreview: XlsxLoader = (file, tab) => unwrap(api.pgp.plans.import.xlsx.preview.post({ file, tab }))
 
-const file = ref<File | null>(null)
-const preview = ref<Preview | null>(null)
+const preview = ref<XlsxPreview | null>(null)
 const items = ref<EditableItem[]>([])
 const year = ref(String(new Date().getFullYear()))
 const quarter = ref('1')
 const header = ref({ division: '', sbu: '', sbuDetail: '', directLeader: '' })
 const withProgress = ref(true)
-const reading = ref(false)
 const saving = ref(false)
 const sum = computed(() => totals(items.value))
 const canMerge = computed(() => Boolean(preview.value && (preview.value.hasProgress || preview.value.hasEvidence)))
 
-async function read(tab?: string) {
-  if (!file.value) return
-  reading.value = true
+function onLoaded(p: XlsxPreview) {
   taken.value = null
-  try {
-    const p = await loadPreview(file.value, tab)
-    preview.value = p
-    items.value = p.items.map((i) => ({ ...i, status: i.status ?? 'not_started', _key: newKey() }))
-    if (p.suggestedPeriod) { year.value = String(p.suggestedPeriod.year); quarter.value = String(p.suggestedPeriod.quarter) }
-    header.value = {
-      division: p.meta.division ?? '', sbu: p.meta.sbu ?? '', sbuDetail: p.meta.sbuDetail ?? '', directLeader: p.meta.directLeader ?? '',
-    }
-    withProgress.value = p.hasProgress || p.hasEvidence
-  } catch (e) {
-    preview.value = null
-    items.value = []
-    notifyError(e)
-  } finally { reading.value = false }
+  preview.value = p
+  items.value = p.items.map((i) => ({ ...i, status: i.status ?? 'not_started', _key: newKey() }))
+  if (p.suggestedPeriod) { year.value = String(p.suggestedPeriod.year); quarter.value = String(p.suggestedPeriod.quarter) }
+  header.value = {
+    division: p.meta.division ?? '', sbu: p.meta.sbu ?? '', sbuDetail: p.meta.sbuDetail ?? '', directLeader: p.meta.directLeader ?? '',
+  }
+  withProgress.value = p.hasProgress || p.hasEvidence
 }
-function onFile(e: Event) {
-  file.value = (e.target as HTMLInputElement).files?.[0] ?? null
+function onCleared() {
   preview.value = null
   items.value = []
-  read()
 }
 
 const yearOk = computed(() => /^20\d{2}$/.test(year.value))
@@ -152,22 +140,7 @@ const noticeBox = `${ui.note} ${notice}`
   </AsyncState>
 
   <template v-else>
-    <div :class="card">
-      <div :class="row">
-        <MpFormControl>
-          <MpFormLabel>Excel file (.xlsx, up to 10 MB)</MpFormLabel>
-          <input type="file" accept=".xlsx" data-test="xlsx-file" @change="onFile" />
-          <MpFormHelpText>Google Sheets: File, Download, Microsoft Excel (.xlsx).</MpFormHelpText>
-        </MpFormControl>
-        <MpFormControl v-if="preview && preview.tabs.length > 1" :class="css({ minWidth: '220px' })">
-          <MpFormLabel>Sheet</MpFormLabel>
-          <MpSelect :model-value="preview.selectedTab" @change="(e: Event) => read((e.target as HTMLSelectElement).value)">
-            <option v-for="t in preview.tabs" :key="t" :value="t">{{ t }}</option>
-          </MpSelect>
-        </MpFormControl>
-        <MpText v-if="reading" size="label" color="text.secondary">Reading the file…</MpText>
-      </div>
-    </div>
+    <div :class="card"><XlsxImport :load="loadPreview" @loaded="onLoaded" @cleared="onCleared" /></div>
 
     <template v-if="preview">
       <div :class="card">

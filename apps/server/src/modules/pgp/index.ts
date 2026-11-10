@@ -20,7 +20,7 @@ const templateRoutes = new Elysia({ name: 'module.pgp.templates', prefix: '/temp
   // import helpers — preview only; the client then POSTs / with the (edited) items
   .get('/import/sheet/tabs', ({ query }) => TemplateService.sheetTabs(query.url), { admin: true, query: PgpModel.sheetTabsQuery })
   .get('/import/sheet/preview', ({ query }) => TemplateService.previewSheet(query.url, query.tab), { admin: true, query: PgpModel.sheetPreviewQuery })
-  .post('/import/xlsx/preview', ({ body }) => TemplateService.previewXlsx(body.file, body.tab), { admin: true, body: PgpModel.xlsxPreview })
+  .post('/import/xlsx/preview', ({ body }) => PlanImportService.preview(body.file, body.tab), { admin: true, body: PgpModel.xlsxPreview })
 
 const planRoutes = new Elysia({ name: 'module.pgp.plans', prefix: '/plans' })
   .use(authPlugin)
