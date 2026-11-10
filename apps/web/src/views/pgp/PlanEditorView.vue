@@ -71,7 +71,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 onBeforeRouteLeave(() => !dirty.value || window.confirm('Ada perubahan yang belum disimpan. Tinggalkan halaman?'))
 
 const card = css({ bg: 'background.surface', rounded: 'lg', borderWidth: '1px', borderColor: 'border.default', p: '5', mb: '4' })
-const headerGrid = css({ display: 'grid', gridTemplateColumns: { base: '1fr', md: 'repeat(4, 1fr)' }, gap: '4' })
+const headerGrid = css({ display: 'grid', gridTemplateColumns: { base: '1fr', md: 'repeat(2, 1fr)', xl: 'repeat(4, 1fr)' }, gap: '4' })
 const summary = css({ display: 'grid', gridTemplateColumns: { base: '1fr', md: '2fr 3fr' }, gap: '4', mb: '4' })
 const statRow = css({ display: 'flex', gap: '4', flexWrap: 'wrap' })
 const stat = css({ bg: 'background.neutral.subtle', rounded: 'md', px: '3', py: '2', minWidth: '140px' })

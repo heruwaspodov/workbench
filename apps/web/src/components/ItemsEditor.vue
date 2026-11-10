@@ -8,7 +8,7 @@ import {
   MpBadge, MpButton, MpInput, MpSelect, MpTable, MpTableBody, MpTableCell, MpTableContainer, MpTableHead, MpTableRow,
   MpText, MpTextarea, css,
 } from '@mekari/pixel3'
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import EvidenceLinks from './EvidenceLinks.vue'
 import RowActions from './RowActions.vue'
 import { type EditableItem, STATUS_OPTIONS, newKey, statusMeta, totals } from '@/lib/pgp'
@@ -25,6 +25,15 @@ const sum = computed(() => totals(items.value))
 /** First row of a run of identical objective / KR is where we print the group label in read-only mode. */
 const isGroupStart = (idx: number, key: 'objective' | 'keyResult') =>
   idx === 0 || items.value[idx - 1]![key] !== items.value[idx]![key] || (key === 'keyResult' && items.value[idx - 1]!.objective !== items.value[idx]!.objective)
+
+/** Rows that repeat the previous row's objective and KR collapse to a compact line while editing. */
+const isContinuation = (idx: number) =>
+  idx > 0 && items.value[idx - 1]!.objective === items.value[idx]!.objective && items.value[idx - 1]!.keyResult === items.value[idx]!.keyResult
+const startsObjective = (idx: number) => idx > 0 && items.value[idx - 1]!.objective !== items.value[idx]!.objective
+
+const expanded = ref(new Set<string>())
+const expand = (key: string) => { expanded.value = new Set(expanded.value).add(key) }
+const collapsed = (idx: number) => isContinuation(idx) && !expanded.value.has(items.value[idx]!._key)
 
 const num = (v: unknown) => {
   const n = Number.parseFloat(String(v ?? '').replace(',', '.'))
@@ -67,6 +76,8 @@ const wrap = css({ overflowX: 'auto', bg: 'background.surface', rounded: 'lg', b
 const th = css({ whiteSpace: 'nowrap' })
 const progressTh = css({ whiteSpace: 'nowrap', bg: 'background.highlight !important' })
 const cellTop = css({ verticalAlign: 'top' })
+const groupTop = css({ '& > td': { borderTopWidth: '2px', borderTopColor: 'border.default' } })
+const sameAsAbove = css({ display: 'flex', alignItems: 'center', gap: '2' })
 const stack = css({ display: 'flex', flexDirection: 'column', gap: '1.5' })
 const footer = css({ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '3', p: '3', borderTopWidth: '1px', borderColor: 'border.default', flexWrap: 'wrap' })
 const pre = css({ whiteSpace: 'pre-wrap' })
@@ -95,7 +106,7 @@ const pre = css({ whiteSpace: 'pre-wrap' })
         </MpTableHead>
 
         <MpTableBody>
-          <MpTableRow v-for="(item, idx) in items" :key="item._key">
+          <MpTableRow v-for="(item, idx) in items" :key="item._key" :class="startsObjective(idx) && groupTop">
             <MpTableCell :class="cellTop"><MpText size="label" color="text.secondary">{{ idx + 1 }}</MpText></MpTableCell>
 
             <!-- Objective / KR -->
@@ -103,6 +114,10 @@ const pre = css({ whiteSpace: 'pre-wrap' })
               <div v-if="planningLocked" :class="stack">
                 <MpText v-if="isGroupStart(idx, 'objective')" size="label" weight="semiBold">{{ item.objective }}</MpText>
                 <MpText v-if="isGroupStart(idx, 'keyResult')" size="label" color="text.secondary" :class="pre">{{ item.keyResult }}</MpText>
+              </div>
+              <div v-else-if="collapsed(idx)" :class="sameAsAbove">
+                <MpText size="label-small" color="text.secondary">↳ Objective &amp; KR sama dengan di atas</MpText>
+                <MpButton variant="ghost" size="sm" @click="expand(item._key)">Ubah</MpButton>
               </div>
               <div v-else :class="stack">
                 <MpInput size="sm" placeholder="Objective" :model-value="item.objective" @update:model-value="(v: string) => patch(idx, { objective: v })" />
