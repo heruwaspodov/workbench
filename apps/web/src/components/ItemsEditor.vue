@@ -72,14 +72,14 @@ const setStatus = (idx: number, e: Event) =>
   patch(idx, { status: (e.target as HTMLSelectElement).value as EditableItem['status'] })
 
 
-const wrap = css({ overflowX: 'auto', bg: 'background.surface', rounded: 'lg', borderWidth: '1px', borderColor: 'border.default' })
+const wrap = css({ overflowX: 'auto', bg: 'background.stage', rounded: 'xl', borderWidth: '1px', borderColor: 'border.default.subtle', shadow: 'xs' })
 const th = css({ whiteSpace: 'nowrap' })
 const progressTh = css({ whiteSpace: 'nowrap', bg: 'background.highlight !important' })
 const cellTop = css({ verticalAlign: 'top' })
 const groupTop = css({ '& > td': { borderTopWidth: '2px', borderTopColor: 'border.default' } })
 const sameAsAbove = css({ display: 'flex', alignItems: 'center', gap: '2' })
 const stack = css({ display: 'flex', flexDirection: 'column', gap: '1.5' })
-const footer = css({ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '3', p: '3', borderTopWidth: '1px', borderColor: 'border.default', flexWrap: 'wrap' })
+const footer = css({ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '3', p: '3', borderTopWidth: '1px', borderColor: 'border.default.subtle', flexWrap: 'wrap' })
 const pre = css({ whiteSpace: 'pre-wrap' })
 </script>
 
@@ -99,7 +99,7 @@ const pre = css({ whiteSpace: 'pre-wrap' })
               <MpTableCell as="th" :class="progressTh" :style="{ minWidth: '140px' }">Current</MpTableCell>
               <MpTableCell as="th" :class="progressTh" :style="{ width: '104px' }">Achv %</MpTableCell>
               <MpTableCell as="th" :class="progressTh" :style="{ minWidth: '150px' }">Status</MpTableCell>
-              <MpTableCell as="th" :class="progressTh" :style="{ minWidth: '240px' }">Evidence (1 link / baris)</MpTableCell>
+              <MpTableCell as="th" :class="progressTh" :style="{ minWidth: '240px' }">Evidence (one link per line)</MpTableCell>
             </template>
             <MpTableCell v-if="!readonly" as="th" :class="th" :style="{ width: '120px' }" />
           </MpTableRow>
@@ -116,8 +116,8 @@ const pre = css({ whiteSpace: 'pre-wrap' })
                 <MpText v-if="isGroupStart(idx, 'keyResult')" size="label" color="text.secondary" :class="pre">{{ item.keyResult }}</MpText>
               </div>
               <div v-else-if="collapsed(idx)" :class="sameAsAbove">
-                <MpText size="label-small" color="text.secondary">↳ Objective &amp; KR sama dengan di atas</MpText>
-                <MpButton variant="ghost" size="sm" @click="expand(item._key)">Ubah</MpButton>
+                <MpText size="label-small" color="text.secondary">↳ Same objective &amp; KR as above</MpText>
+                <MpButton variant="ghost" size="sm" @click="expand(item._key)">Edit</MpButton>
               </div>
               <div v-else :class="stack">
                 <MpInput size="sm" placeholder="Objective" :model-value="item.objective" @update:model-value="(v: string) => patch(idx, { objective: v })" />
@@ -135,7 +135,7 @@ const pre = css({ whiteSpace: 'pre-wrap' })
             <!-- Initiative -->
             <MpTableCell :class="cellTop">
               <MpText v-if="planningLocked" size="label" :class="pre">{{ item.initiative }}</MpText>
-              <MpTextarea v-else placeholder="Initiative / target terukur" :model-value="item.initiative"
+              <MpTextarea v-else placeholder="Initiative / measurable target" :model-value="item.initiative"
                 @update:model-value="(v: string) => patch(idx, { initiative: v })" />
             </MpTableCell>
 
@@ -150,7 +150,7 @@ const pre = css({ whiteSpace: 'pre-wrap' })
                 <MpInput v-else size="sm" type="number" min="0" :max="item.weight" step="0.5" :model-value="item.achievement ?? ''"
                   :is-invalid="(item.achievement ?? 0) > item.weight"
                   @update:model-value="(v: string) => patch(idx, { achievement: numOrNull(v) })" />
-                <MpText v-if="!readonly" size="label-small" color="text.secondary">maks {{ item.weight }}</MpText>
+                <MpText v-if="!readonly" size="label-small" color="text.secondary">max {{ item.weight }}</MpText>
               </MpTableCell>
               <MpTableCell :class="cellTop">
                 <MpBadge v-if="readonly" variant="subtle" :variant-color="statusMeta(item.status ?? 'not_started').color">
@@ -175,7 +175,7 @@ const pre = css({ whiteSpace: 'pre-wrap' })
 
           <MpTableRow v-if="!items.length">
             <MpTableCell :colspan="isPlan ? 11 : 5">
-              <MpText color="text.secondary">Belum ada item.</MpText>
+              <MpText color="text.secondary">No items yet.</MpText>
             </MpTableCell>
           </MpTableRow>
         </MpTableBody>
@@ -183,7 +183,7 @@ const pre = css({ whiteSpace: 'pre-wrap' })
     </MpTableContainer>
 
     <div :class="footer">
-      <MpButton v-if="!planningLocked" variant="secondary" size="sm" left-icon="add" @click="addNew">Tambah item</MpButton>
+      <MpButton v-if="!planningLocked" variant="secondary" size="sm" left-icon="add" @click="addNew">Add item</MpButton>
       <span v-else />
       <div :class="css({ display: 'flex', gap: '4', alignItems: 'center' })">
         <MpText size="label">

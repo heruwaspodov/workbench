@@ -110,8 +110,8 @@ await step('admin creates & publishes template (API), shown on home', async () =
   const t = await api('POST', '/api/pgp/templates', {
     title, period: '2026-Q4',
     items: [
-      { objective: 'Reliability', keyResult: 'SLO 99.9%', weight: 60, initiative: 'Perbaiki alert' },
-      { objective: 'Delivery', keyResult: 'Rilis 3 fitur', weight: 40, initiative: 'Sprint planning' },
+      { objective: 'Reliability', keyResult: 'SLO 99.9%', weight: 60, initiative: 'Fix noisy alerts' },
+      { objective: 'Delivery', keyResult: 'Ship 3 features', weight: 40, initiative: 'Sprint planning' },
     ],
   })
   await api('PATCH', `/api/pgp/templates/${t.id}`, { status: 'published' })
@@ -131,7 +131,7 @@ await step('connect Jira, Bitbucket and board (API), connections page', async ()
 await step('pick the Kanban board by pasting its Jira URL (Connections)', async () => {
   await api('PUT', '/api/connections/jira/board', { boardId: null })
   await page.goto(`${APP}/connections`)
-  const box = page.getByPlaceholder('Nama, project key (MESIGN), atau URL board')
+  const box = page.getByPlaceholder('Name, project key (MESIGN) or board URL')
   await box.fill('https://example.atlassian.net/jira/software/c/projects/MESIGN/boards/7?assignee=abc')
   await box.press('Enter')
   await page.waitForFunction(async () => (await (await fetch('/api/connections')).json()).jira.boardName === 'MESIGN board', undefined, { timeout: 10_000 })
@@ -140,20 +140,20 @@ await step('pick the Kanban board by pasting its Jira URL (Connections)', async 
 
 await step('open plan, fill achievement, save', async () => {
   await page.goto(`${APP}/pgp`)
-  await page.getByRole('button', { name: 'Isi PGP ini' }).first().click()
+  await page.getByRole('button', { name: 'Fill in this PGP' }).first().click()
   await page.waitForURL(/\/pgp\/plans\/[0-9a-f-]{36}$/)
   planId = page.url().split('/').pop()!
   const input = page.locator('input[type=number][max]').first()
   await input.waitFor()
   await input.fill('5')
-  await page.getByRole('button', { name: 'Simpan', exact: true }).click()
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
   await page.waitForFunction(async (id) => (await (await fetch(`/api/pgp/plans/${id}`)).json()).score > 0, planId, { timeout: 10_000 })
   await shot('02-plan-editor')
 })
 
 await step('plan editor shows Confluence evidence card (no page body)', async () => {
   await page.goto(`${APP}/pgp/plans/${planId}`)
-  await text(page, 'Dokumen Confluence kamu')
+  await text(page, 'Your Confluence pages')
   await text(page, 'Runbook Signing')
   if (await page.getByText('CONFIDENTIAL BODY TEXT').count()) throw new Error('page body/excerpt leaked into the UI')
   await shot('02b-plan-confluence')
@@ -165,8 +165,8 @@ await step('My Confluence lists, searches and links my pages', async () => {
   await text(page, 'Roadmap Q4')
   const href = await page.getByRole('link', { name: 'Runbook Signing' }).first().getAttribute('href')
   if (!href?.startsWith('http://localhost:4010/wiki/spaces/')) throw new Error(`unexpected link ${href}`)
-  await page.getByPlaceholder('Cari judul halaman').fill('runbook')
-  await page.getByRole('button', { name: 'Cari' }).click()
+  await page.getByPlaceholder('Search page titles').fill('runbook')
+  await page.getByRole('button', { name: 'Search' }).click()
   await page.getByText('Postmortem SEV1').first().waitFor({ state: 'detached', timeout: 8000 })
   await text(page, 'Runbook Signing')
   if (await page.getByText('CONFIDENTIAL BODY TEXT').count()) throw new Error('page body/excerpt leaked into the UI')
@@ -175,17 +175,17 @@ await step('My Confluence lists, searches and links my pages', async () => {
 
 await step('kanban shows columns and cards', async () => {
   await page.goto(`${APP}/kanban`)
-  await text(page, 'Rapikan endpoint signing')
+  await text(page, 'Tidy up the signing endpoint')
   await text(page, 'In Progress')
   await shot('04-kanban')
 })
 
 await step('issue drawer opens with panel and overlay', async () => {
-  await page.getByText('Tambah retry webhook').first().click()
-  await text(page, 'Deskripsi sintetis untuk Tambah retry webhook')
+  await page.getByText('Add webhook retries').first().click()
+  await text(page, 'Synthetic description for Add webhook retries')
   await page.waitForTimeout(800)
   const layout = await page.evaluate(() => {
-    const el = [...document.querySelectorAll('*')].find((n) => n.children.length === 0 && n.textContent?.includes('Deskripsi sintetis untuk'))
+    const el = [...document.querySelectorAll('*')].find((n) => n.children.length === 0 && n.textContent?.includes('Synthetic description for'))
     let panel: Element | null = el ?? null
     while (panel && getComputedStyle(panel).position !== 'fixed') panel = panel.parentElement
     const overlay = [...document.querySelectorAll('div')].some((d) => {
@@ -203,20 +203,20 @@ await step('issue drawer opens with panel and overlay', async () => {
 
 await step('PR list (author and reviewer)', async () => {
   await page.goto(`${APP}/pull-requests`)
-  await text(page, 'MESIGN-101 Rapikan endpoint signing')
+  await text(page, 'MESIGN-101 Tidy up the signing endpoint')
   await shot('06-pr-author')
-  await page.getByRole('button', { name: 'Perlu review saya' }).click()
-  await text(page, 'MESIGN-104 Migrasi template email')
+  await page.getByRole('button', { name: 'Needs my review' }).click()
+  await text(page, 'MESIGN-104 Migrate the email template')
   await shot('07-pr-reviewer')
 })
 
 await step('PR detail shows files and diff', async () => {
-  await page.getByRole('button', { name: 'Dibuat saya' }).click()
-  await page.getByText('MESIGN-101 Rapikan endpoint signing').first().click()
+  await page.getByRole('button', { name: 'Created by me' }).click()
+  await page.getByText('MESIGN-101 Tidy up the signing endpoint').first().click()
   await page.waitForURL(/\/pull-requests\/msign-backend\/101$/)
   await page.getByRole('tab', { name: /^Files/ }).click()
   await text(page, 'app/signing.rb')
-  await page.getByRole('button', { name: 'Tampilkan diff' }).first().click()
+  await page.getByRole('button', { name: 'Show diff' }).first().click()
   await text(page, 'class Signing')
   await shot('08-pr-detail-diff')
 })
@@ -226,7 +226,7 @@ await step('templates list and new template page', async () => {
   await text(page, title)
   await shot('09-templates')
   await page.goto(`${APP}/pgp/templates/new`)
-  await text(page, 'Buat template')
+  await text(page, 'Create template')
   await shot('10-template-new')
 })
 

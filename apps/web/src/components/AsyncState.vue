@@ -18,25 +18,25 @@ const center = css({ display: 'flex', flexDirection: 'column', alignItems: 'cent
 <template>
   <div v-if="loading" :class="center"><MpSpinner /></div>
   <MpBanner v-else-if="needsConnection" variant="warning">
-    <MpBannerTitle>Akun belum terhubung</MpBannerTitle>
+    <MpBannerTitle>Account not connected</MpBannerTitle>
     <MpBannerDescription>
       {{ message }}
-      <RouterLink to="/connections"><MpButton size="sm" variant="secondary" :class="css({ mt: '2' })">Buka Connections</MpButton></RouterLink>
+      <RouterLink to="/connections"><MpButton size="sm" variant="secondary" :class="css({ mt: '2' })">Open Connections</MpButton></RouterLink>
     </MpBannerDescription>
   </MpBanner>
   <MpBanner v-else-if="notConfigured" variant="info">
-    <MpBannerTitle>Integrasi belum dikonfigurasi</MpBannerTitle>
-    <MpBannerDescription>{{ message }}. Hubungi admin One Desk.</MpBannerDescription>
+    <MpBannerTitle>Integration not configured</MpBannerTitle>
+    <MpBannerDescription>{{ message }}. Contact a One Desk admin.</MpBannerDescription>
   </MpBanner>
   <MpBanner v-else-if="error" variant="danger">
-    <MpBannerTitle>Gagal memuat data</MpBannerTitle>
+    <MpBannerTitle>Could not load data</MpBannerTitle>
     <MpBannerDescription>
       {{ message }}
-      <MpButton size="sm" variant="secondary" :class="css({ mt: '2' })" @click="$emit('retry')">Coba lagi</MpButton>
+      <MpButton size="sm" variant="secondary" :class="css({ mt: '2' })" @click="$emit('retry')">Try again</MpButton>
     </MpBannerDescription>
   </MpBanner>
   <div v-else-if="empty" :class="center">
-    <MpText color="text.secondary">{{ emptyText ?? 'Belum ada data' }}</MpText>
+    <MpText color="text.secondary">{{ emptyText ?? 'Nothing here yet' }}</MpText>
     <slot name="empty" />
   </div>
   <slot v-else />

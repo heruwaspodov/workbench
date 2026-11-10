@@ -31,7 +31,7 @@ const periodOptions = computed(() => {
   return current && !list.includes(current) ? [current, ...list] : list
 })
 
-const label = (plan: { status: string } | null) => (!plan ? 'Belum mulai' : plan.status === 'submitted' ? 'Submitted' : 'Draft')
+const label = (plan: { status: string } | null) => (!plan ? 'Not started' : plan.status === 'submitted' ? 'Submitted' : 'Draft')
 const color = (plan: { status: string } | null) => (!plan ? 'gray' : plan.status === 'submitted' ? 'green' : 'orange')
 
 const bar = css({ display: 'flex', alignItems: 'flex-end', gap: '3', mb: '4' })
@@ -41,7 +41,7 @@ const actions = css({ display: 'flex', gap: '2', justifyContent: 'flex-end' })
 </script>
 
 <template>
-  <PageHeader title="Tim Saya" subtitle="PGP direct report kamu per quarter. Hanya baca." />
+  <PageHeader title="My Team" subtitle="Your direct reports' PGP per quarter. Read-only." />
 
   <div :class="bar">
     <MpFormControl :class="css({ width: '200px' })">
@@ -53,17 +53,17 @@ const actions = css({ display: 'flex', gap: '2', justifyContent: 'flex-end' })
   </div>
 
   <AsyncState :loading="team.loading.value && !team.data.value" :error="team.error.value"
-    :empty="team.data.value?.members.length === 0" empty-text="Belum ada direct report aktif." @retry="team.run(period)">
+    :empty="team.data.value?.members.length === 0" empty-text="No active direct reports yet." @retry="team.run(period)">
     <div v-if="team.data.value" :class="wrap">
       <MpTableContainer>
         <MpTable>
           <MpTableHead>
             <MpTableRow>
-              <MpTableCell as="th">Nama</MpTableCell>
-              <MpTableCell as="th">Status PGP</MpTableCell>
+              <MpTableCell as="th">Name</MpTableCell>
+              <MpTableCell as="th">PGP status</MpTableCell>
               <MpTableCell as="th">Score</MpTableCell>
               <MpTableCell as="th">Total weight</MpTableCell>
-              <MpTableCell as="th">Terakhir update</MpTableCell>
+              <MpTableCell as="th">Last updated</MpTableCell>
               <MpTableCell as="th" />
             </MpTableRow>
           </MpTableHead>
@@ -84,7 +84,7 @@ const actions = css({ display: 'flex', gap: '2', justifyContent: 'flex-end' })
               <MpTableCell>{{ m.plan ? timeAgo(m.plan.updatedAt) : '-' }}</MpTableCell>
               <MpTableCell>
                 <div v-if="m.plan" :class="actions">
-                  <RouterLink :to="`/pgp/plans/${m.plan.planId}`"><MpButton size="sm" variant="secondary">Lihat</MpButton></RouterLink>
+                  <RouterLink :to="`/pgp/plans/${m.plan.planId}`"><MpButton size="sm" variant="secondary">View</MpButton></RouterLink>
                   <a :href="`/api/pgp/plans/${m.plan.planId}/export`"><MpButton size="sm" variant="ghost" left-icon="excel-document">Export</MpButton></a>
                 </div>
               </MpTableCell>

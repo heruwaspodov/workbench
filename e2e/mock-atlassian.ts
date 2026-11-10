@@ -40,21 +40,21 @@ const issue = (n: number, summary: string, st: typeof S.todo, sp: number | null,
     customfield_10016: sp,
     customfield_10020: [{ name: 'Sprint 42' }],
     resolutiondate: resolvedDaysAgo === undefined ? null : iso(resolvedDaysAgo),
-    description: adf(`Deskripsi sintetis untuk ${summary}.`),
+    description: adf(`Synthetic description for ${summary}.`),
     assignee: jiraUser,
-    reporter: { ...jiraUser, displayName: 'Reporter Uji' },
+    reporter: { ...jiraUser, displayName: 'Test Reporter' },
     parent: null,
-    subtasks: [{ key: `MESIGN-${n}1`, fields: { summary: 'Subtask uji', status: S.todo } }],
+    subtasks: [{ key: `MESIGN-${n}1`, fields: { summary: 'Test subtask', status: S.todo } }],
     components: [{ name: 'api' }],
     fixVersions: [],
   },
 })
 const issues = [
-  issue(101, 'Rapikan endpoint signing', S.todo, 3),
-  issue(102, 'Tambah retry webhook', S.doing, 5),
-  issue(103, 'Perbaiki alert SLO', S.doing, 2),
-  issue(104, 'Migrasi template email', S.done, 8, 2),
-  issue(105, 'Hapus flag lama', S.done, 1, 5),
+  issue(101, 'Tidy up the signing endpoint', S.todo, 3),
+  issue(102, 'Add webhook retries', S.doing, 5),
+  issue(103, 'Fix SLO alerts', S.doing, 2),
+  issue(104, 'Migrate the email template', S.done, 8, 2),
+  issue(105, 'Remove the old flag', S.done, 1, 5),
 ]
 
 // ---------- Confluence (search only; excerpt included on purpose, the app must never forward it) ----------
@@ -99,7 +99,7 @@ function jiraRoute(path: string, url: URL, method: string): Response | null {
   if (m) {
     const found = issues.find((i) => i.key === m[1])
     if (!found) return json({ errorMessages: ['Issue does not exist'] }, 404)
-    if (m[2]) return json({ comments: [{ id: '1', author: jiraUser, body: adf('Komentar sintetis.'), created: iso(1) }] })
+    if (m[2]) return json({ comments: [{ id: '1', author: jiraUser, body: adf('Synthetic comment.'), created: iso(1) }] })
     return json(found)
   }
   return null
@@ -110,12 +110,12 @@ const DEV = '{00000000-0000-4000-8000-000000000001}'
 const OTHER = '{00000000-0000-4000-8000-000000000002}'
 const bbUser = (uuid: string, name: string, account?: string) => ({ uuid, display_name: name, nickname: name, account_id: account, links: { avatar: { href: '' } } })
 const dev = bbUser(DEV, 'Dev Mekari', 'acc-dev')
-const other = bbUser(OTHER, 'Rekan Uji', 'acc-other')
+const other = bbUser(OTHER, 'Test Colleague', 'acc-other')
 
 const pr = (id: number, repo: string, title: string, author: typeof dev, state: 'OPEN' | 'MERGED', reviewers: (typeof dev)[]) => ({
   id,
   title,
-  description: `Deskripsi sintetis PR ${id}. Terkait MESIGN-10${id % 5}.`,
+  description: `Synthetic description of PR ${id}. Related to MESIGN-10${id % 5}.`,
   state,
   draft: false,
   author,
@@ -123,7 +123,7 @@ const pr = (id: number, repo: string, title: string, author: typeof dev, state: 
   updated_on: iso(1),
   comment_count: 1,
   task_count: 0,
-  source: { branch: { name: `feature/MESIGN-10${id % 5}-uji` }, repository: { full_name: `${WS}/${repo}`, name: repo } },
+  source: { branch: { name: `feature/MESIGN-10${id % 5}-test` }, repository: { full_name: `${WS}/${repo}`, name: repo } },
   destination: { branch: { name: 'main' }, repository: { full_name: `${WS}/${repo}`, name: repo } },
   reviewers,
   participants: reviewers.map((u) => ({ user: u, role: 'REVIEWER', approved: false, state: null })),
@@ -131,10 +131,10 @@ const pr = (id: number, repo: string, title: string, author: typeof dev, state: 
   merge_commit: null,
 })
 const prs = [
-  pr(101, 'msign-backend', 'MESIGN-101 Rapikan endpoint signing', dev, 'OPEN', [other]),
-  pr(102, 'msign-web', 'MESIGN-102 Tambah retry webhook', dev, 'OPEN', [other]),
-  pr(103, 'msign-web', 'MESIGN-103 Hapus flag lama', dev, 'MERGED', [other]),
-  pr(201, 'msign-web', 'MESIGN-104 Migrasi template email', other, 'OPEN', [dev]),
+  pr(101, 'msign-backend', 'MESIGN-101 Tidy up the signing endpoint', dev, 'OPEN', [other]),
+  pr(102, 'msign-web', 'MESIGN-102 Add webhook retries', dev, 'OPEN', [other]),
+  pr(103, 'msign-web', 'MESIGN-103 Remove the old flag', dev, 'MERGED', [other]),
+  pr(201, 'msign-web', 'MESIGN-104 Migrate the email template', other, 'OPEN', [dev]),
 ]
 
 const diff = `diff --git a/app/signing.rb b/app/signing.rb
@@ -171,10 +171,10 @@ function bbRoute(path: string, url: URL): Response | null {
     switch (m[3]) {
       case undefined: return json(found)
       case 'diffstat': return paged([{ status: 'modified', lines_added: 3, lines_removed: 1, old: { path: 'app/signing.rb' }, new: { path: 'app/signing.rb' } }])
-      case 'commits': return paged([{ hash: 'abc1234def5678', message: 'Uji commit', date: iso(2), author: { raw: 'Dev Mekari <dev@mekari.com>', user: dev } }])
+      case 'commits': return paged([{ hash: 'abc1234def5678', message: 'Test commit', date: iso(2), author: { raw: 'Dev Mekari <dev@mekari.com>', user: dev } }])
       case 'comments': return paged([
-        { id: 1, content: { raw: 'Komentar umum sintetis.' }, user: other, created_on: iso(1) },
-        { id: 2, content: { raw: 'Komentar inline sintetis.' }, user: other, created_on: iso(1), inline: { path: 'app/signing.rb', to: 2 } },
+        { id: 1, content: { raw: 'Synthetic general comment.' }, user: other, created_on: iso(1) },
+        { id: 2, content: { raw: 'Synthetic inline comment.' }, user: other, created_on: iso(1), inline: { path: 'app/signing.rb', to: 2 } },
       ])
       case 'statuses': return paged([{ key: 'ci', name: 'CI', state: 'SUCCESSFUL', url: 'https://ci.example.test/1', updated_on: iso(1) }])
       case 'diff': return new Response(diff, { headers: { 'content-type': 'text/plain' } })

@@ -8,6 +8,7 @@ import AsyncState from '@/components/AsyncState.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import { api, notifyError, unwrap } from '@/lib/api'
 import { formatDate, timeAgo } from '@/lib/format'
+import { ui } from '@/lib/ui'
 import { useAsync } from '@/lib/use-async'
 import IssueDrawer from '../kanban/IssueDrawer.vue'
 import { buildColor, prStateColor } from './pr-ui'
@@ -34,7 +35,7 @@ const FILE_STATUS = { added: 'green', removed: 'red', modified: 'blue', renamed:
 const fileColor = (s: string) => FILE_STATUS[s as keyof typeof FILE_STATUS] ?? 'gray'
 
 const layout = css({ display: 'grid', gridTemplateColumns: { base: '1fr', xl: '1fr 320px' }, gap: '4', alignItems: 'start' })
-const card = css({ bg: 'background.surface', rounded: 'lg', borderWidth: '1px', borderColor: 'border.default', p: '5' })
+const card = ui.card
 const side = css({ display: 'flex', flexDirection: 'column', gap: '4' })
 const pre = css({ whiteSpace: 'pre-wrap', wordBreak: 'break-word' })
 const branch = css({ fontFamily: 'mono', fontSize: 'xs', bg: 'background.neutral', px: '1.5', py: '0.5', rounded: 'sm' })
@@ -53,12 +54,12 @@ const comment = css({ display: 'flex', gap: '3', py: '3', borderBottomWidth: '1p
 <template>
   <AsyncState :loading="loading && !pr" :error="error" @retry="run">
     <template v-if="pr">
-      <PageHeader :title="`#${pr.id} ${pr.title}`" :subtitle="`${pr.repo} · dibuat ${formatDate(pr.createdOn)} oleh ${pr.author.name}`">
+      <PageHeader :title="`#${pr.id} ${pr.title}`" :subtitle="`${pr.repo} · created ${formatDate(pr.createdOn)} by ${pr.author.name}`">
         <template #before-title>
           <RouterLink to="/pull-requests"><MpButton variant="textLink" size="sm" left-icon="chevrons-left">Pull Requests</MpButton></RouterLink>
         </template>
         <MpBadge variant="subtle" :variant-color="prStateColor(pr.state)">{{ pr.state }}</MpBadge>
-        <a :href="pr.url" target="_blank" rel="noopener noreferrer"><MpButton variant="secondary" right-icon="newtab">Buka di Bitbucket</MpButton></a>
+        <a :href="pr.url" target="_blank" rel="noopener noreferrer"><MpButton variant="secondary" right-icon="newtab">Open in Bitbucket</MpButton></a>
       </PageHeader>
 
       <div :class="layout">
@@ -77,7 +78,7 @@ const comment = css({ display: 'flex', gap: '3', py: '3', borderBottomWidth: '1p
                   <MpText size="label" color="text.success">+{{ pr.totals.added }}</MpText>
                   <MpText size="label" color="text.danger">−{{ pr.totals.removed }}</MpText>
                 </div>
-                <MpText size="label" :class="pre">{{ pr.description || 'Tidak ada deskripsi.' }}</MpText>
+                <MpText size="label" :class="pre">{{ pr.description || 'No description.' }}</MpText>
               </MpTabPanel>
 
               <MpTabPanel>
@@ -92,9 +93,9 @@ const comment = css({ display: 'flex', gap: '3', py: '3', borderBottomWidth: '1p
                   </MpText>
                 </div>
                 <div :class="css({ mt: '4' })">
-                  <MpButton v-if="!diff" variant="secondary" size="sm" :is-loading="diffLoading" @click="loadDiff">Tampilkan diff</MpButton>
+                  <MpButton v-if="!diff" variant="secondary" size="sm" :is-loading="diffLoading" @click="loadDiff">Show diff</MpButton>
                   <template v-else>
-                    <MpText v-if="diff.truncated" size="label-small" color="text.warning" :class="css({ mb: '2' })">Diff terlalu besar, ditampilkan sebagian. Buka di Bitbucket untuk versi lengkap.</MpText>
+                    <MpText v-if="diff.truncated" size="label-small" color="text.warning" :class="css({ mb: '2' })">The diff is too large and is shown in part. Open it in Bitbucket for the full version.</MpText>
                     <div :class="diffBox"><span v-for="(l, i) in diffLines" :key="i" :class="diffClass[l.kind as keyof typeof diffClass]">{{ l.text || ' ' }}</span></div>
                   </template>
                 </div>
@@ -111,7 +112,7 @@ const comment = css({ display: 'flex', gap: '3', py: '3', borderBottomWidth: '1p
               </MpTabPanel>
 
               <MpTabPanel>
-                <MpText v-if="!pr.comments.length" color="text.secondary">Belum ada komentar.</MpText>
+                <MpText v-if="!pr.comments.length" color="text.secondary">No comments yet.</MpText>
                 <div v-for="c in pr.comments" :key="c.id" :class="comment">
                   <MpAvatar :name="c.author" :src="c.avatarUrl ?? undefined" size="sm" />
                   <div :class="css({ minWidth: 0 })">
@@ -128,7 +129,7 @@ const comment = css({ display: 'flex', gap: '3', py: '3', borderBottomWidth: '1p
         <aside :class="side">
           <div :class="card">
             <MpText weight="semiBold" :class="css({ mb: '2' })">Reviewers</MpText>
-            <MpText v-if="!pr.reviewers.length" size="label" color="text.secondary">Belum ada reviewer.</MpText>
+            <MpText v-if="!pr.reviewers.length" size="label" color="text.secondary">No reviewers yet.</MpText>
             <div v-for="r in pr.reviewers" :key="r.name" :class="listRow">
               <div :class="css({ display: 'flex', gap: '2', alignItems: 'center' })">
                 <MpAvatar :name="r.name" :src="r.avatarUrl ?? undefined" size="sm" />
@@ -142,7 +143,7 @@ const comment = css({ display: 'flex', gap: '3', py: '3', borderBottomWidth: '1p
 
           <div :class="card">
             <MpText weight="semiBold" :class="css({ mb: '2' })">Builds</MpText>
-            <MpText v-if="!pr.builds.length" size="label" color="text.secondary">Tidak ada build status.</MpText>
+            <MpText v-if="!pr.builds.length" size="label" color="text.secondary">No build statuses.</MpText>
             <div v-for="b in pr.builds" :key="b.key" :class="listRow">
               <a v-if="b.url" :href="b.url" target="_blank" rel="noopener noreferrer" :class="css({ color: 'text.link', fontSize: 'sm' })">{{ b.name }}</a>
               <MpText v-else size="label">{{ b.name }}</MpText>

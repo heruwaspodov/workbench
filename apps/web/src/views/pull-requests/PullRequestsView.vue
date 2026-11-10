@@ -1,14 +1,16 @@
 <script setup lang="ts">
 import {
-  MpAvatar, MpAvatarGroup, MpBadge, MpButton, MpButtonGroup, MpIcon, MpSelect, MpTable, MpTableBody, MpTableCell,
+  MpAvatar, MpAvatarGroup, MpBadge, MpButton, MpIcon, MpSelect, MpTable, MpTableBody, MpTableCell,
   MpTableContainer, MpTableHead, MpTableRow, MpText, css,
 } from '@mekari/pixel3'
 import { onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import AsyncState from '@/components/AsyncState.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import SegmentedControl from '@/components/SegmentedControl.vue'
 import { api, unwrap } from '@/lib/api'
 import { timeAgo } from '@/lib/format'
+import { ui } from '@/lib/ui'
 import { useAsync } from '@/lib/use-async'
 import { prStateColor } from './pr-ui'
 
@@ -30,36 +32,38 @@ watch(page, run)
 
 const open = (r: string, id: number) => router.push(`/pull-requests/${r}/${id}`)
 
-const toolbar = css({ display: 'flex', gap: '3', alignItems: 'center', mb: '4', flexWrap: 'wrap' })
-const wrap = css({ bg: 'background.surface', rounded: 'lg', borderWidth: '1px', borderColor: 'border.default', overflowX: 'auto' })
 const rowCls = css({ cursor: 'pointer' })
 const branch = css({ fontFamily: 'mono', fontSize: 'xs', bg: 'background.neutral', px: '1.5', py: '0.5', rounded: 'sm', whiteSpace: 'nowrap' })
-const pager = css({ display: 'flex', justifyContent: 'flex-end', gap: '2', p: '3' })
+const pager = css({ display: 'flex', justifyContent: 'flex-end', gap: '2', p: '3', borderTopWidth: '1px', borderColor: 'border.default.subtle' })
 </script>
 
 <template>
-  <PageHeader title="Pull Requests" subtitle="PR Bitbucket kamu dari semua repo yang kamu kerjakan.">
+  <PageHeader title="Pull Requests" subtitle="Your Bitbucket pull requests across every repository you work in.">
     <MpButton variant="secondary" left-icon="refresh" :is-loading="loading" @click="run">Refresh</MpButton>
   </PageHeader>
 
-  <div :class="toolbar">
-    <MpButtonGroup>
-      <MpButton size="sm" :variant="role === 'author' ? 'primary' : 'secondary'" @click="role = 'author'">Dibuat saya</MpButton>
-      <MpButton size="sm" :variant="role === 'reviewer' ? 'primary' : 'secondary'" @click="role = 'reviewer'">Perlu review saya</MpButton>
-    </MpButtonGroup>
-    <MpSelect v-model="state" size="sm" :class="css({ width: '160px' })">
-      <option value="OPEN">Open</option>
-      <option value="MERGED">Merged</option>
-      <option value="DECLINED">Declined</option>
-      <option value="ALL">Semua state</option>
-    </MpSelect>
-    <MpSelect v-model="repo" size="sm" placeholder="Semua repo" is-clearable :class="css({ width: '220px' })">
-      <option v-for="r in repos ?? []" :key="r" :value="r">{{ r }}</option>
-    </MpSelect>
+  <div :class="ui.toolbar">
+    <SegmentedControl v-model="role" label="Role" :options="[
+      { value: 'author', label: 'Created by me' },
+      { value: 'reviewer', label: 'Needs my review' },
+    ]" />
+    <div :class="ui.field">
+      <MpSelect v-model="state" size="sm">
+        <option value="OPEN">Open</option>
+        <option value="MERGED">Merged</option>
+        <option value="DECLINED">Declined</option>
+        <option value="ALL">All states</option>
+      </MpSelect>
+    </div>
+    <div :class="ui.field">
+      <MpSelect v-model="repo" size="sm" placeholder="All repositories" is-clearable>
+        <option v-for="r in repos ?? []" :key="r" :value="r">{{ r }}</option>
+      </MpSelect>
+    </div>
   </div>
 
-  <AsyncState :loading="loading && !data" :error="error" :empty="data?.items.length === 0" empty-text="Tidak ada pull request." @retry="run">
-    <div v-if="data" :class="wrap">
+  <AsyncState :loading="loading && !data" :error="error" :empty="data?.items.length === 0" empty-text="No pull requests." @retry="run">
+    <div v-if="data" :class="ui.panel">
       <MpTableContainer>
         <MpTable is-hoverable>
           <MpTableHead>
@@ -81,7 +85,7 @@ const pager = css({ display: 'flex', justifyContent: 'flex-end', gap: '2', p: '3
                 <div :class="css({ display: 'flex', gap: '1', mt: '1', flexWrap: 'wrap' })">
                   <MpBadge v-if="pr.draft" size="sm" variant="subtle" variant-color="gray">Draft</MpBadge>
                   <MpBadge v-for="k in pr.jiraKeys" :key="k" size="sm" variant="subtle" variant-color="blue">{{ k }}</MpBadge>
-                  <MpText v-if="role === 'reviewer'" size="label-small" color="text.secondary">oleh {{ pr.author.name }}</MpText>
+                  <MpText v-if="role === 'reviewer'" size="label-small" color="text.secondary">by {{ pr.author.name }}</MpText>
                 </div>
               </MpTableCell>
               <MpTableCell>
@@ -110,8 +114,8 @@ const pager = css({ display: 'flex', justifyContent: 'flex-end', gap: '2', p: '3
         </MpTable>
       </MpTableContainer>
       <div :class="pager">
-        <MpButton size="sm" variant="secondary" :is-disabled="page === 1" @click="page--">Sebelumnya</MpButton>
-        <MpButton size="sm" variant="secondary" :is-disabled="!data.hasNext" @click="page++">Berikutnya</MpButton>
+        <MpButton size="sm" variant="secondary" :is-disabled="page === 1" @click="page--">Previous</MpButton>
+        <MpButton size="sm" variant="secondary" :is-disabled="!data.hasNext" @click="page++">Next</MpButton>
       </div>
     </div>
   </AsyncState>

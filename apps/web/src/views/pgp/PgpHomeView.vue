@@ -7,6 +7,7 @@ import PageHeader from '@/components/PageHeader.vue'
 import ReportingLinePanel from '@/components/ReportingLinePanel.vue'
 import { api, notifyError, unwrap } from '@/lib/api'
 import { timeAgo } from '@/lib/format'
+import { ui } from '@/lib/ui'
 import { useAsync } from '@/lib/use-async'
 import { useAuth } from '@/stores/auth'
 
@@ -33,20 +34,18 @@ async function start(templateId: string) {
   } catch (e) { notifyError(e) } finally { creating.value = null }
 }
 
-const grid = css({ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '4' })
-const card = css({
-  bg: 'background.surface', rounded: 'lg', borderWidth: '1px', borderColor: 'border.default', p: '5',
-  display: 'flex', flexDirection: 'column', gap: '3', textDecoration: 'none', color: 'inherit',
-  transition: 'box-shadow .15s', _hover: { shadow: 'md' },
-})
-const between = css({ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '2' })
-const section = css({ mt: '8', mb: '3' })
+const col = css({ display: 'flex', flexDirection: 'column', gap: '3' })
+const card = `${ui.card} ${col}`
+const linkCard = `${ui.card} ${col} ${ui.lift}`
+const grid = ui.cards
+const between = ui.between
+const section = ui.section
 </script>
 
 <template>
-  <PageHeader title="Personal Growth Plan" subtitle="Rencana dan progress quarterly kamu, sesuai format dari management.">
+  <PageHeader title="Personal Growth Plan" subtitle="Your quarterly plan and progress, in the format set by management.">
     <RouterLink v-if="auth.me?.role === 'admin'" to="/pgp/templates">
-      <MpButton variant="secondary" left-icon="plans">Kelola template</MpButton>
+      <MpButton variant="secondary" left-icon="plans">Manage templates</MpButton>
     </RouterLink>
   </PageHeader>
 
@@ -55,23 +54,23 @@ const section = css({ mt: '8', mb: '3' })
   <AsyncState :loading="loading && !data" :error="error" @retry="run">
     <template v-if="data">
       <div v-if="available.length">
-        <MpText size="h3" weight="semiBold" :class="css({ mb: '3' })">Mulai PGP baru</MpText>
+        <MpText size="h3" weight="semiBold" :class="css({ mb: '3' })">Start a new PGP</MpText>
         <div :class="grid">
           <div v-for="t in available" :key="t.id" :class="card">
             <div :class="between">
               <MpBadge variant="subtle" variant-color="blue">{{ t.period }}</MpBadge>
-              <MpText size="label-small" color="text.secondary">{{ t.itemCount }} item</MpText>
+              <MpText size="label-small" color="text.secondary">{{ t.itemCount }} {{ t.itemCount === 1 ? 'item' : 'items' }}</MpText>
             </div>
             <MpText weight="semiBold">{{ t.title }}</MpText>
-            <MpButton size="sm" :is-loading="creating === t.id" @click="start(t.id)">Isi PGP ini</MpButton>
+            <MpButton size="sm" :is-loading="creating === t.id" @click="start(t.id)">Fill in this PGP</MpButton>
           </div>
         </div>
       </div>
 
-      <MpText size="h3" weight="semiBold" :class="section">PGP saya</MpText>
-      <AsyncState :empty="!data.plans.length" empty-text="Belum ada PGP. Pilih template di atas untuk mulai.">
+      <MpText size="h3" weight="semiBold" :class="section">My PGP</MpText>
+      <AsyncState :empty="!data.plans.length" empty-text="No PGP yet. Pick a template above to start.">
         <div :class="grid">
-          <RouterLink v-for="p in data.plans" :key="p.id" :to="`/pgp/plans/${p.id}`" :class="card">
+          <RouterLink v-for="p in data.plans" :key="p.id" :to="`/pgp/plans/${p.id}`" :class="linkCard">
             <div :class="between">
               <MpBadge variant="subtle" variant-color="blue">{{ p.period }}</MpBadge>
               <MpBadge :variant-color="p.status === 'submitted' ? 'green' : 'gray'" variant="subtle">
@@ -86,7 +85,7 @@ const section = css({ mt: '8', mb: '3' })
               </div>
               <MpProgress :value="String(p.score)" :class="css({ mt: '1' })" />
             </div>
-            <MpText size="label-small" color="text.secondary">Diupdate {{ timeAgo(p.updatedAt) }}</MpText>
+            <MpText size="label-small" color="text.secondary">Updated {{ timeAgo(p.updatedAt) }}</MpText>
           </RouterLink>
         </div>
       </AsyncState>

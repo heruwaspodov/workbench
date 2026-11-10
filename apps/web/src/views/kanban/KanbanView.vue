@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { MpBadge, MpButton, MpButtonGroup, MpInput, MpText, css } from '@mekari/pixel3'
+import { MpBadge, MpButton, MpInput, MpText, css } from '@mekari/pixel3'
 import { computed, onMounted, ref, watch } from 'vue'
 import AsyncState from '@/components/AsyncState.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import SegmentedControl from '@/components/SegmentedControl.vue'
 import { api, unwrap } from '@/lib/api'
 import { timeAgo } from '@/lib/format'
+import { ui } from '@/lib/ui'
 import { useAsync } from '@/lib/use-async'
 import IssueDrawer from './IssueDrawer.vue'
 
@@ -27,44 +29,45 @@ const total = computed(() => columns.value.reduce((s, c) => s + c.cards.length, 
 
 const priorityColor = (p: string | null) => (p && /highest|high|critical|blocker/i.test(p) ? 'red' : p && /medium/i.test(p) ? 'orange' : 'gray')
 
-const toolbar = css({ display: 'flex', gap: '3', alignItems: 'center', mb: '4', flexWrap: 'wrap' })
 const board = css({ display: 'flex', gap: '4', overflowX: 'auto', pb: '4', alignItems: 'flex-start' })
-const column = css({ width: '300px', flexShrink: 0, bg: 'background.neutral.subtle', rounded: 'lg', p: '3', display: 'flex', flexDirection: 'column', gap: '2', maxHeight: 'calc(100vh - 220px)' })
-const columnHead = css({ display: 'flex', justifyContent: 'space-between', alignItems: 'center', px: '1', mb: '1' })
-const cards = css({ display: 'flex', flexDirection: 'column', gap: '2', overflowY: 'auto' })
+const column = css({ width: '300px', flexShrink: 0, bg: 'background.neutral.subtle', rounded: 'xl', p: '3', display: 'flex', flexDirection: 'column', gap: '3', maxHeight: 'calc(100vh - 240px)' })
+const columnHead = css({ display: 'flex', justifyContent: 'space-between', alignItems: 'center', px: '1' })
+const cards = css({ display: 'flex', flexDirection: 'column', gap: '2', overflowY: 'auto', pb: '1' })
 const card = css({
-  bg: 'background.surface', rounded: 'md', borderWidth: '1px', borderColor: 'border.default', p: '3', cursor: 'pointer', textAlign: 'left',
-  display: 'flex', flexDirection: 'column', gap: '2', _hover: { borderColor: 'border.focused', shadow: 'sm' },
+  bg: 'background.stage', rounded: 'lg', borderWidth: '1px', borderColor: 'border.default.subtle', shadow: 'xs', p: '3', textAlign: 'left',
+  display: 'flex', flexDirection: 'column', gap: '2',
 })
 const cardFoot = css({ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '2' })
+const tags = css({ display: 'flex', gap: '1', flexWrap: 'wrap' })
 const typeIcon = css({ width: '4', height: '4' })
+const count = css({ bg: 'background.stage', rounded: 'full', px: '2', py: '0.5', borderWidth: '1px', borderColor: 'border.default.subtle' })
 </script>
 
 <template>
-  <PageHeader title="My Kanban" :subtitle="data?.board ? `Board: ${data.board.name}` : 'Issue Jira yang di-assign ke kamu'">
+  <PageHeader title="My Kanban" :subtitle="data?.board ? `Board: ${data.board.name}` : 'Jira issues assigned to you'">
     <MpButton variant="secondary" left-icon="refresh" :is-loading="loading" @click="run">Refresh</MpButton>
   </PageHeader>
 
-  <div :class="toolbar">
-    <MpButtonGroup>
-      <MpButton size="sm" :variant="scope === 'sprint' ? 'primary' : 'secondary'" :is-disabled="data?.board?.scrum === false || data?.board === null" @click="scope = 'sprint'">Sprint aktif</MpButton>
-      <MpButton size="sm" :variant="scope === 'active' ? 'primary' : 'secondary'" @click="scope = 'active'">Semua aktif + done 7 hari</MpButton>
-    </MpButtonGroup>
-    <MpInput v-model="search" size="sm" placeholder="Filter key / summary" :class="css({ maxWidth: '260px' })" is-clearable />
-    <MpText size="label" color="text.secondary">{{ total }} issue</MpText>
+  <div :class="ui.toolbar">
+    <SegmentedControl v-model="scope" label="Scope" :options="[
+      { value: 'sprint', label: 'Active sprint', disabled: data?.board?.scrum === false || data?.board === null },
+      { value: 'active', label: 'All active + done 7 days' },
+    ]" />
+    <div :class="ui.fieldWide"><MpInput v-model="search" size="sm" placeholder="Filter by key or summary" is-clearable /></div>
+    <MpText size="label" color="text.secondary">{{ total }} {{ total === 1 ? 'issue' : 'issues' }}</MpText>
   </div>
 
   <AsyncState :loading="loading && !data" :error="error" @retry="run">
     <div :class="board">
       <section v-for="col in columns" :key="col.name" :class="column">
         <div :class="columnHead">
-          <MpText size="label" weight="semiBold">{{ col.name.toUpperCase() }}</MpText>
-          <MpText size="label-small" color="text.secondary">{{ col.cards.length }} · {{ col.points }} SP</MpText>
+          <MpText size="label" weight="semiBold">{{ col.name }}</MpText>
+          <div :class="count"><MpText size="label-small" color="text.secondary">{{ col.cards.length }} · {{ col.points }} SP</MpText></div>
         </div>
         <div :class="cards">
-          <button v-for="c in col.cards" :key="c.key" type="button" :class="card" @click="selected = c.key">
+          <button v-for="c in col.cards" :key="c.key" type="button" :class="[card, ui.lift]" @click="selected = c.key">
             <MpText size="label">{{ c.summary }}</MpText>
-            <div v-if="c.labels.length" :class="css({ display: 'flex', gap: '1', flexWrap: 'wrap' })">
+            <div v-if="c.labels.length" :class="tags">
               <MpBadge v-for="l in c.labels.slice(0, 3)" :key="l" size="sm" variant="subtle" variant-color="gray">{{ l }}</MpBadge>
             </div>
             <div :class="cardFoot">
@@ -77,9 +80,9 @@ const typeIcon = css({ width: '4', height: '4' })
                 <MpBadge v-if="c.storyPoints != null" size="sm" variant="subtle" variant-color="blue">{{ c.storyPoints }}</MpBadge>
               </div>
             </div>
-            <MpText size="label-small" color="text.secondary">{{ timeAgo(c.updated) }}</MpText>
+            <MpText size="label-small" color="text.secondary">Updated {{ timeAgo(c.updated) }}</MpText>
           </button>
-          <MpText v-if="!col.cards.length" size="label-small" color="text.secondary" :class="css({ px: '1', py: '2' })">Kosong</MpText>
+          <MpText v-if="!col.cards.length" size="label-small" color="text.secondary" :class="css({ px: '1', py: '2' })">No issues</MpText>
         </div>
       </section>
     </div>

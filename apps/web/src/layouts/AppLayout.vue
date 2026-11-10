@@ -9,7 +9,7 @@ const route = useRoute()
 
 const nav = computed(() => [
   { to: '/pgp', label: 'Personal Growth Plan', icon: 'goal' as const },
-  ...((auth.me?.reportCount ?? 0) > 0 ? [{ to: '/team', label: 'Tim Saya', icon: 'team' as const }] : []),
+  ...((auth.me?.reportCount ?? 0) > 0 ? [{ to: '/team', label: 'My Team', icon: 'team' as const }] : []),
   { to: '/kanban', label: 'My Kanban', icon: 'table-view-column' as const },
   { to: '/pull-requests', label: 'Pull Requests', icon: 'file-code' as const },
   { to: '/confluence', label: 'My Confluence', icon: 'draft' as const },
@@ -20,29 +20,30 @@ const nav = computed(() => [
 const isActive = (to: string) =>
   to === '/pgp' ? route.path === '/pgp' || route.path.startsWith('/pgp/plans') : route.path.startsWith(to)
 
-const shell = css({ display: 'flex', minHeight: '100vh', bg: 'background.stage' })
+const shell = css({ display: 'flex', minHeight: '100vh', bg: 'background.surface' })
 const sidebar = css({
-  width: '240px', flexShrink: 0, bg: 'background.surface', borderRightWidth: '1px', borderColor: 'border.default',
+  width: '248px', flexShrink: 0, bg: 'background.stage', borderRightWidth: '1px', borderColor: 'border.default.subtle',
   display: 'flex', flexDirection: 'column', position: 'sticky', top: 0, height: '100vh',
 })
-const brand = css({ display: 'flex', alignItems: 'center', gap: '2', px: '4', py: '4', borderBottomWidth: '1px', borderColor: 'border.default' })
+const brand = css({ display: 'flex', alignItems: 'center', gap: '2', px: '4', py: '4', borderBottomWidth: '1px', borderColor: 'border.default.subtle' })
 const logo = css({ width: '8', height: '8', rounded: 'md', bg: 'background.brand.bold', display: 'grid', placeItems: 'center' })
+const whiteIcon = css({ filter: 'brightness(0) invert(1)' })
 const navList = css({ display: 'flex', flexDirection: 'column', gap: '1', p: '3', flex: 1 })
 const navItem = css({
-  display: 'flex', alignItems: 'center', gap: '3', px: '3', py: '2', rounded: 'md', color: 'text.secondary', textDecoration: 'none',
+  display: 'flex', alignItems: 'center', gap: '3', px: '3', py: '2', rounded: 'lg', color: 'text.secondary', textDecoration: 'none',
   _hover: { bg: 'background.neutral' },
 })
 const navActive = css({ bg: 'background.information', color: 'text.link', fontWeight: 'semiBold', _hover: { bg: 'background.information' } })
-const userBox = css({ display: 'flex', alignItems: 'center', gap: '2', p: '3', borderTopWidth: '1px', borderColor: 'border.default' })
+const userBox = css({ display: 'flex', alignItems: 'center', gap: '2', p: '3', borderTopWidth: '1px', borderColor: 'border.default.subtle' })
 const main = css({ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' })
-const content = css({ p: '6', flex: 1, minWidth: 0 })
+const content = css({ px: { base: '5', xl: '8' }, py: '8', flex: 1, minWidth: 0, width: '100%', maxWidth: '1320px', mx: 'auto' })
 </script>
 
 <template>
   <div :class="shell">
     <aside :class="sidebar">
       <div :class="brand">
-        <div :class="logo"><MpIcon name="sign-outline" color="icon.inverse" size="sm" /></div>
+        <div :class="logo"><MpIcon name="sign-outline" :class="whiteIcon" size="sm" /></div>
         <div>
           <MpText size="label" weight="semiBold">One Desk</MpText>
           <MpText size="label-small" color="text.secondary">Mekari Sign Engineering</MpText>

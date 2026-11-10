@@ -8,6 +8,7 @@ import AsyncState from '@/components/AsyncState.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import { api, notifyError, notifySuccess, unwrap } from '@/lib/api'
 import { timeAgo } from '@/lib/format'
+import { ui } from '@/lib/ui'
 import { useAsync } from '@/lib/use-async'
 
 const { data, loading, error, run } = useAsync(() => unwrap(api.pgp.templates.get()))
@@ -17,23 +18,22 @@ const STATUS = { draft: { label: 'Draft', color: 'gray' }, published: { label: '
 const SOURCE = { scratch: 'Manual', google_sheet: 'Google Sheet', xlsx: 'Excel' } as const
 
 async function setStatus(id: string, status: 'draft' | 'published' | 'archived') {
-  try { await unwrap(api.pgp.templates({ id }).patch({ status })); notifySuccess('Status template diubah'); run() } catch (e) { notifyError(e) }
+  try { await unwrap(api.pgp.templates({ id }).patch({ status })); notifySuccess('Template status updated'); run() } catch (e) { notifyError(e) }
 }
 
-const wrap = css({ bg: 'background.surface', rounded: 'lg', borderWidth: '1px', borderColor: 'border.default', overflowX: 'auto' })
 const actions = css({ display: 'flex', gap: '2', justifyContent: 'flex-end' })
 </script>
 
 <template>
-  <PageHeader title="PGP Templates" subtitle="Format PGP per quarter dari management. Member hanya melihat template yang published.">
-    <RouterLink to="/pgp/templates/new"><MpButton left-icon="add">Template baru</MpButton></RouterLink>
+  <PageHeader title="PGP Templates" subtitle="PGP formats per quarter, set by management. Members only see published templates.">
+    <RouterLink to="/pgp/templates/new"><MpButton left-icon="add">New template</MpButton></RouterLink>
   </PageHeader>
 
-  <AsyncState :loading="loading && !data" :error="error" :empty="data?.length === 0" empty-text="Belum ada template." @retry="run">
+  <AsyncState :loading="loading && !data" :error="error" :empty="data?.length === 0" empty-text="No templates yet." @retry="run">
     <template #empty>
-      <RouterLink to="/pgp/templates/new"><MpButton variant="secondary">Buat atau import template</MpButton></RouterLink>
+      <RouterLink to="/pgp/templates/new"><MpButton variant="secondary">Create or import a template</MpButton></RouterLink>
     </template>
-    <div :class="wrap">
+    <div :class="ui.panel">
       <MpTableContainer>
         <MpTable is-hoverable>
           <MpTableHead>
@@ -52,7 +52,7 @@ const actions = css({ display: 'flex', gap: '2', justifyContent: 'flex-end' })
             <MpTableRow v-for="t in data" :key="t.id">
               <MpTableCell><MpText weight="semiBold">{{ t.period }}</MpText></MpTableCell>
               <MpTableCell>
-                <RouterLink :to="`/pgp/templates/${t.id}`" :class="css({ color: 'text.link' })">{{ t.title }}</RouterLink>
+                <RouterLink :to="`/pgp/templates/${t.id}`" :class="ui.link">{{ t.title }}</RouterLink>
               </MpTableCell>
               <MpTableCell>{{ SOURCE[t.source] }}</MpTableCell>
               <MpTableCell>{{ t.itemCount }}</MpTableCell>

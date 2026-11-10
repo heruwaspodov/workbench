@@ -8,6 +8,7 @@ import PageHeader from '@/components/PageHeader.vue'
 import { api, unwrap } from '@/lib/api'
 import { copyText, isHttpUrl } from '@/lib/clipboard'
 import { formatDate } from '@/lib/format'
+import { ui } from '@/lib/ui'
 import { useAsync } from '@/lib/use-async'
 
 const query = ref('')
@@ -26,45 +27,43 @@ function search() {
   else page.value = 1
 }
 
-const bar = css({ display: 'flex', gap: '3', mb: '4', maxWidth: '520px' })
-const wrap = css({ bg: 'background.surface', rounded: 'lg', borderWidth: '1px', borderColor: 'border.default', overflow: 'hidden' })
-const link = css({ color: 'text.link', fontWeight: 'semiBold', textDecoration: 'none', _hover: { textDecoration: 'underline' } })
+const bar = css({ display: 'flex', gap: '3', mb: '5', maxWidth: '520px' })
 const actions = css({ display: 'flex', justifyContent: 'flex-end' })
-const pager = css({ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: '3', borderTopWidth: '1px', borderColor: 'border.default' })
+const pager = css({ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: '3', borderTopWidth: '1px', borderColor: 'border.default.subtle' })
 </script>
 
 <template>
-  <PageHeader title="My Confluence" subtitle="Halaman Confluence yang pernah kamu buat. Hanya judul, space, dan link; isi halaman tidak ditampilkan." />
+  <PageHeader title="My Confluence" subtitle="Confluence pages you have created. Only the title, space and link are shown; page content is never displayed." />
 
   <div :class="bar">
-    <MpInput v-model="query" placeholder="Cari judul halaman" @keyup.enter="search" />
-    <MpButton variant="secondary" @click="search">Cari</MpButton>
+    <MpInput v-model="query" placeholder="Search page titles" @keyup.enter="search" />
+    <MpButton variant="secondary" @click="search">Search</MpButton>
   </div>
 
   <AsyncState :loading="loading && !data" :error="error" :empty="data?.items.length === 0"
-    :empty-text="applied ? 'Tidak ada halaman yang cocok.' : 'Belum ada halaman yang kamu buat.'" @retry="run">
-    <div v-if="data" :class="wrap">
+    :empty-text="applied ? 'No pages match your search.' : 'You have not created any pages yet.'" @retry="run">
+    <div v-if="data" :class="ui.panel">
       <MpTableContainer>
         <MpTable is-hoverable>
           <MpTableHead>
             <MpTableRow>
-              <MpTableCell as="th">Halaman</MpTableCell>
+              <MpTableCell as="th">Page</MpTableCell>
               <MpTableCell as="th">Space</MpTableCell>
-              <MpTableCell as="th">Terakhir diubah</MpTableCell>
+              <MpTableCell as="th">Last modified</MpTableCell>
               <MpTableCell as="th" />
             </MpTableRow>
           </MpTableHead>
           <MpTableBody>
             <MpTableRow v-for="p in data.items" :key="p.id">
               <MpTableCell :style="{ minWidth: '320px' }">
-                <a v-if="isHttpUrl(p.url)" :href="p.url" target="_blank" rel="noopener noreferrer" :class="link">{{ p.title }}</a>
+                <a v-if="isHttpUrl(p.url)" :href="p.url" target="_blank" rel="noopener noreferrer" :class="ui.link">{{ p.title }}</a>
                 <MpText v-else weight="semiBold">{{ p.title }}</MpText>
               </MpTableCell>
               <MpTableCell><MpBadge v-if="p.space" variant="subtle" variant-color="gray">{{ p.space }}</MpBadge></MpTableCell>
               <MpTableCell>{{ formatDate(p.lastModified) }}</MpTableCell>
               <MpTableCell>
                 <div :class="actions">
-                  <MpButton size="sm" variant="ghost" left-icon="link" @click="copyText(p.url)">Salin link</MpButton>
+                  <MpButton size="sm" variant="ghost" left-icon="copy" @click="copyText(p.url)">Copy link</MpButton>
                 </div>
               </MpTableCell>
             </MpTableRow>
@@ -72,10 +71,10 @@ const pager = css({ display: 'flex', justifyContent: 'space-between', alignItems
         </MpTable>
       </MpTableContainer>
       <div :class="pager">
-        <MpText size="label" color="text.secondary">{{ data.total }} halaman · halaman {{ data.page }}</MpText>
+        <MpText size="label" color="text.secondary">{{ data.total }} {{ data.total === 1 ? 'page' : 'pages' }} · page {{ data.page }}</MpText>
         <div :class="css({ display: 'flex', gap: '2' })">
-          <MpButton size="sm" variant="secondary" :is-disabled="page === 1" @click="page--">Sebelumnya</MpButton>
-          <MpButton size="sm" variant="secondary" :is-disabled="!data.hasNext" @click="page++">Berikutnya</MpButton>
+          <MpButton size="sm" variant="secondary" :is-disabled="page === 1" @click="page--">Previous</MpButton>
+          <MpButton size="sm" variant="secondary" :is-disabled="!data.hasNext" @click="page++">Next</MpButton>
         </div>
       </div>
     </div>

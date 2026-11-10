@@ -1,7 +1,7 @@
 import { notifyError, notifySuccess } from './api'
 
 /** Copies text. `navigator.clipboard` only exists in secure contexts, and http://one-desk.local is not one. */
-export async function copyText(text: string, done = 'Link disalin') {
+export async function copyText(text: string, done = 'Link copied') {
   try {
     if (navigator.clipboard && window.isSecureContext) await navigator.clipboard.writeText(text)
     else {
@@ -17,7 +17,7 @@ export async function copyText(text: string, done = 'Link disalin') {
     }
     notifySuccess(done)
   } catch {
-    notifyError(new Error('Gagal menyalin link'))
+    notifyError(new Error('Could not copy the link'))
   }
 }
 

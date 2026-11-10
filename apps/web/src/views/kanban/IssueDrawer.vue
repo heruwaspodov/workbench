@@ -17,7 +17,7 @@ watch(() => props.issueKey, (k) => { if (k) run(k) }, { immediate: true })
 const meta = css({ display: 'grid', gridTemplateColumns: '120px 1fr', rowGap: '2', columnGap: '3', mb: '5' })
 const block = css({ mb: '5' })
 const pre = css({ whiteSpace: 'pre-wrap', wordBreak: 'break-word' })
-const comment = css({ borderLeftWidth: '2px', borderColor: 'border.default', pl: '3', py: '1', mb: '3' })
+const comment = css({ borderLeftWidth: '2px', borderColor: 'border.default.subtle', pl: '3', py: '1', mb: '3' })
 </script>
 
 <template>
@@ -37,7 +37,7 @@ const comment = css({ borderLeftWidth: '2px', borderColor: 'border.default', pl:
             <MpBadge variant="subtle" :variant-color="issue.statusCategory === 'done' ? 'green' : issue.statusCategory === 'indeterminate' ? 'blue' : 'gray'">{{ issue.status }}</MpBadge>
             <MpBadge variant="subtle" variant-color="gray">{{ issue.issueType }}</MpBadge>
             <MpBadge v-if="issue.storyPoints != null" variant="subtle" variant-color="blue">{{ issue.storyPoints }} SP</MpBadge>
-            <a :href="issue.url" target="_blank" rel="noopener noreferrer"><MpButton size="sm" variant="ghost" right-icon="newtab">Buka di Jira</MpButton></a>
+            <a :href="issue.url" target="_blank" rel="noopener noreferrer"><MpButton size="sm" variant="ghost" right-icon="newtab">Open in Jira</MpButton></a>
           </div>
 
           <div :class="meta">
@@ -53,7 +53,7 @@ const comment = css({ borderLeftWidth: '2px', borderColor: 'border.default', pl:
 
           <div :class="block">
             <MpText weight="semiBold" :class="css({ mb: '2' })">Description</MpText>
-            <MpText size="label" :class="pre">{{ issue.description || 'Tidak ada deskripsi.' }}</MpText>
+            <MpText size="label" :class="pre">{{ issue.description || 'No description.' }}</MpText>
           </div>
 
           <div v-if="issue.subtasks.length" :class="block">
@@ -62,7 +62,7 @@ const comment = css({ borderLeftWidth: '2px', borderColor: 'border.default', pl:
           </div>
 
           <div :class="block">
-            <MpText weight="semiBold" :class="css({ mb: '2' })">Komentar ({{ issue.comments.length }})</MpText>
+            <MpText weight="semiBold" :class="css({ mb: '2' })">Comments ({{ issue.comments.length }})</MpText>
             <div v-for="c in issue.comments" :key="c.id" :class="comment">
               <MpText size="label" weight="semiBold">{{ c.author }} <MpText as="span" size="label-small" color="text.secondary">· {{ timeAgo(c.created) }}</MpText></MpText>
               <MpText size="label" :class="pre">{{ c.body }}</MpText>

@@ -11,13 +11,13 @@ const publicUser = { id: users.id, name: users.name, email: users.email, avatarU
 
 /** Rules shared by requests, accept and admin set: no self-link, no mutual link, no duplicate active link. */
 async function assertPair(ex: Executor, reportId: string, leaderId: string, opts: { allowActive?: boolean } = {}) {
-  if (reportId === leaderId) throw new BadRequestError('Tidak bisa menjadi atasan atau bawahan diri sendiri')
+  if (reportId === leaderId) throw new BadRequestError('You cannot be your own leader or report')
   const found = await ex.select({ id: users.id, managerId: users.managerId }).from(users).where(inArray(users.id, [reportId, leaderId]))
   const report = found.find((u) => u.id === reportId)
   const leader = found.find((u) => u.id === leaderId)
   if (!report || !leader) throw new NotFoundError('User')
-  if (leader.managerId === reportId) throw new BadRequestError('Relasi saling atasan tidak diizinkan')
-  if (!opts.allowActive && report.managerId === leaderId) throw new BadRequestError('Relasi ini sudah aktif')
+  if (leader.managerId === reportId) throw new BadRequestError('Two people cannot be each other\'s leader')
+  if (!opts.allowActive && report.managerId === leaderId) throw new BadRequestError('This reporting line is already active')
 }
 
 async function loadRequest(ex: Executor, id: string) {
@@ -90,7 +90,7 @@ export abstract class OrgService {
     await db.transaction(async (tx) => {
       const req = await loadRequest(tx, requestId)
       if (!isParty(req, user.id)) throw new ForbiddenError()
-      if (req.requestedBy === user.id) throw new ForbiddenError('Permintaan harus dikonfirmasi pihak lain')
+      if (req.requestedBy === user.id) throw new ForbiddenError('The other person has to confirm this request')
       await assertPair(tx, req.reportId, req.leaderId)
       await tx.update(users).set({ managerId: req.leaderId }).where(eq(users.id, req.reportId))
       await tx.delete(reportingRequests).where(eq(reportingRequests.id, req.id))
@@ -101,14 +101,14 @@ export abstract class OrgService {
   static async reject(user: User, requestId: string) {
     const req = await loadRequest(db, requestId)
     if (!isParty(req, user.id)) throw new ForbiddenError()
-    if (req.requestedBy === user.id) throw new ForbiddenError('Gunakan pembatalan untuk permintaanmu sendiri')
+    if (req.requestedBy === user.id) throw new ForbiddenError('Use cancel for your own request')
     await db.delete(reportingRequests).where(eq(reportingRequests.id, req.id))
     return { ok: true }
   }
 
   static async cancel(user: User, requestId: string) {
     const req = await loadRequest(db, requestId)
-    if (req.requestedBy !== user.id) throw new ForbiddenError('Hanya pengaju yang bisa membatalkan')
+    if (req.requestedBy !== user.id) throw new ForbiddenError('Only the requester can cancel')
     await db.delete(reportingRequests).where(eq(reportingRequests.id, req.id))
     return { ok: true }
   }

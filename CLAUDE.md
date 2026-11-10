@@ -48,6 +48,7 @@ apps/server/src/modules/<nama>/
 
 ### Konvensi frontend
 
+- Token semantik Pixel (`border.default`, `background.surface`, …) hanya ada di tema `next`: `usePixelTheme().setNextTheme(true)` di `main.ts` — jangan dihapus. Pakai gaya bersama dari `src/lib/ui.ts` (kartu, panel, toolbar) dan `SegmentedControl`, jangan definisikan ulang kartu per halaman. Teks UI berbahasa Inggris.
 - Komponen UI **wajib Mekari Pixel** (`Mp*`) dari `@mekari/pixel3`; styling via `css({...})` dengan objek literal statis (diekstrak Panda saat build) dan token semantik (`background.surface`, `text.secondary`, `border.default`, …).
 - `MpTabs` memakai index numerik (`:default-value="0"`), bukan string.
 - Hindari ekspresi TS kompleks di template (`as const`, cast bertingkat) — pindahkan ke `<script setup>`; pecah komponen bila vue-tsc kehilangan scope `v-for`.
