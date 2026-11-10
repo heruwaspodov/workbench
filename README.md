@@ -32,6 +32,7 @@ Tanpa integrasi eksternal, PGP sudah bisa dipakai penuh: buat template dari scra
 | `bun run dev:server` / `dev:web` | Salah satunya saja |
 | `bun run typecheck` | `tsc` server + `vue-tsc` web |
 | `bun run test` | `bun test` di `apps/server` |
+| `bun run e2e` | Uji visual end-to-end (mock Jira/Bitbucket + Chrome sistem, screenshot di `e2e/out/`); butuh `bun run build` dulu |
 | `bun run build` | Build web ke `apps/web/dist` |
 | `bun run start` | Jalankan server production (menyajikan `apps/web/dist`) |
 | `bun run db:generate` | Generate migration dari `src/db/schema.ts` |

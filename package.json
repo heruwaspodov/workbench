@@ -5,6 +5,7 @@
   "scripts": {
     "setup": "bun install && bun run db:migrate",
     "dev": "bun run --parallel dev:server dev:web",
+    "e2e": "bun e2e/run.ts",
     "dev:server": "bun run --cwd apps/server --env-file=../../.env dev",
     "dev:web": "bun run --cwd apps/web dev",
     "build": "bun run --cwd apps/web build",
@@ -13,5 +14,8 @@
     "test": "cd apps/server && bun --env-file=../../.env test",
     "db:generate": "bun run --cwd apps/server --env-file=../../.env db:generate",
     "db:migrate": "bun run --cwd apps/server --env-file=../../.env db:migrate"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.65.0"
   }
 }

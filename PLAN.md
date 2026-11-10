@@ -30,7 +30,7 @@ Status: `TODO` · `IN PROGRESS` · `DONE` · `BLOCKED`
 | 3b. Direct leader & PGP bawahan (2 arah) | OD-45 … OD-50 | TODO |
 | 4. Kanban | OD-21 … OD-23 | DONE (mock) |
 | 5. Pull Requests | OD-24 … OD-26 | DONE (mock) |
-| 6. Frontend shell & polish | OD-27 … OD-31 | DONE · OD-31 IN PROGRESS |
+| 6. Frontend shell & polish | OD-27 … OD-31 | DONE |
 | 7. Pindah ke laptop & run lokal | OD-32 … OD-35 | OD-32 … OD-35 DONE |
 | 8. Hardening & integrasi nyata | OD-36 … OD-42 | TODO |
 | 9. Rilis MVP internal | OD-43 … OD-44 | TODO |
@@ -252,10 +252,12 @@ Toast sukses/error via `notifySuccess/notifyError`; refresh `GET /api/org/me` se
 **Description:** Treeshake `@mekari/pixel3` (package tidak mendeklarasikan `sideEffects`) → JS awal 1.16 MB → 60 KB (23 KB gzip). `postcss.config.cjs` meng-include `node_modules/@mekari/**/dist` secara eksplisit (workspace hoisted) agar recipe seperti modal/drawer ter-generate.
 **Log:** OK. Sisa noise build: `🐼 error ... reading 'literal'` dari Pixel/Panda (tidak memengaruhi output) → OD-41.
 
-### OD-31 · Verifikasi visual end-to-end (Playwright, mock) · `IN PROGRESS`
+### OD-31 · Verifikasi visual end-to-end (Playwright, mock) · `DONE`
 **Description:** Jalankan server + mock Jira/Bitbucket + Postgres, skrip Playwright: login (dev) → PGP home → buka plan → isi achievement → simpan → kanban → drawer → PR list → PR detail (files + diff) → connections → templates → template baru. Catat error console (abaikan icon dari `cdn.mekari.design` yang diblok di sandbox).
+**Scope tambahan (disetujui 2026-11-10):** mock & skrip tidak ada di repo (dulu hanya di sandbox cloud) → dibuat ulang dan di-commit: `e2e/mock-atlassian.ts` (satu server Bun meniru Jira & Bitbucket, data sintetis), `e2e/run.ts` (runner: DB `one-desk-e2e`, mock, server monolith :3100, Playwright via `playwright-core` + Chrome sistem, screenshot ke `e2e/out/`), script root `bun run e2e`. Prasyarat: `bun run build`.
 **Acceptance:** Semua langkah lulus, drawer tampil dengan panel & overlay, tidak ada error JS.
 **Log:** Run pertama: semua halaman render; drawer belum ber-style → diperbaiki (OD-30). Re-run dihentikan atas permintaan user; dilanjutkan setelah PLAN disetujui.
+**Log (2026-11-10):** `e2e/mock-atlassian.ts`, `e2e/run.ts`, `bun run e2e` dibuat & dijalankan di laptop (Bun 1.4.4, Chrome sistem via `playwright-core`, DB `one-desk-e2e`): 10/10 langkah lulus — login dev, PGP home, buat plan & isi achievement & simpan, connections, kanban, drawer (panel di viewport + overlay, dicek visual), PR list author & reviewer, PR detail files + diff, templates, template baru; tidak ada error JS. Temuan: browser mencatat 409 di console bila Jira belum terhubung (perilaku `NOT_CONNECTED`, bukan bug); skrip menghubungkan akun dulu. Commit: lihat git log.
 
 ## Fase 7 — Pindah ke laptop & run lokal
 
