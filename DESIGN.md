@@ -20,7 +20,7 @@
 | G5 | **Menu Kanban** milik current user | Issue Jira yang di-assign ke user, dikelompokkan per kolom board (atau status category), detail issue tanpa buka Jira |
 | G6 | **Menu Pull Request** current user lintas repo | List PR (dibuat saya / perlu review saya) dari semua repo yang terlibat + detail (files, diff, commits, comments, reviewers, build) |
 | G7 | **Ringan di browser** | 1 tab, route lazy-loaded, bundle awal kecil (target < 100 KB JS gzip), data diambil on-demand |
-| G8 | **Leader bisa lihat PGP direct report-nya** | Tiap user punya satu direct leader (`users.manager_id` → `users.id`). Leader menambahkan direct report dari dashboard; setelah dikonfirmasi bawahan, leader bisa membaca PGP mereka (read-only) dan melihat ringkasan tim |
+| G8 | **Leader bisa lihat PGP direct report-nya** | Reporting line `users.manager_id` → `users.id`. Permintaan bisa diajukan **2 arah** (bawahan ajukan atasan, atau atasan tambah bawahan) dan aktif setelah pihak lain mengonfirmasi. Leader membaca PGP direct report (read-only) + ringkasan tim |
 
 ## 3. Non-goals (MVP)
 
@@ -40,17 +40,20 @@
 | `admin` (via `ADMIN_EMAILS`) | Semua di atas + kelola template PGP (import/buat/edit/publish/archive) + lihat PGP semua orang per template (read-only) + set direct leader user mana pun secara langsung |
 | *leader* (bukan role, relasi) | Siapa pun yang menjadi `manager_id` aktif user lain: membaca & export PGP direct report-nya, melihat halaman "Tim Saya" |
 
-### Direct leader (reporting line)
+### Direct leader (reporting line) — 2 arah
 
-- Model: `users.manager_id` (FK → `users.id`, aktif) dan `users.pending_manager_id` (permintaan yang belum dikonfirmasi). Satu user = maksimal satu direct leader.
-- Alur dari dashboard (PGP home):
-  1. Leader mencari user (yang sudah pernah login) → **Tambah sebagai direct report** → tersimpan sebagai `pending_manager_id` di user tsb.
-  2. Bawahan melihat permintaan di dashboard-nya → **Terima** (pindah ke `manager_id`, menggantikan leader lama) atau **Tolak**.
-  3. Leader bisa melepas direct report; bawahan bisa melepas leader-nya.
-  4. Admin bisa set/hapus `manager_id` langsung tanpa konfirmasi (untuk koreksi).
-- **Kenapa ada konfirmasi bawahan:** PGP adalah data personal karyawan (UU PDP / ISO 27701). Tanpa konfirmasi, siapa pun bisa mengklaim orang lain sebagai bawahan lalu membaca PGP-nya. Ini satu langkah ekstra kecil untuk mencegah itu.
-- Hak akses leader: **hanya direct report** (bukan skip-level), **read-only** (lihat plan + export Excel), berlaku selama relasi aktif.
-- Validasi: tidak boleh diri sendiri; tidak boleh saling (A leader B dan B leader A).
+- **Aturan inti:** relasi atasan–bawahan baru **aktif** jika **kedua pihak setuju**. Pihak yang mengajukan dianggap setuju; pihak lainnya mengonfirmasi. Dengan begitu bawahan (pemilik data PGP) selalu ikut menyetujui sebelum PGP-nya bisa dibaca.
+- Model data:
+  - `users.manager_id` (FK → `users.id`) = relasi **aktif**. Satu user maksimal satu direct leader.
+  - Tabel `reporting_requests` (`id`, `report_id`, `leader_id`, `requested_by`, `created_at`) = permintaan yang belum dikonfirmasi. Unik per `report_id` (satu bawahan maksimal satu permintaan pending; permintaan baru menggantikan yang lama). `requested_by` menentukan siapa yang harus mengonfirmasi: bila `requested_by = report_id` → leader yang konfirmasi; bila `requested_by = leader_id` → bawahan yang konfirmasi.
+- Alur dari dashboard (PGP home), bisa dimulai dari dua sisi:
+  1. **Bawahan → "Ajukan atasan"**: cari user → kirim permintaan → leader melihat banner *Terima / Tolak*.
+  2. **Atasan → "Tambah bawahan"**: cari user → kirim permintaan → bawahan melihat banner *Terima / Tolak*.
+  3. Saat diterima: `report.manager_id = leader_id` (menggantikan leader lama bila ada), permintaan dihapus.
+  4. Pengaju bisa membatalkan permintaannya; leader bisa melepas direct report; bawahan bisa melepas leader-nya.
+  5. Admin bisa set/hapus `manager_id` langsung tanpa konfirmasi (untuk koreksi).
+- Hak akses leader: **hanya direct report aktif** (bukan skip-level, bukan pending), **read-only** (lihat plan + export Excel).
+- Validasi: tidak boleh diri sendiri; tidak boleh saling (A leader B dan B leader A); hanya user yang sudah pernah login.
 - Header plan "Direct Leader" di-prefill dari nama `manager_id` saat plan dibuat (tetap bisa diedit sebagai teks).
 
 ## 5. Arsitektur
@@ -91,7 +94,7 @@ one-desk/                     (bun workspaces, linker hoisted)
 
 ## 6. Data model (ringkas)
 
-- `users` (email unik, role, `manager_id`, `pending_manager_id`) · `sessions` · `connections` (1:1 user: jira_account_id, jira_board_id, bitbucket_uuid)
+- `users` (email unik, role, `manager_id`) · `reporting_requests` (report, leader, requested_by — permintaan pending) · `sessions` · `connections` (1:1 user: jira_account_id, jira_board_id, bitbucket_uuid)
 - `pgp_templates` (title, period `YYYY-Qn`, source scratch/google_sheet/xlsx, status draft/published/archived) → `pgp_template_items` (objective, key_result, weight, initiative, position)
 - `pgp_plans` (template × user unik, header: division/SBU/leader, status draft/submitted) → `pgp_plan_items` (copy item template + kolom monitoring: start/target/current value, achievement, status, evidence_links)
 

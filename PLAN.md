@@ -27,7 +27,7 @@ Status: `TODO` · `IN PROGRESS` · `DONE` · `BLOCKED`
 | 1. Auth (Mekari OAuth2) | OD-05 … OD-07 | DONE · OD-07 BLOCKED (butuh info SSO) |
 | 2. Connect Jira & Bitbucket | OD-08 … OD-11 | DONE (diverifikasi dengan mock) |
 | 3. PGP | OD-12 … OD-20 | DONE · OD-19 IN PROGRESS (butuh Google SA) |
-| 3b. Direct leader & PGP bawahan | OD-45 … OD-50 | TODO |
+| 3b. Direct leader & PGP bawahan (2 arah) | OD-45 … OD-50 | TODO |
 | 4. Kanban | OD-21 … OD-23 | DONE (mock) |
 | 5. Pull Requests | OD-24 … OD-26 | DONE (mock) |
 | 6. Frontend shell & polish | OD-27 … OD-31 | DONE · OD-31 IN PROGRESS |
@@ -147,39 +147,47 @@ Status: `TODO` · `IN PROGRESS` · `DONE` · `BLOCKED`
 **Acceptance:** Angka sesuai data mock.
 **Log:** OK.
 
-## Fase 3b — Direct leader & PGP bawahan
+## Fase 3b — Direct leader & PGP bawahan (2 arah)
 
-> Keputusan (lihat DESIGN §4 "Direct leader"): `users.manager_id → users.id`, hanya direct report, read-only, leader menambah dari dashboard + bawahan mengonfirmasi, admin bisa set langsung.
+> Keputusan (lihat DESIGN §4 "Direct leader — 2 arah"): `users.manager_id → users.id` untuk relasi aktif; permintaan bisa diajukan dari bawahan **atau** atasan dan aktif setelah pihak lain mengonfirmasi; hanya direct report; leader read-only; admin bisa set langsung.
 
 ### OD-45 · Schema reporting line · `TODO`
-**Description:** Di `apps/server/src/db/schema.ts` tambahkan ke `users`: `managerId uuid references users.id on delete set null` dan `pendingManagerId uuid references users.id on delete set null`, plus index `users_manager_idx`. Tambahkan check constraint `manager_id <> id` dan `pending_manager_id <> id`. Relation Drizzle `manager` / `reports` (self-relation). Generate migration `bunx drizzle-kit generate --name reporting_line` → `drizzle/0001_reporting_line.sql`, jalankan `bun run db:migrate`.
-**Acceptance:** Migration jalan di DB yang sudah berisi data; `bun run typecheck` lulus; insert manager = diri sendiri ditolak DB.
+**Description:** Di `apps/server/src/db/schema.ts`:
+- `users`: tambah `managerId uuid references users.id on delete set null` + index `users_manager_idx` + check constraint `manager_id <> id`.
+- Tabel baru `reporting_requests`: `id uuid pk`, `reportId uuid not null → users.id on delete cascade`, `leaderId uuid not null → users.id on delete cascade`, `requestedBy uuid not null → users.id on delete cascade`, `createdAt timestamptz default now()`. Unique index pada `report_id` (satu pending per bawahan). Check `report_id <> leader_id` dan `requested_by in (report_id, leader_id)`.
+- Relation Drizzle: `users.manager` / `users.reports` (self-relation), `reportingRequests.report|leader`.
+Generate migration `bunx drizzle-kit generate --name reporting_line` → `drizzle/0001_reporting_line.sql`, jalankan `bun run db:migrate`.
+**Acceptance:** Migration jalan di DB yang sudah berisi data; `bun run typecheck` lulus; insert manager = diri sendiri dan `requested_by` pihak ketiga ditolak DB.
 **Depends:** OD-34 (DB lokal jalan).
 
-### OD-46 · Module `org` (API reporting line) · `TODO`
-**Description:** Buat `apps/server/src/modules/org/{index,service,model}.ts` (pola sama dengan module lain, guard `auth: true`), daftarkan di `app.ts`. Endpoint:
-- `GET /api/org/me` → `{ leader, pendingLeader, reports[], pendingReports[] }` (id, name, email, avatarUrl).
+### OD-46 · Module `org` (API reporting line, 2 arah) · `TODO`
+**Description:** Buat `apps/server/src/modules/org/{index,service,model}.ts` (pola module lain, guard `auth: true`), daftarkan di `app.ts`. Endpoint:
+- `GET /api/org/me` → `{ leader, reports[], incoming[], outgoing[] }`. `incoming` = permintaan yang menunggu konfirmasi **saya** (dari calon leader atau calon bawahan), `outgoing` = permintaan yang saya ajukan. Tiap item: `requestId`, `direction: 'as_report' | 'as_leader'`, user (id, name, email, avatarUrl), `createdAt`.
 - `GET /api/org/users?q=` → cari user terdaftar (nama/email, maks 20, exclude diri sendiri).
-- `POST /api/org/reports` `{ userId }` → set `pendingManagerId = me` pada user tsb. Tolak bila: diri sendiri, user itu sudah aktif melapor ke saya, atau saya sendiri melapor ke user itu (cegah saling).
-- `DELETE /api/org/reports/:userId` → lepas direct report aktif saya atau batalkan pending saya.
-- `POST /api/org/leader/accept` → `managerId = pendingManagerId`, `pendingManagerId = null`. `POST /api/org/leader/reject` → `pendingManagerId = null`.
-- `DELETE /api/org/leader` → bawahan melepas leader (`managerId = null`).
-- Admin (`admin: true`): `PUT /api/org/users/:id/manager` `{ managerId | null }` → set langsung (aktif), validasi sama.
+- `POST /api/org/requests/leader` `{ userId }` → **bawahan mengajukan atasan**: upsert `reporting_requests(report=me, leader=userId, requested_by=me)`.
+- `POST /api/org/requests/report` `{ userId }` → **atasan menambah bawahan**: upsert `reporting_requests(report=userId, leader=me, requested_by=me)`.
+  Validasi keduanya: bukan diri sendiri; relasi yang sama belum aktif; tidak saling (calon leader tidak sedang melapor ke calon bawahan) → 400.
+- `POST /api/org/requests/:id/accept` → hanya pihak yang **bukan** `requested_by` (dan merupakan report/leader di request tsb); set `report.manager_id = leader_id`, hapus request (dalam transaksi).
+- `POST /api/org/requests/:id/reject` → pihak yang harus konfirmasi; hapus request.
+- `DELETE /api/org/requests/:id` → pengaju membatalkan.
+- `DELETE /api/org/reports/:userId` → leader melepas direct report aktif. `DELETE /api/org/leader` → bawahan melepas leader-nya.
+- Admin (`admin: true`): `PUT /api/org/users/:id/manager` `{ managerId | null }` → set langsung (aktif), hapus request pending user tsb, validasi sama.
 - `GET /api/org/team?period=` → daftar direct report aktif + plan mereka per period (`planId`, status, score, totalWeight, updatedAt; `null` bila belum membuat plan).
-**Acceptance:** Skenario curl: leader A tambah B → B lihat pending → B accept → `GET /team` milik A berisi B; reject/lepas/admin set berfungsi; validasi diri sendiri & saling → 400.
+**Acceptance:** Skenario curl kedua arah: (a) B ajukan A sebagai leader → A accept → `GET /team` A berisi B; (b) A tambah C → C accept → aktif; (c) pengaju tidak bisa accept permintaannya sendiri → 403; reject, batal, lepas, admin set berfungsi; validasi diri sendiri & saling → 400.
 **Depends:** OD-45.
 
 ### OD-47 · Aturan akses plan untuk leader · `TODO`
-**Description:** Di `PlanService.get` (`modules/pgp/plan.service.ts`) izinkan mode `read` bila `plan.user.managerId === viewer.id` (relasi **aktif**, bukan pending); `canEdit` tetap hanya owner. Export Excel ikut aturan yang sama (memakai `get`). Tambahkan field `viewerRole: 'owner' | 'leader' | 'admin'` di response. Saat `PlanService.create`, prefill `directLeader` dari nama manager aktif bila belum ada dari plan sebelumnya.
-**Acceptance:** Leader aktif bisa GET & export plan bawahan; PUT/PATCH/submit oleh leader → 403; pending leader → 403; user lain → 403.
+**Description:** Di `PlanService.get` (`modules/pgp/plan.service.ts`) izinkan mode `read` bila `plan.user.managerId === viewer.id` (relasi **aktif**; request pending tidak memberi akses); `canEdit` tetap hanya owner. Export Excel ikut aturan yang sama (memakai `get`). Tambahkan field `viewerRole: 'owner' | 'leader' | 'admin'` di response. Saat `PlanService.create`, prefill `directLeader` dari nama manager aktif bila belum ada dari plan sebelumnya.
+**Acceptance:** Leader aktif bisa GET & export plan bawahan; PUT/PATCH/submit oleh leader → 403; pihak dengan request pending → 403; user lain → 403.
 **Depends:** OD-46.
 
-### OD-48 · UI dashboard: atasan & direct report · `TODO`
-**Description:** Di `views/pgp/PgpHomeView.vue` tambahkan panel (komponen baru `components/ReportingLinePanel.vue`, Mekari Pixel):
-- "Direct leader saya": nama + tombol Lepas; bila ada permintaan pending → banner dengan tombol Terima / Tolak.
-- "Direct report saya": daftar aktif + pending (badge "Menunggu konfirmasi"), tombol Lepas/Batalkan, input cari user (`GET /api/org/users`) + tombol "Tambah sebagai direct report".
-Toast sukses/error memakai `notifySuccess/notifyError`.
-**Acceptance:** Seluruh alur OD-46 bisa dilakukan dari UI tanpa curl; vue-tsc & build lulus.
+### OD-48 · UI dashboard: atasan & direct report (2 arah) · `TODO`
+**Description:** Komponen baru `components/ReportingLinePanel.vue` (Mekari Pixel), dipasang di `views/pgp/PgpHomeView.vue`:
+- **Banner permintaan masuk** (`incoming`): "X mengajukan kamu sebagai direct leader" (`as_leader`) atau "X ingin menambahkan kamu sebagai direct report" (`as_report`), tombol *Terima* / *Tolak*.
+- **Direct leader saya**: nama leader aktif + tombol *Lepas*; bila belum ada → input cari user + tombol *Ajukan sebagai atasan*; permintaan keluar tampil dengan badge "Menunggu konfirmasi" + *Batalkan*.
+- **Direct report saya**: daftar aktif (tombol *Lepas*) + permintaan keluar (badge "Menunggu konfirmasi" + *Batalkan*) + input cari user + tombol *Tambah sebagai bawahan*.
+Toast sukses/error via `notifySuccess/notifyError`; refresh `GET /api/org/me` setelah tiap aksi.
+**Acceptance:** Seluruh alur OD-46 (kedua arah) bisa dilakukan dari UI tanpa curl; vue-tsc & build lulus.
 **Depends:** OD-46.
 
 ### OD-49 · Halaman "Tim Saya" · `TODO`
@@ -188,7 +196,7 @@ Toast sukses/error memakai `notifySuccess/notifyError`.
 **Depends:** OD-47, OD-48.
 
 ### OD-50 · Test akses reporting line · `TODO`
-**Description:** `apps/server/test/org.test.ts` (memakai DB test dari OD-39 atau setup sendiri dengan `DATABASE_URL` test): skenario request/accept/reject/lepas, validasi diri sendiri & saling, akses plan (owner, leader aktif, leader pending, user lain, admin), admin set langsung.
+**Description:** `apps/server/test/org.test.ts` (DB test dari OD-39 atau setup sendiri dengan `DATABASE_URL` test). Skenario: request dari bawahan → accept leader; request dari leader → accept bawahan; pengaju tidak bisa accept sendiri; reject; batal; request baru menggantikan pending lama; lepas leader / lepas report; validasi diri sendiri & saling; akses plan (owner, leader aktif, pihak pending, user lain, admin); admin set langsung menghapus pending.
 **Acceptance:** `bun run test` hijau.
 **Depends:** OD-47.
 
