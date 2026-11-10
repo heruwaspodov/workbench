@@ -27,20 +27,23 @@ export abstract class PlanService {
     return rows
   }
 
-  /** Owner or admin may read; only owner may write. */
+  /** Owner, active direct leader or admin may read; only owner may write. Pending requests grant nothing. */
   static async get(id: string, user: User, mode: 'read' | 'write' = 'read') {
     const plan = await db.query.plans.findFirst({
       where: eq(plans.id, id),
       with: {
         items: { orderBy: [asc(planItems.position)] },
         template: { columns: { id: true, title: true, period: true, status: true } },
-        user: { columns: { id: true, name: true, email: true } },
+        user: { columns: { id: true, name: true, email: true, managerId: true } },
       },
     })
     if (!plan) throw new NotFoundError('Plan')
     const isOwner = plan.userId === user.id
-    if (!isOwner && !(mode === 'read' && user.role === 'admin')) throw new ForbiddenError()
-    return { ...plan, ...scoreOf(plan.items), canEdit: isOwner }
+    const isLeader = !isOwner && plan.user.managerId === user.id
+    const isAdmin = user.role === 'admin'
+    if (!isOwner && !(mode === 'read' && (isLeader || isAdmin))) throw new ForbiddenError()
+    const viewerRole = isOwner ? 'owner' : isLeader ? 'leader' : 'admin'
+    return { ...plan, ...scoreOf(plan.items), canEdit: isOwner, viewerRole } as const
   }
 
   static async create(user: User, templateId: string) {
@@ -55,11 +58,14 @@ export abstract class PlanService {
 
     // Prefill header from the user's previous plan.
     const previous = await db.query.plans.findFirst({ where: eq(plans.userId, user.id), orderBy: [desc(plans.createdAt)] })
+    const managerName = previous?.directLeader || !user.managerId
+      ? null
+      : (await db.select({ name: users.name }).from(users).where(eq(users.id, user.managerId)))[0]?.name ?? null
 
     const id = await db.transaction(async (tx) => {
       const [plan] = await tx.insert(plans).values({
         templateId, userId: user.id,
-        division: previous?.division, sbu: previous?.sbu, sbuDetail: previous?.sbuDetail, directLeader: previous?.directLeader,
+        division: previous?.division, sbu: previous?.sbu, sbuDetail: previous?.sbuDetail, directLeader: previous?.directLeader || managerName,
       }).returning()
       if (tpl.items.length) {
         await tx.insert(planItems).values(tpl.items.map((i) => ({

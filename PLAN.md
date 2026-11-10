@@ -178,10 +178,11 @@ Generate migration `bunx drizzle-kit generate --name reporting_line` → `drizzl
 **Depends:** OD-45.
 **Log:** 2026-11-10 — `modules/org/{index,service,model}.ts` + registrasi di `app.ts`; semua endpoint di Description ada. `direction` = peran **saya** di request (`as_leader` = saya calon leader). Request baru menggantikan pending lama; `accept` memvalidasi ulang (saling/aktif) di dalam transaksi; `team` default ke period template published terbaru. Diverifikasi dengan skrip sementara (4 user sintetis di DB `one-desk-e2e`): 34 pengecekan lulus — kedua arah accept, pengaju tidak bisa accept/reject sendiri (403), pihak ketiga 403, reject, batal, lepas leader/report, admin set langsung (menghapus pending), diri sendiri/saling/sudah aktif → 400, user tidak ada → 404, tanpa session → 401, search. `typecheck` lulus, `test` 11 pass. Test permanen → OD-50. Commit: lihat git log.
 
-### OD-47 · Aturan akses plan untuk leader · `TODO`
+### OD-47 · Aturan akses plan untuk leader · `DONE`
 **Description:** Di `PlanService.get` (`modules/pgp/plan.service.ts`) izinkan mode `read` bila `plan.user.managerId === viewer.id` (relasi **aktif**; request pending tidak memberi akses); `canEdit` tetap hanya owner. Export Excel ikut aturan yang sama (memakai `get`). Tambahkan field `viewerRole: 'owner' | 'leader' | 'admin'` di response. Saat `PlanService.create`, prefill `directLeader` dari nama manager aktif bila belum ada dari plan sebelumnya.
 **Acceptance:** Leader aktif bisa GET & export plan bawahan; PUT/PATCH/submit oleh leader → 403; pihak dengan request pending → 403; user lain → 403.
 **Depends:** OD-46.
+**Log:** 2026-11-10 — `PlanService.get`: mode `read` kini juga untuk leader aktif (`users.manager_id = viewer`); `canEdit` tetap owner; response + `viewerRole` (`owner` > `leader` > `admin`). Export ikut `get`. `create`: `directLeader` = plan sebelumnya, kalau kosong nama manager aktif. Diverifikasi (skrip sementara, 5 user sintetis, DB `one-desk-e2e`): 18 pengecekan lulus — leader aktif GET & export 200; PUT items/PATCH/submit/reopen/DELETE oleh leader 403; pihak pending 403 (GET & export); user lain 403; admin 200 (`viewerRole=admin`); setelah leader dilepas 403; prefill leader benar. `typecheck` lulus, `test` 11 pass. Test permanen → OD-50. Commit: lihat git log.
 
 ### OD-48 · UI dashboard: atasan & direct report (2 arah) · `TODO`
 **Description:** Komponen baru `components/ReportingLinePanel.vue` (Mekari Pixel), dipasang di `views/pgp/PgpHomeView.vue`:
