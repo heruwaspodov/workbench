@@ -163,6 +163,16 @@ await step('My Confluence lists, searches and links my pages', async () => {
   await page.goto(`${APP}/confluence`)
   await text(page, 'Postmortem SEV1')
   await text(page, 'Roadmap Q4')
+  for (const width of [1440, 1024, 768]) {
+    await page.setViewportSize({ width, height: 900 })
+    const m = await page.evaluate(() => ({
+      page: document.documentElement.scrollWidth - innerWidth,
+      rows: [...document.querySelectorAll('[data-row]')].filter((r) => r.scrollWidth > r.clientWidth + 1).length,
+    }))
+    if (m.page > 1 || m.rows > 0) throw new Error(`My Confluence scrolls sideways at ${width}px (page +${m.page}px, ${m.rows} rows)`)
+  }
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.waitForTimeout(400)
   const href = await page.getByRole('link', { name: 'Runbook Signing' }).first().getAttribute('href')
   if (!href?.startsWith('http://localhost:4010/wiki/spaces/')) throw new Error(`unexpected link ${href}`)
   await page.getByPlaceholder('Search page titles').fill('runbook')

@@ -1,7 +1,5 @@
 <script setup lang="ts">
-import {
-  MpBadge, MpButton, MpTable, MpTableBody, MpTableCell, MpTableContainer, MpTableHead, MpTableRow, MpText, css,
-} from '@mekari/pixel3'
+import { MpBadge, MpButton, MpIcon, MpText, css } from '@mekari/pixel3'
 import { onMounted, ref, watch } from 'vue'
 import AsyncState from '@/components/AsyncState.vue'
 import PageHeader from '@/components/PageHeader.vue'
@@ -29,8 +27,17 @@ function search() {
 }
 
 const bar = css({ display: 'flex', gap: '3', mb: '5', maxWidth: '520px' })
-const actions = css({ display: 'flex', justifyContent: 'flex-end' })
-const pager = css({ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: '3', borderTopWidth: '1px', borderColor: 'border.default.subtle' })
+// One compact block per page (same pattern as the pull request list): nothing needs sideways scrolling.
+const list = css({ borderTopWidth: '1px', borderColor: 'border.default.subtle' })
+const row = css({
+  display: 'grid', gridTemplateColumns: 'auto minmax(0, 1fr) auto', columnGap: '3', alignItems: 'center',
+  px: '4', py: '3', borderBottomWidth: '1px', borderColor: 'border.default.subtle', _hover: { bg: 'background.surface' },
+})
+const tile = css({ width: '9', height: '9', rounded: 'full', bg: 'background.surface', display: 'grid', placeItems: 'center', flexShrink: 0 })
+const main = css({ minWidth: 0, display: 'flex', flexDirection: 'column', gap: '1' })
+const title = css({ display: 'block', truncate: true })
+const meta = css({ display: 'flex', alignItems: 'center', flexWrap: 'wrap', columnGap: '2', rowGap: '1' })
+const pager = css({ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: '3' })
 </script>
 
 <template>
@@ -43,34 +50,21 @@ const pager = css({ display: 'flex', justifyContent: 'space-between', alignItems
 
   <AsyncState :loading="loading && !data" :error="error" :empty="data?.items.length === 0"
     :empty-text="applied ? 'No pages match your search.' : 'You have not created any pages yet.'" @retry="run">
-    <div v-if="data" :class="ui.flat">
-      <MpTableContainer>
-        <MpTable is-hoverable :class="ui.table">
-          <MpTableHead>
-            <MpTableRow>
-              <MpTableCell as="th">Page</MpTableCell>
-              <MpTableCell as="th">Space</MpTableCell>
-              <MpTableCell as="th">Last modified</MpTableCell>
-              <MpTableCell as="th" />
-            </MpTableRow>
-          </MpTableHead>
-          <MpTableBody>
-            <MpTableRow v-for="p in data.items" :key="p.id">
-              <MpTableCell :style="{ minWidth: '320px' }">
-                <a v-if="isHttpUrl(p.url)" :href="p.url" target="_blank" rel="noopener noreferrer" :class="ui.link">{{ p.title }}</a>
-                <MpText v-else weight="semiBold">{{ p.title }}</MpText>
-              </MpTableCell>
-              <MpTableCell><MpBadge v-if="p.space" variant="subtle" variant-color="gray">{{ p.space }}</MpBadge></MpTableCell>
-              <MpTableCell>{{ formatDate(p.lastModified) }}</MpTableCell>
-              <MpTableCell>
-                <div :class="actions">
-                  <MpButton size="sm" variant="ghost" left-icon="copy" @click="copyText(p.url)">Copy link</MpButton>
-                </div>
-              </MpTableCell>
-            </MpTableRow>
-          </MpTableBody>
-        </MpTable>
-      </MpTableContainer>
+    <div v-if="data">
+      <div :class="list">
+        <div v-for="p in data.items" :key="p.id" :class="row" data-row>
+          <div :class="tile"><MpIcon name="draft" size="sm" /></div>
+          <div :class="main">
+            <a v-if="isHttpUrl(p.url)" :href="p.url" target="_blank" rel="noopener noreferrer" :title="p.title" :class="[ui.link, title]">{{ p.title }}</a>
+            <MpText v-else weight="semiBold" :class="title" :title="p.title">{{ p.title }}</MpText>
+            <div :class="meta">
+              <MpBadge v-if="p.space" size="sm" variant="subtle" variant-color="gray">{{ p.space }}</MpBadge>
+              <MpText size="label-small" color="text.secondary">Last modified {{ formatDate(p.lastModified) }}</MpText>
+            </div>
+          </div>
+          <MpButton size="sm" variant="ghost" left-icon="copy" @click="copyText(p.url)">Copy link</MpButton>
+        </div>
+      </div>
       <div :class="pager">
         <MpText size="label" color="text.secondary">{{ data.total }} {{ data.total === 1 ? 'page' : 'pages' }} · page {{ data.page }}</MpText>
         <div :class="css({ display: 'flex', gap: '2' })">

@@ -386,6 +386,12 @@ Toast sukses/error via `notifySuccess/notifyError`; refresh `GET /api/org/me` se
 **Depends:** OD-24, OD-26, OD-59.
 **Log:** 2026-11-10 — `PullRequestsView` ditulis ulang (tanpa `MpTable`): grid `avatar | isi | kolom kanan` dengan `minmax(0, 1fr)` agar teks terpotong, bukan melebar; kolom kanan `104px 40px 40px 72px` di ≥ lg agar sejajar antar baris. Mock e2e + PR berjudul 140+ karakter dan branch panjang; e2e mengukur `scrollWidth` halaman dan tiap baris di 1440/1024/768 (gagal bila ada yang melebar) dan menyimpan screenshot 1024. Screenshot dicek di 1440 dan 1024. `typecheck`, `build`, `test` (81 pass), `e2e` (13/13) hijau. Catatan: kolom state tetap ditampilkan walau filter Open (konsisten saat filter All states); Bitbucket menampilkan build status, belum ditiru di daftar (ada di halaman detail).
 
+### OD-61 · My Confluence: daftar ringkas seperti daftar PR · `DONE`
+**Description:** Tabel My Confluence (4 kolom dengan `min-width`) dinilai kurang compact dan bisa menuntut scroll horizontal. Ganti dengan baris-blok seperti daftar PR (OD-60): ikon halaman, judul (satu baris, ellipsis, link ke Confluence di tab baru), meta (`space` + `Last modified …`), dan tombol Copy link di kanan.
+**Acceptance:** Tanpa scroll horizontal di 1440, 1024, dan 768 px termasuk judul sangat panjang; link tetap `http(s)` saja; pencarian & paging tetap berfungsi; e2e memeriksa lebar (mock berisi judul 130+ karakter); typecheck, build, test, e2e hijau.
+**Depends:** OD-54, OD-60.
+**Log:** 2026-11-10 — `ConfluenceView` ditulis ulang tanpa `MpTable` (grid `ikon | isi | aksi`, `minmax(0,1fr)`, judul `truncate` + `title`), data `data-row` untuk pemeriksaan lebar. Mock e2e + halaman berjudul panjang; e2e mengukur `scrollWidth` halaman dan tiap baris di 1440/1024/768. Screenshot dicek. `typecheck`, `build`, `test` (81 pass), `e2e` (13/13) hijau. Commit: lihat git log.
+
 ## Fase 10 — Confluence (read-only)
 
 ### OD-54 · Confluence: My Confluence + evidence PGP · `IN PROGRESS`

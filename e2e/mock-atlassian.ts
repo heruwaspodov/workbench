@@ -62,6 +62,7 @@ const wikiPages = [
   { id: '5001', title: 'Runbook Signing', space: 'Engineering' },
   { id: '5002', title: 'Postmortem SEV1', space: 'Engineering' },
   { id: '5003', title: 'Roadmap Q4', space: 'Product' },
+  { id: '5004', title: 'Runbook: how to recover a stuck signing workflow after a failed webhook delivery, including every manual step, owner and escalation path', space: 'Engineering' },
 ]
 function wikiSearch(url: URL): Response {
   const cql = url.searchParams.get('cql') ?? ''
