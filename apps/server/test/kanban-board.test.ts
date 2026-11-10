@@ -41,7 +41,7 @@ describe('Kanban follows the board sub-filter', () => {
         const def = m && boardDefs[Number(m[1])]
         if (!m || !def) return Response.json({ errorMessages: ['not found'] }, { status: 404 })
         if (m[2] === '/configuration') {
-          return Response.json({ id: Number(m[1]), name: `Board ${m[1]}`, subQuery: def.subQuery, columnConfig: { columns: [{ name: 'To Do', statuses: [{ id: '1' }] }, { name: 'Done', statuses: [{ id: '3' }] }] } })
+          return Response.json({ id: Number(m[1]), name: `Board ${m[1]}`, subQuery: def.subQuery, columnConfig: { columns: [{ name: 'Backlog', statuses: [] }, { name: 'To Do', statuses: [{ id: '1' }] }, { name: 'Done', statuses: [{ id: '3' }] }] } })
         }
         if (m[2] === '/issue') {
           jqls.push(u.searchParams.get('jql')!)
@@ -64,6 +64,12 @@ describe('Kanban follows the board sub-filter', () => {
     const res = await Kanban.KanbanService.board(user, 'active')
     expect(res.columns.find((c) => c.name === 'To Do')?.cards).toHaveLength(1)
     expect(jqls.at(-1)).toBe(`assignee = "acct-${tag}-a" AND (statusCategory != Done OR updated >= -7d) AND (${SUB}) ORDER BY Rank ASC`)
+  })
+
+  test('the empty Kanban "Backlog" placeholder column is not shown', async () => {
+    const user = await userOnBoard(9101, 'd')
+    const res = await Kanban.KanbanService.board(user, 'active')
+    expect(res.columns.map((c) => c.name)).toEqual(['To Do', 'Done'])
   })
 
   test('a board without a sub-filter is queried as before', async () => {

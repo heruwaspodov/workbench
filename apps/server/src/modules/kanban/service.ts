@@ -64,9 +64,11 @@ export abstract class KanbanService {
       const jql = withSubQuery(base, config.subQuery?.query)
       const { issues } = await jira.boardIssues(boardId, `${jql} ORDER BY Rank ASC`, CARD_FIELDS)
 
+      // A column without statuses is Jira's Kanban "Backlog" placeholder, which the board view never shows.
+      const boardColumns = config.columnConfig.columns.filter((c) => c.statuses.length > 0)
       const columnOf = new Map<string, string>()
-      for (const col of config.columnConfig.columns) for (const s of col.statuses) columnOf.set(s.id, col.name)
-      const columns = config.columnConfig.columns.map((c) => ({ name: c.name, cards: [] as KanbanCard[] }))
+      for (const col of boardColumns) for (const s of col.statuses) columnOf.set(s.id, col.name)
+      const columns = boardColumns.map((c) => ({ name: c.name, cards: [] as KanbanCard[] }))
       const other: KanbanCard[] = []
       for (const issue of issues) {
         const name = columnOf.get(issue.fields.status?.id)

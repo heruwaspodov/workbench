@@ -362,6 +362,12 @@ Toast sukses/error via `notifySuccess/notifyError`; refresh `GET /api/org/me` se
 **Depends:** OD-21, OD-55.
 **Log:** 2026-11-10 — Penyebab: board 2508 punya `subQuery` `created >= 2026-01-01 AND issuetype != Epic`; UI Jira menerapkannya, API `/board/{id}/issue` tidak → issue lama (2023–2025) dan Epic ikut tampil (BACKLOG 17 vs 1 di Jira). Perbaikan: `KanbanService` menambahkan `subQuery.query` dari konfigurasi board (cache 30 menit; `ORDER BY` di dalamnya dibuang) ke JQL scope sprint & active; `JiraBoardConfig.subQuery`. **Jendela Done** juga disamakan: Jira menyembunyikan issue Done yang tidak di-update 7 hari → `DONE_WINDOW = 'updated >= -7d'` (sebelumnya `resolved >= -14d` = 44 issue; kandidat lain: resolved -7d = 14, updated -7d = **18** = angka Jira); label tombol jadi "Semua aktif + done 7 hari". Diverifikasi ke Jira sungguhan untuk akun user di board 2508 (baca-saja): sebelum 68 issue (backlog 17, Human REview 3, In Progress 4, Done 44); sesudah 24 issue **backlog 1, In Progress 3, Human REview 2, Done 18 = persis UI Jira**. `test/kanban-board.test.ts` (4 test, Jira palsu); `typecheck`, `build`, `test` (80 pass), `e2e` (13/13) hijau. Catatan: aturan 7 hari disimpulkan dari kecocokan angka (belum ada dokumentasi Jira yang menyebutnya); bila Jira mengubah perilakunya, ubah konstanta `DONE_WINDOW`.
 
+### OD-57 · Kanban: sembunyikan kolom placeholder "Backlog" tanpa status · `DONE`
+**Description:** Board Kanban Jira punya kolom "Backlog" tanpa status (placeholder backlog) yang tidak pernah ditampilkan UI board Jira; dashboard menampilkannya sebagai kolom "BACKLOG" kosong di samping kolom "backlog" yang sebenarnya. Sembunyikan kolom tanpa status.
+**Acceptance:** Kolom Kanban di dashboard = kolom yang tampil di board Jira (board 2508: backlog, AI Ready, In Progress, AI Self Test, Human REview, BLOCKED, Done); test; typecheck, test, e2e hijau.
+**Depends:** OD-56.
+**Log:** 2026-11-10 — `KanbanService` hanya memakai kolom dengan ≥ 1 status (kolom "Backlog" dengan 0 status pada board 2508 dibuang); test menambahkan kolom placeholder pada konfigurasi palsu dan memastikan hasilnya hanya `To Do`, `Done`. Commit: lihat git log.
+
 ## Fase 10 — Confluence (read-only)
 
 ### OD-54 · Confluence: My Confluence + evidence PGP · `IN PROGRESS`
