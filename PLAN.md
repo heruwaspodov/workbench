@@ -24,9 +24,9 @@ Status: `TODO` · `IN PROGRESS` · `DONE` · `BLOCKED`
 | Fase | Tiket | Status |
 |------|-------|--------|
 | 0. Fondasi | OD-01 … OD-04 | DONE |
-| 1. Auth (Mekari OAuth2) | OD-05 … OD-07, OD-51 … OD-53 | DONE · OD-07 BLOCKED (butuh info SSO) · OD-51 … OD-53 DONE |
+| 1. Auth (Mekari OAuth2) | OD-05 … OD-07, OD-51 … OD-53, OD-64 | DONE · OD-07 BLOCKED (butuh info SSO) · OD-51 … OD-53 DONE |
 | 2. Connect Jira & Bitbucket | OD-08 … OD-11 | DONE (diverifikasi dengan mock) |
-| 3. PGP | OD-12 … OD-20 | DONE · OD-19 IN PROGRESS (butuh Google SA) |
+| 3. PGP | OD-12 … OD-20 | DONE · OD-19 OUT OF SCOPE (digantikan usulan OD-65) |
 | 3b. Direct leader & PGP bawahan (2 arah) | OD-45 … OD-50 | DONE |
 | 4. Kanban | OD-21 … OD-23 | DONE (mock) |
 | 5. Pull Requests | OD-24 … OD-26 | DONE (mock) |
@@ -157,10 +157,11 @@ Status: `TODO` · `IN PROGRESS` · `DONE` · `BLOCKED`
 **Acceptance:** Semua halaman render tanpa error console (selain icon CDN di sandbox).
 **Log:** Screenshot OK.
 
-### OD-19 · Import dari Google Sheet (Sheets API) · `IN PROGRESS`
+### OD-19 · Import dari Google Sheet (Sheets API) · `OUT OF SCOPE`
 **Description:** Kode sudah ada: `integrations/google-sheets.client.ts` + `GET /templates/import/sheet/tabs?url=` dan `/sheet/preview?url=&tab=`. Sisa pekerjaan: buat service account Google (Sheets API readonly), isi `GOOGLE_SERVICE_ACCOUNT_JSON`, share sheet contoh (Viewer), uji import tab "Q4 - 26" dan "Q3 - 2026"; perbaiki parser bila format tab lama berbeda (mis. Q3 yang kolom Objective berisi label pendek "DORA/SLO").
 **Acceptance:** Import kedua tab menghasilkan item dengan total weight sesuai sheet, warnings masuk akal.
 **Depends:** credential Google (user/admin).
+**Keputusan (2026-11-10):** out of scope — tidak akan membuat Google service account. Alternatif tanpa credential diusulkan di OD-65 (sheet publik diunduh sebagai .xlsx). Kode `integrations/google-sheets.client.ts` dan env `GOOGLE_SERVICE_ACCOUNT_JSON` dihapus saat OD-65 dikerjakan.
 
 ### OD-20 · Ringkasan delivery Jira di PGP · `DONE`
 **Description:** `GET /api/kanban/stats`: story point & jumlah tiket resolved per bulan (3 bulan) untuk evidence KR delivery; ditampilkan di PlanEditor.
@@ -403,6 +404,18 @@ Toast sukses/error via `notifySuccess/notifyError`; refresh `GET /api/org/me` se
 **Acceptance:** Default 20 di kedua halaman; ganti Rows per page mengembalikan ke halaman 1; Showing benar (mis. 21-40 pada halaman 2); tombol ikon nonaktif di ujung; server mengirim `pagelen` ke Bitbucket/Confluence dan CQL tetap memuat `creator = accountId` (test); e2e hijau; typecheck, build, test hijau.
 **Depends:** OD-54, OD-60, OD-61.
 **Log:** 2026-11-10 — Server: `PullRequestsService.list` menerima `pagelen` (default 20, maks 50) dan mengembalikan `pagelen` + `total` (author: `size` Bitbucket, `null` bila filter repo karena filter diterapkan setelah fetch; reviewer: jumlah hasil gabungan); Confluence default 25 → 20 (`creator = accountId` tetap, dites). Web: `components/PaginationBar.vue` ("Rows per page" 10/20/50, "Showing 1-20 of N", tombol sebelumnya/berikutnya berupa ikon `chevrons-left/right` dengan `aria-label`, nonaktif di ujung), dipasang di My Pull Requests & My Confluence; ganti ukuran halaman kembali ke halaman 1; placeholder cari My Confluence "Search your pages by title" (hasil pencarian tetap hanya halaman buatan user login). Verifikasi: `test/pull-requests-list.test.ts` (4 test, Bitbucket palsu: default 20, total, pagelen kustom, filter repo, paging reviewer) + test Confluence disesuaikan (limit 20); e2e memeriksa footer ("Showing 1-3 of 3", "Showing 1-4 of 4") dan bahwa request memuat `pagelen=20` (& `role=creator`); screenshot dicek. `typecheck`, `build`, `test` (85 pass), `e2e` (13/13) hijau. Catatan: paging reviewer hanya menjangkau 25 PR teratas per repo (batas lama, tidak diubah).
+
+### OD-64 · Hapus fitur dev login · `DONE`
+**Description:** Fitur `GET /auth/dev-login` (login tanpa kredensial dengan `DEV_LOGIN_EMAIL`) tidak dibutuhkan lagi karena login Mekari SSO sudah berjalan, dan jalur login tanpa-kredensial adalah risiko keamanan (juga saat dev server terjangkau dari jaringan lokal). Hapus dari server, UI, env, dan dokumen; e2e masuk lewat sesi yang dibuat langsung di database.
+**Acceptance:** `/auth/dev-login` → 404; `/api/auth/config` hanya `oauthConfigured`; tombol "Dev login" hilang dari halaman login; `DEV_LOGIN_EMAIL` tidak lagi dibaca atau didokumentasikan; e2e tetap hijau tanpa jalur login khusus; typecheck, build, test hijau.
+**Depends:** OD-07 (login SSO berjalan).
+**Log:** 2026-11-10 — dihapus: route `dev-login` & `devLogin` di `modules/auth`, `devLoginEmail` di `config/env.ts`, tombol di `LoginView`, `DEV_LOGIN_EMAIL` di `.env.example` (dan `.env` lokal user), teks README/CLAUDE.md/DESIGN.md (README kini menyatakan login hanya lewat SSO dan memerlukan `one-desk.local`). `e2e/run.ts` membuat user + sesi lewat `AuthService.upsertUser/createSession` ke DB e2e lalu menyuntik cookie `od_session`. Test baru: `/auth/dev-login` 404 dan config tanpa saklar dev. `typecheck`, `build`, `test` (86 pass), `e2e` (13/13) hijau. Konsekuensi: untuk menjalankan app lokal wajib punya login Mekari SSO yang berfungsi (host `one-desk.local`, `MEKARI_OAUTH_*`). Commit: lihat git log.
+
+### OD-65 · Import template dari Google Sheet publik (tanpa service account) · `TODO`
+**Description:** Pengganti OD-19. Admin menempel URL Google Sheet yang dibagikan "Anyone with the link: Viewer"; server mengunduh `https://docs.google.com/spreadsheets/d/{id}/export?format=xlsx` lalu memakai alur preview `.xlsx` yang sudah ada (pilih tab, parser, warnings, review, simpan). Kelayakan diverifikasi 2026-11-10 dengan sheet publik contoh: 200, `.xlsx` valid, redirect ke `*.googleusercontent.com`; sheet privat/tidak ada → balasan HTML 400 (bukan xlsx) sehingga bisa dideteksi. Hapus `integrations/google-sheets.client.ts`, env `GOOGLE_SERVICE_ACCOUNT_JSON`, dan dependency `google-auth-library`.
+Keamanan (SSRF & data): hanya host `docs.google.com` dengan id `[A-Za-z0-9_-]{20,}`; redirect hanya ke `docs.google.com`/`*.googleusercontent.com`; batas 10 MB; timeout 20 dtk; content-type harus xlsx, selain itu error jelas ("Sheet is not public: share it as Anyone with the link"). Hanya untuk sheet **template** tanpa data pribadi; sheet PGP berisi nama & penilaian karyawan (UU PDP) → jangan dipublikasikan, pakai upload `.xlsx`.
+**Acceptance:** Import tab dari sheet publik menghasilkan item & warnings seperti upload xlsx; sheet privat → pesan jelas; URL non-Google/ber-host lain ditolak; redirect ke host lain ditolak; test dengan fetch palsu hijau; README memuat cara membagikan sheet; typecheck, build, test, e2e hijau.
+**Depends:** OD-16, OD-19 (keputusan out of scope).
 
 ## Fase 10 — Confluence (read-only)
 

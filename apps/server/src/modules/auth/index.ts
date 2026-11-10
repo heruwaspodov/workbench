@@ -47,20 +47,12 @@ export const authModule = new Elysia({ name: 'module.auth' })
         if (verifier) cookie[OAUTH_VERIFIER_COOKIE]!.set({ value: verifier, ...shortCookie })
         cookie[OAUTH_REDIRECT_COOKIE]!.set({ value: AuthService.safeRedirect(query.redirect), ...shortCookie })
         return redirect(url)
-      }, { query: AuthModel.loginQuery })
-      .get('/dev-login', async ({ cookie, redirect }) => {
-        if (env.isProd || !env.devLoginEmail) throw new AppError(404, 'Not found', 'NOT_FOUND')
-        const user = await AuthService.upsertUser({ subject: 'dev', email: env.devLoginEmail.toLowerCase(), name: env.devLoginEmail.split('@')[0]! })
-        const session = await AuthService.createSession(user.id)
-        cookie[SESSION_COOKIE]!.set({ value: session.token, httpOnly: true, sameSite: 'lax', path: '/', expires: session.expiresAt })
-        return redirect('/')
-      }),
+      }, { query: AuthModel.loginQuery }),
   )
   .group('/api/auth', (app) =>
     app
       .get('/config', () => ({
         oauthConfigured: AuthService.oauthConfigured,
-        devLogin: !env.isProd && Boolean(env.devLoginEmail),
       }))
       .get('/me', async ({ user }) => ({
         id: user.id, email: user.email, name: user.name, avatarUrl: user.avatarUrl, role: user.role,

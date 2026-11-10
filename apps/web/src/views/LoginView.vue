@@ -5,7 +5,7 @@ import { useRoute } from 'vue-router'
 import { api, unwrap } from '@/lib/api'
 
 const route = useRoute()
-const config = ref<{ oauthConfigured: boolean; devLogin: boolean } | null>(null)
+const config = ref<{ oauthConfigured: boolean } | null>(null)
 const error = typeof route.query.error === 'string' ? route.query.error : null
 const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/'
 
@@ -46,9 +46,6 @@ const feature = css({ display: 'flex', gap: '2', alignItems: 'center' })
       <MpText v-if="config && !config.oauthConfigured" size="label-small" color="text.secondary">
         Mekari OAuth2 is not configured on the server (see .env).
       </MpText>
-      <a v-if="config?.devLogin" href="/auth/dev-login">
-        <MpButton is-full-width variant="ghost">Dev login (local only)</MpButton>
-      </a>
     </div>
   </div>
 </template>

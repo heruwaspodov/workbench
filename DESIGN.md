@@ -117,7 +117,7 @@ Aturan bisnis PGP:
 ## 8. Prinsip keamanan & data (UU PDP / ISO 27001 / 27701)
 
 - Tidak ada secret di repo; semua via `.env` (`.env.example` hanya placeholder). Token integrasi hanya di server.
-- Hanya domain yang diizinkan (`ALLOWED_EMAIL_DOMAINS`) yang bisa login; `dev-login` mati di production.
+- Hanya domain yang diizinkan (`ALLOWED_EMAIL_DOMAINS`) yang bisa login. Tidak ada jalur login selain Mekari SSO (fitur dev login dihapus, OD-64).
 - Data PGP = data personal karyawan → akses: owner (read/write), direct leader aktif yang sudah dikonfirmasi (read), admin (read). Tidak ada endpoint publik.
 - Konten dari Jira/PR dirender sebagai **teks** (bukan HTML) — ADF → plain text; evidence link hanya dirender sebagai `<a>` bila `http(s)`.
 - Redirect pasca-login hanya path relatif (anti open-redirect).

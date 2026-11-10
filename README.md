@@ -14,12 +14,12 @@ Goals & arsitektur: [DESIGN.md](./DESIGN.md) · Tiket kerja: [PLAN.md](./PLAN.md
 
 ```bash
 createdb -h localhost one-desk     # sekali saja
-cp .env.example .env               # lalu isi DEV_LOGIN_EMAIL
+cp .env.example .env               # lalu isi APP_URL dan MEKARI_OAUTH_* (lihat di bawah)
 bun run setup                      # bun install + migrate
 bun run dev                        # server :3000 + web :5173, log ber-prefix
 ```
 
-Buka http://localhost:5173. Selama Mekari OAuth belum dikonfigurasi (OD-07), login lewat tombol dev login. Tombol ini aktif bila `DEV_LOGIN_EMAIL` terisi dan hanya untuk lokal, mati di production.
+Login hanya lewat Mekari SSO (tidak ada dev login). Karena SSO tidak menerima `localhost` sebagai redirect URI, di lokal wajib memakai host `one-desk.local` (bagian berikut), `MEKARI_OAUTH_*` terisi, dan emailmu di `ADMIN_EMAILS` bila perlu akses admin.
 
 ### Host `one-desk.local` (untuk Mekari OAuth)
 
@@ -32,9 +32,9 @@ Mekari SSO tidak menerima `localhost` sebagai redirect URI. Pakai host lokal:
 2. Di `.env` set `APP_URL=http://one-desk.local`. Redirect URI untuk didaftarkan di SSO: `http://one-desk.local/sso-callback`.
 3. `bun run dev`, lalu buka http://one-desk.local (tanpa port).
 
-Vite mengikuti `APP_URL`: host dan port diambil dari URL itu. Port 80 butuh bind wildcard (macOS tanpa root hanya mengizinkan itu untuk port < 1024), jadi dev server terjangkau dari jaringan lokal lewat IP. Hostname lain ditolak (`allowedHosts`), tapi akses via IP tidak. Kosongkan `DEV_LOGIN_EMAIL` setelah OAuth jalan dan jangan pakai di jaringan yang tidak dipercaya. Bila port 80 dipakai proses lain, tidak ada fallback otomatis (`strictPort`); hentikan proses itu atau pakai `APP_URL` dengan port lain jika SSO mengizinkan.
+Vite mengikuti `APP_URL`: host dan port diambil dari URL itu. Port 80 butuh bind wildcard (macOS tanpa root hanya mengizinkan itu untuk port < 1024), jadi dev server terjangkau dari jaringan lokal lewat IP. Hostname lain ditolak (`allowedHosts`), tapi akses via IP tidak. Jangan jalankan di jaringan yang tidak dipercaya; semua endpoint tetap butuh sesi login Mekari. Bila port 80 dipakai proses lain, tidak ada fallback otomatis (`strictPort`); hentikan proses itu atau pakai `APP_URL` dengan port lain jika SSO mengizinkan.
 
-Tanpa integrasi eksternal, PGP sudah bisa dipakai penuh: buat template dari scratch, isi plan, export Excel. Kanban dan PR butuh kredensial Jira/Bitbucket di bawah.
+Setelah login, PGP bisa dipakai tanpa integrasi lain: buat template dari scratch, isi plan, export Excel. Kanban, PR, dan Confluence butuh kredensial Atlassian/Bitbucket di bawah.
 
 ## Perintah
 
@@ -63,7 +63,6 @@ Semua di `.env` (tidak di-commit). `.env.example` hanya berisi placeholder. Jang
 |----------|-------|------------|
 | `DATABASE_URL` | ya | Default `postgres://localhost:5432/one-desk` (user = user OS) |
 | `APP_URL`, `PORT` | tidak | Origin UI dan port API. Request `POST/PUT/PATCH/DELETE` ke `/api/*` hanya diterima bila `Origin`/`Referer` sama dengan `APP_URL` (proteksi CSRF); di production set ke URL publik, di lokal akses lewat http://localhost:5173 |
-| `DEV_LOGIN_EMAIL` | lokal | Email untuk dev login |
 | `MEKARI_OAUTH_*` | production | Authorize `https://account.mekari.com/auth`, token `https://account.mekari.com/auth/oauth2/token` (body JSON), userinfo `https://api.mekari.com/v1/users/me` (Mekari SSO API, Bearer token), client id/secret, scope (`esign` untuk app yang terdaftar). `MEKARI_OAUTH_REDIRECT_URI` opsional, default `{APP_URL}/sso-callback`; harus persis sama dengan yang didaftarkan di SSO. `MEKARI_OAUTH_PKCE=false` karena dokumen Mekari tidak menyebut PKCE |
 | `ADMIN_EMAILS` | tidak | Email dipisah koma; jadi admin saat login pertama |
 | `ALLOWED_EMAIL_DOMAINS` | tidak | Default `mekari.com` |

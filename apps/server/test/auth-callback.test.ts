@@ -43,4 +43,10 @@ describe('OAuth callback route', () => {
     const res = await get('/auth/callback?code=abc&state=x')
     expect(res.status).toBe(404)
   })
+
+  test('there is no dev login route and the config exposes no dev switch', async () => {
+    expect((await get('/auth/dev-login')).status).toBe(404)
+    const config = await (await get('/api/auth/config')).json()
+    expect(Object.keys(config)).toEqual(['oauthConfigured'])
+  })
 })

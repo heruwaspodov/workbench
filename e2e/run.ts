@@ -40,7 +40,6 @@ const serverEnv = {
   DATABASE_URL: DB_URL,
   PORT: String(APP_PORT),
   APP_URL: APP,
-  DEV_LOGIN_EMAIL: EMAIL,
   ADMIN_EMAILS: EMAIL,
   JIRA_BASE_URL: `http://localhost:${MOCK_PORT}`,
   JIRA_EMAIL: 'mock@example.test',
@@ -64,8 +63,16 @@ if ((await migrate.exited) !== 0) throw new Error('migration failed')
 spawn(['bun', 'src/index.ts'], SERVER_DIR, serverEnv)
 await Promise.all([waitFor(`http://localhost:${MOCK_PORT}/rest/api/3/user`), waitFor(`${APP}/api/auth/config`)])
 
+// There is no login shortcut in the app: the test signs in with a real session row created in the e2e database.
+Object.assign(process.env, { DATABASE_URL: DB_URL, ADMIN_EMAILS: EMAIL })
+const { AuthService } = await import('../apps/server/src/modules/auth/service')
+const testUser = await AuthService.upsertUser({ subject: 'e2e', email: EMAIL, name: 'dev' })
+const session = await AuthService.createSession(testUser.id)
+
 const browser = await chromium.launch({ channel: 'chrome', headless: true })
-const page = await (await browser.newContext({ viewport: { width: 1440, height: 900 } })).newPage()
+const context = await browser.newContext({ viewport: { width: 1440, height: 900 } })
+await context.addCookies([{ name: 'od_session', value: session.token, url: APP }])
+const page = await context.newPage()
 
 const jsErrors: string[] = []
 // Pixel icons come from cdn.mekari.design; they may be blocked in sandboxes.
@@ -99,8 +106,8 @@ console.log(`e2e against ${APP}`)
 const title = `PGP e2e ${Date.now()}`
 let planId = ''
 
-await step('login (dev) lands on PGP home', async () => {
-  await page.goto(`${APP}/auth/dev-login`)
+await step('signed-in session lands on PGP home', async () => {
+  await page.goto(`${APP}/`)
   await page.waitForURL(/\/pgp$/)
   await text(page, 'Personal Growth Plan')
   await shot('01-pgp-home')

@@ -61,7 +61,7 @@ apps/server/src/modules/<nama>/
 ```bash
 bun install
 docker compose up -d db            # Postgres 16 (onedesk/onedesk)
-cp .env.example .env               # isi; DEV_LOGIN_EMAIL untuk login lokal tanpa OAuth
+cp .env.example .env               # isi MEKARI_OAUTH_* dan APP_URL=http://one-desk.local (login hanya lewat Mekari SSO)
 bun run db:migrate
 bun run dev:server                 # API :3000
 bun run dev:web                    # Vite :5173 (proxy /api & /auth)

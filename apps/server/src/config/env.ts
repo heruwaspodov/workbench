@@ -36,8 +36,6 @@ export const env = {
   },
   adminEmails: list('ADMIN_EMAILS'),
   allowedDomains: list('ALLOWED_EMAIL_DOMAINS'),
-  /** Dev only: bypass OAuth with a fixed user. Ignored in production. */
-  devLoginEmail: read('DEV_LOGIN_EMAIL'),
 
   jira: {
     baseUrl: read('JIRA_BASE_URL', '')!.replace(/\/$/, ''),
