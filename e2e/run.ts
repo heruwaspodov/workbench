@@ -105,6 +105,7 @@ const api = async (method: string, path: string, data?: unknown) => {
 console.log(`e2e against ${APP}`)
 const title = `PGP e2e ${Date.now()}`
 let planId = ''
+let templateId = ''
 
 await step('signed-in session lands on PGP home', async () => {
   await page.goto(`${APP}/`)
@@ -117,10 +118,11 @@ await step('admin creates & publishes template (API), shown on home', async () =
   const t = await api('POST', '/api/pgp/templates', {
     title, period: '2026-Q4',
     items: [
-      { objective: 'Reliability', keyResult: 'SLO 99.9%', weight: 60, initiative: 'Fix noisy alerts' },
+      { objective: 'Reliability', keyResult: 'SLO 99.9% on every customer-facing signing endpoint, measured monthly over a rolling window and reported to the leadership team with a written root cause for each breach', weight: 60, initiative: 'Fix noisy alerts and write the runbook for every page-worthy alert, including the escalation path, the owner and the exact commands an on-call engineer should run first, so that nobody needs to ask in the channel at night' },
       { objective: 'Delivery', keyResult: 'Ship 3 features', weight: 40, initiative: 'Sprint planning' },
     ],
   })
+  templateId = t.id
   await api('PATCH', `/api/pgp/templates/${t.id}`, { status: 'published' })
   await page.reload()
   await text(page, title)
@@ -150,17 +152,26 @@ await step('open plan, fill achievement, save', async () => {
   await page.getByRole('button', { name: 'Fill in this PGP' }).first().click()
   await page.waitForURL(/\/pgp\/plans\/[0-9a-f-]{36}$/)
   planId = page.url().split('/').pop()!
-  const input = page.locator('input[type=number][max]').first()
+  const input = page.locator('[data-field="achievement"] input').first()
   await input.waitFor()
   await input.fill('5')
   await page.getByRole('button', { name: 'Save', exact: true }).click()
   await page.waitForFunction(async (id) => (await (await fetch(`/api/pgp/plans/${id}`)).json()).score > 0, planId, { timeout: 10_000 })
+  for (const width of [1440, 1024, 768]) {
+    await page.setViewportSize({ width, height: 900 })
+    await page.waitForTimeout(250)
+    const m = await page.evaluate(() => ({ page: document.documentElement.scrollWidth - innerWidth, wide: [...document.querySelectorAll('main *')].filter((e) => e.getBoundingClientRect().right > innerWidth + 1).length }))
+    if (m.page > 1 || m.wide > 0) throw new Error(`Plan editor overflows at ${width}px (page +${m.page}px, ${m.wide} elements past the edge)`)
+    if (width === 1024) await shot('02a-plan-editor-1024')
+  }
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.waitForTimeout(300)
   await shot('02-plan-editor')
 })
 
 await step('plan editor shows Confluence evidence card (no page body)', async () => {
   await page.goto(`${APP}/pgp/plans/${planId}`)
-  await text(page, 'Your Confluence pages')
+  await text(page, 'Created or edited in the last 90 days')
   await text(page, 'Runbook Signing')
   if (await page.getByText('CONFIDENTIAL BODY TEXT').count()) throw new Error('page body/excerpt leaked into the UI')
   await shot('02b-plan-confluence')
@@ -261,6 +272,10 @@ await step('templates list and new template page', async () => {
   await page.goto(`${APP}/pgp/templates`)
   await text(page, title)
   await shot('09-templates')
+  await page.goto(`${APP}/pgp/templates/${templateId}`)
+  await text(page, 'Add initiative')
+  await page.waitForTimeout(400)
+  await shot('09b-template-editor')
   await page.goto(`${APP}/pgp/templates/new`)
   await text(page, 'Create template')
   await shot('10-template-new')

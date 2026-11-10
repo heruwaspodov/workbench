@@ -7,6 +7,7 @@ const emit = defineEmits<{ update: [links: string[]] }>()
 const onInput = (v: string) => emit('update', v.split(/\n+/).map((s) => s.trim()).filter(Boolean))
 const isUrl = (s: string) => /^https?:\/\//i.test(s)
 
+const compactTa = css({ '& textarea': { minHeight: '56px !important' } })
 const stack = css({ display: 'flex', flexDirection: 'column', gap: '1' })
 const link = css({ color: 'text.link', wordBreak: 'break-all', textDecoration: 'underline', fontSize: 'sm' })
 </script>
@@ -19,5 +20,5 @@ const link = css({ color: 'text.link', wordBreak: 'break-all', textDecoration: '
     </template>
     <MpText v-if="!props.links.length" size="label" color="text.secondary">-</MpText>
   </div>
-  <MpTextarea v-else placeholder="https://jurnal.atlassian.net/…" :model-value="props.links.join('\n')" @update:model-value="onInput" />
+  <MpTextarea v-else placeholder="https://jurnal.atlassian.net/…" :class="compactTa" :rows="2" :model-value="props.links.join('\n')" @update:model-value="onInput" />
 </template>
