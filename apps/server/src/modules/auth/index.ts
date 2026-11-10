@@ -59,8 +59,9 @@ export const authModule = new Elysia({ name: 'module.auth' })
         oauthConfigured: AuthService.oauthConfigured,
         devLogin: !env.isProd && Boolean(env.devLoginEmail),
       }))
-      .get('/me', ({ user }) => ({
+      .get('/me', async ({ user }) => ({
         id: user.id, email: user.email, name: user.name, avatarUrl: user.avatarUrl, role: user.role,
+        reportCount: await AuthService.reportCount(user.id),
       }), { auth: true })
       .post('/logout', async ({ cookie }) => {
         await AuthService.destroySession(cookie[SESSION_COOKIE]?.value)

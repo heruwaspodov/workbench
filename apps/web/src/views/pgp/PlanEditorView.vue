@@ -62,7 +62,7 @@ const exportUrl = computed(() => `/api/pgp/plans/${props.id}/export`)
 
 // Jira delivery stats as evidence helper (silently hidden when Jira isn't connected)
 const stats = ref<{ month: string; tickets: number; storyPoints: number }[]>([])
-onMounted(async () => { stats.value = await unwrap(api.kanban.stats.get()).catch(() => []) })
+watch(plan, async (p) => { if (p?.canEdit && !stats.value.length) stats.value = await unwrap(api.kanban.stats.get()).catch(() => []) }, { once: true })
 const monthLabel = (m: string) => new Date(`${m}-01`).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })
 
 const beforeUnload = (e: BeforeUnloadEvent) => { if (dirty.value) e.preventDefault() }
@@ -95,6 +95,12 @@ const stat = css({ bg: 'background.neutral.subtle', rounded: 'md', px: '3', py: 
         </template>
       </PageHeader>
 
+      <MpBanner v-if="!plan.canEdit" variant="info" :class="css({ mb: '4' })">
+        <MpBannerDescription>
+          {{ plan.viewerRole === 'leader' ? `Kamu melihat PGP ${plan.user.name} sebagai direct leader (hanya baca).` : `Kamu melihat PGP ${plan.user.name} sebagai admin (hanya baca).` }}
+        </MpBannerDescription>
+      </MpBanner>
+
       <MpBanner v-if="plan.status === 'submitted' && plan.canEdit" variant="info" :class="css({ mb: '4' })">
         <MpBannerDescription>Plan sudah disubmit: kolom planning dikunci, kolom monitoring (baseline, current, achievement, status, evidence) tetap bisa diupdate.</MpBannerDescription>
       </MpBanner>
@@ -108,7 +114,7 @@ const stat = css({ bg: 'background.neutral.subtle', rounded: 'md', px: '3', py: 
             Total weight {{ sum.weight }}%{{ sum.weight !== 100 ? ' — harus 100% untuk submit' : '' }}
           </MpText>
         </div>
-        <div :class="[card, css({ mb: '0' })]">
+        <div v-if="plan.canEdit" :class="[card, css({ mb: '0' })]">
           <MpText size="label" color="text.secondary" :class="css({ mb: '2' })">Delivery dari Jira (resolved, 3 bulan terakhir)</MpText>
           <div v-if="stats.length" :class="statRow">
             <div v-for="s in stats" :key="s.month" :class="stat">

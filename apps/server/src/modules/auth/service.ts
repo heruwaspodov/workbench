@@ -1,4 +1,4 @@
-import { and, eq, gt, lt } from 'drizzle-orm'
+import { and, count, eq, gt, lt } from 'drizzle-orm'
 import { env } from '../../config/env'
 import { db } from '../../db/client'
 import { sessions, users, type User } from '../../db/schema'
@@ -123,6 +123,11 @@ export abstract class AuthService {
     // opportunistic cleanup of expired sessions
     await db.delete(sessions).where(lt(sessions.expiresAt, new Date()))
     return { token, expiresAt }
+  }
+
+  static async reportCount(userId: string) {
+    const [row] = await db.select({ n: count() }).from(users).where(eq(users.managerId, userId))
+    return row?.n ?? 0
   }
 
   static async userFromSession(token: unknown): Promise<User | null> {

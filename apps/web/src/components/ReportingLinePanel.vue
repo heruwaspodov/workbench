@@ -5,6 +5,9 @@ import AsyncState from '@/components/AsyncState.vue'
 import UserPicker from '@/components/UserPicker.vue'
 import { api, notifyError, notifySuccess, unwrap } from '@/lib/api'
 import { useAsync } from '@/lib/use-async'
+import { useAuth } from '@/stores/auth'
+
+const auth = useAuth()
 
 const { data, loading, error, run } = useAsync(() => unwrap(api.org.me.get()))
 onMounted(run)
@@ -12,7 +15,7 @@ onMounted(run)
 const busy = ref<string | null>(null)
 async function act(key: string, fn: () => Promise<unknown>, success: string) {
   busy.value = key
-  try { await fn(); notifySuccess(success); await run() } catch (e) { notifyError(e) } finally { busy.value = null }
+  try { await fn(); notifySuccess(success); await Promise.all([run(), auth.load()]) } catch (e) { notifyError(e) } finally { busy.value = null }
 }
 
 const accept = (id: string) => act(`acc-${id}`, () => unwrap(api.org.requests({ id }).accept.post()), 'Permintaan diterima')

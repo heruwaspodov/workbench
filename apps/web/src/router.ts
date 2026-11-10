@@ -19,6 +19,7 @@ export const router = createRouter({
         { path: 'kanban', name: 'kanban', component: () => import('./views/kanban/KanbanView.vue'), meta: { title: 'My Kanban' } },
         { path: 'pull-requests', name: 'pull-requests', component: () => import('./views/pull-requests/PullRequestsView.vue'), meta: { title: 'Pull Requests' } },
         { path: 'pull-requests/:repo/:id', name: 'pull-request', component: () => import('./views/pull-requests/PullRequestDetailView.vue'), props: true, meta: { title: 'Pull Request' } },
+        { path: 'team', name: 'team', component: () => import('./views/team/TeamView.vue'), meta: { title: 'Tim Saya' } },
         { path: 'connections', name: 'connections', component: () => import('./views/ConnectionsView.vue'), meta: { title: 'Connections' } },
       ],
     },
