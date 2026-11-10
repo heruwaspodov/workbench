@@ -2,6 +2,7 @@ import { Elysia } from 'elysia'
 import { authPlugin } from '../../shared/auth.plugin'
 import { ExcelService } from './excel.service'
 import { PgpModel } from './model'
+import { PlanImportService } from './plan-import.service'
 import { PlanService } from './plan.service'
 import { TemplateService } from './template.service'
 
@@ -27,6 +28,8 @@ const planRoutes = new Elysia({ name: 'module.pgp.plans', prefix: '/plans' })
     app
       .get('/', ({ user }) => PlanService.listMine(user))
       .post('/', ({ user, body }) => PlanService.create(user, body.templateId), { body: PgpModel.planCreate })
+      .post('/import/xlsx/preview', ({ body }) => PlanImportService.preview(body.file, body.tab), { body: PgpModel.xlsxPreview })
+      .post('/from-xlsx', ({ user, body }) => PlanImportService.create(user, body), { body: PgpModel.planFromXlsx })
       .get('/:id', ({ user, params }) => PlanService.get(params.id, user), { params: PgpModel.idParam })
       .patch('/:id', ({ user, params, body }) => PlanService.updateHeader(params.id, user, body), { params: PgpModel.idParam, body: PgpModel.planUpdate })
       .put('/:id/items', ({ user, params, body }) => PlanService.replaceItems(params.id, user, body.items), { params: PgpModel.idParam, body: PgpModel.planItems })

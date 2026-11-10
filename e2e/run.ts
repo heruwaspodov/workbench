@@ -68,6 +68,13 @@ Object.assign(process.env, { DATABASE_URL: DB_URL, ADMIN_EMAILS: EMAIL })
 const { AuthService } = await import('../apps/server/src/modules/auth/service')
 const testUser = await AuthService.upsertUser({ subject: 'e2e', email: EMAIL, name: 'dev' })
 const session = await AuthService.createSession(testUser.id)
+// The e2e database is reused between runs and a user may hold only one plan per quarter: start from none.
+{
+  const { db } = await import('../apps/server/src/db/client')
+  const { plans } = await import('../apps/server/src/db/schema')
+  const { eq } = await import('drizzle-orm')
+  await db.delete(plans).where(eq(plans.userId, testUser.id))
+}
 
 const browser = await chromium.launch({ channel: 'chrome', headless: true })
 const context = await browser.newContext({ viewport: { width: 1440, height: 900 } })
@@ -76,7 +83,8 @@ const page = await context.newPage()
 
 const jsErrors: string[] = []
 // Pixel icons come from cdn.mekari.design; they may be blocked in sandboxes.
-const ignorable = (s: string) => s.includes('cdn.mekari.design')
+// The 409 is the expected answer when a quarter is created twice (checked in its own step).
+const ignorable = (s: string) => s.includes('cdn.mekari.design') || s.includes('status of 409')
 page.on('pageerror', (e) => jsErrors.push(`pageerror: ${e.message}`))
 page.on('console', (m) => { if (m.type() === 'error' && !ignorable(m.text() + (m.location().url ?? ''))) jsErrors.push(`console: ${m.text()}`) })
 
@@ -114,7 +122,7 @@ await step('signed-in session lands on PGP home', async () => {
   await shot('01-pgp-home')
 })
 
-await step('admin creates & publishes template (API), shown on home', async () => {
+await step('admin creates & publishes template (API), shown on Create PGP', async () => {
   const t = await api('POST', '/api/pgp/templates', {
     title, period: '2026-Q4',
     items: [
@@ -124,13 +132,13 @@ await step('admin creates & publishes template (API), shown on home', async () =
   })
   templateId = t.id
   await api('PATCH', `/api/pgp/templates/${t.id}`, { status: 'published' })
-  await page.reload()
+  await page.goto(`${APP}/pgp/new`)
   await text(page, title)
   for (const width of [1440, 1024, 768]) {
     await page.setViewportSize({ width, height: 900 })
     await page.waitForTimeout(200)
     const m = await page.evaluate(() => ({ page: document.documentElement.scrollWidth - innerWidth, wide: [...document.querySelectorAll('main *')].filter((e) => e.getBoundingClientRect().right > innerWidth + 1).length }))
-    if (m.page > 1 || m.wide > 0) throw new Error(`PGP home overflows at ${width}px (page +${m.page}px, ${m.wide} elements past the edge)`)
+    if (m.page > 1 || m.wide > 0) throw new Error(`Create PGP overflows at ${width}px (page +${m.page}px, ${m.wide} elements past the edge)`)
     if (width === 1024) await shot('01b-pgp-home-1024')
   }
   await page.setViewportSize({ width: 1440, height: 900 })
@@ -158,7 +166,7 @@ await step('pick the Kanban board by pasting its Jira URL (Connections)', async 
 })
 
 await step('open plan, fill achievement, save', async () => {
-  await page.goto(`${APP}/pgp`)
+  await page.goto(`${APP}/pgp/new`)
   await page.getByRole('button', { name: 'Fill in this PGP' }).first().click()
   await page.waitForURL(/\/pgp\/plans\/[0-9a-f-]{36}$/)
   planId = page.url().split('/').pop()!
@@ -177,6 +185,44 @@ await step('open plan, fill achievement, save', async () => {
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.waitForTimeout(300)
   await shot('02-plan-editor')
+})
+
+await step('Create PGP from an uploaded Excel file, then the same quarter is refused', async () => {
+  const ExcelJS = (await import('exceljs')).default
+  const wb = new ExcelJS.Workbook()
+  const ws = wb.addWorksheet('Q1 - 2025')
+  const head = ['Company OKR', 'Objective', 'Key Results', 'Weightage', 'Initiatives', 'Start Value', 'Target Value', 'Current Value', '% Achievement', 'Status', 'Hyperlink to key results']
+  ws.addRow(['Division Name', 'Your Name', 'SBU (Scope Product)', 'SBU (Detail)', 'Direct Leader', 'Period'])
+  ws.addRow(['Engineering', 'Test Person', 'ESIGN', '', 'Test Leader', 'Q1'])
+  ws.addRow([])
+  ws.addRow(head)
+  ws.addRow(['', 'Delivery', 'Ship stories', 0.6, 'Average 40 story points', '', '', 'AVG 44', 0.6, 'Done'])
+  ws.getRow(5).getCell(11).value = { text: 'July (162 SP)', hyperlink: 'https://jira.example.test/issues?jql=e2e' }
+  ws.addRow(['', 'Quality', 'No regressions', 0.4, 'Zero P0 bugs'])
+  const xlsx = join(OUT, 'e2e-plan.xlsx')
+  await wb.xlsx.writeFile(xlsx)
+
+  await page.goto(`${APP}/pgp`)
+  await page.getByRole('button', { name: 'Create PGP' }).click()
+  await page.waitForURL(/\/pgp\/new$/)
+  await page.getByRole('button', { name: 'Upload Excel' }).click()
+  await page.locator('[data-test="xlsx-file"]').setInputFiles(xlsx)
+  await page.locator('[data-test="create-plan"]').waitFor() // initiatives sit in textareas, which getByText cannot match
+  if ((await page.getByPlaceholder('2026').inputValue()) !== '2025') throw new Error('year was not read from the tab name')
+  await shot('04-create-from-upload')
+  await page.locator('[data-test="create-plan"]').click()
+  await page.waitForURL(/\/pgp\/plans\/[0-9a-f-]{36}$/)
+  await text(page, 'PGP 2025-Q1')
+  await page.waitForFunction(() => [...document.querySelectorAll('textarea')].some((t) => t.value.includes('https://jira.example.test/issues?jql=e2e')), undefined, { timeout: 10_000 })
+
+  await page.goto(`${APP}/pgp/new`)
+  await page.getByRole('button', { name: 'Upload Excel' }).click()
+  await page.locator('[data-test="xlsx-file"]').setInputFiles(xlsx)
+  await page.locator('[data-test="create-plan"]').waitFor() // initiatives sit in textareas, which getByText cannot match
+  await page.locator('[data-test="create-plan"]').click()
+  await text(page, 'You already have a PGP for 2025-Q1')
+  await text(page, 'Open existing PGP')
+  await shot('04b-create-quarter-taken')
 })
 
 await step('plan editor shows Confluence evidence card (no page body)', async () => {

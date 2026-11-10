@@ -54,6 +54,17 @@ export const PgpModel = {
     tab: t.Optional(t.String()),
   }),
 
+  planFromXlsx: t.Object({
+    year: t.Integer({ minimum: 2020, maximum: 2100 }),
+    quarter: t.Integer({ minimum: 1, maximum: 4 }),
+    sourceRef: t.Optional(t.String({ maxLength: 500 })),
+    division: nullableText,
+    sbu: nullableText,
+    sbuDetail: nullableText,
+    directLeader: nullableText,
+    items: t.Array(PlanItemInput, { minItems: 1, maxItems: 300 }),
+  }),
+
   planCreate: t.Object({ templateId: t.String({ format: 'uuid' }) }),
   planUpdate: t.Object({
     division: nullableText,
@@ -65,4 +76,5 @@ export const PgpModel = {
 }
 
 export type TemplateItemInputT = typeof TemplateItemInput.static
+export type PlanFromXlsxT = typeof PgpModel.planFromXlsx.static
 export type PlanItemInputT = typeof PlanItemInput.static

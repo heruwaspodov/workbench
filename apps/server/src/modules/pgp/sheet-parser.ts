@@ -17,6 +17,8 @@ export interface ParsedItem {
   currentValue: string | null
   achievement: number | null
   status: string | null
+  /** http(s) links from the evidence column: URLs written in the cell and the hidden target of a hyperlink cell. */
+  evidenceLinks: string[]
 }
 
 export interface ParsedSheet {
@@ -26,7 +28,7 @@ export interface ParsedSheet {
   warnings: string[]
 }
 
-type Col = keyof Omit<ParsedItem, never>
+type Col = Exclude<keyof ParsedItem, 'evidenceLinks'> | 'evidence'
 
 const HEADER_MATCHERS: [Col, RegExp][] = [
   ['companyOkr', /okr/i],
@@ -39,6 +41,7 @@ const HEADER_MATCHERS: [Col, RegExp][] = [
   ['currentValue', /current\s*value/i],
   ['achievement', /achievement/i],
   ['status', /^status$/i],
+  ['evidence', /hyperlink|evidence/i],
 ]
 
 const META_LABELS: [keyof ParsedSheet['meta'], RegExp][] = [
@@ -62,7 +65,11 @@ export function parsePercent(raw: string): number | null {
   return Math.round(n * 100) / 100
 }
 
-export function parsePgpSheet(rows: string[][]): ParsedSheet {
+const URL_RE = /https?:\/\/[^\s<>"')]+/gi
+const isHttp = (u: string) => /^https?:\/\//i.test(u)
+
+/** `links` is a grid shaped like `rows` holding hyperlink targets (see ExcelService.readWorkbookWithLinks). */
+export function parsePgpSheet(rows: string[][], links?: string[][]): ParsedSheet {
   const grid = rows.map((r) => r.map(clean))
   const warnings: string[] = []
 
@@ -126,6 +133,10 @@ export function parsePgpSheet(rows: string[][]): ParsedSheet {
     const weight = parsePercent(weightRaw) ?? 0
     if (weightRaw && parsePercent(weightRaw) === null) warnings.push(`Row ${r + 1}: invalid weight "${weightRaw}"`)
     const currentValue = get(row, 'currentValue')
+    const evidence = [
+      ...(get(row, 'evidence').match(URL_RE) ?? []),
+      ...(col.evidence === undefined ? [] : [links?.[r]?.[col.evidence] ?? '']),
+    ].map((u) => u.trim().replace(/[.,;]+$/, '')).filter(isHttp)
 
     items.push({
       companyOkr: companyOkr || null,
@@ -138,6 +149,7 @@ export function parsePgpSheet(rows: string[][]): ParsedSheet {
       currentValue: currentValue && !/^score$/i.test(currentValue) ? currentValue : null,
       achievement: parsePercent(get(row, 'achievement')),
       status: get(row, 'status') || null,
+      evidenceLinks: [...new Set(evidence)],
     })
   }
 

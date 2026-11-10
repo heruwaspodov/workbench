@@ -12,6 +12,7 @@ export const router = createRouter({
       children: [
         { path: '', redirect: '/pgp' },
         { path: 'pgp', name: 'pgp', component: () => import('./views/pgp/PgpHomeView.vue'), meta: { title: 'Personal Growth Plan' } },
+        { path: 'pgp/new', name: 'plan-new', component: () => import('./views/pgp/NewPlanView.vue'), meta: { title: 'Create PGP' } },
         { path: 'pgp/plans/:id', name: 'plan', component: () => import('./views/pgp/PlanEditorView.vue'), props: true, meta: { title: 'Personal Growth Plan' } },
         { path: 'pgp/templates', name: 'templates', component: () => import('./views/pgp/TemplatesView.vue'), meta: { title: 'PGP Templates', admin: true } },
         { path: 'pgp/templates/new', name: 'template-new', component: () => import('./views/pgp/TemplateEditorView.vue'), meta: { title: 'New Template', admin: true } },

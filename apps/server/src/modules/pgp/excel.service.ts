@@ -5,6 +5,15 @@ const STATUS_LABEL: Record<PlanItem['status'], string> = {
   not_started: 'Not Started', on_track: 'On Track', at_risk: 'At Risk', done: 'Done', not_achieved: 'Not Achieved',
 }
 
+const richPlain = (t: unknown): string =>
+  typeof t === 'string' ? t : t && typeof t === 'object' && 'richText' in t ? (t as ExcelJS.CellRichTextValue).richText.map((r) => r.text).join('') : t == null ? '' : String(t)
+
+/** Hidden target of an Excel hyperlink cell ("text" shown, URL behind it). */
+const cellLink = (cell: ExcelJS.Cell): string => {
+  const v = cell.value
+  return v && typeof v === 'object' && 'hyperlink' in v && typeof v.hyperlink === 'string' ? v.hyperlink : ''
+}
+
 const cellText = (cell: ExcelJS.Cell): string => {
   // Mirror Google Sheets semantics: merged ranges only carry a value in the top-left cell.
   if (cell.isMerged && cell.master.address !== cell.address) return ''
@@ -17,7 +26,7 @@ const cellText = (cell: ExcelJS.Cell): string => {
   if (typeof v === 'object') {
     if ('richText' in v) return v.richText.map((r) => r.text).join('')
     if ('result' in v) return v.result == null ? '' : String(v.result)
-    if ('text' in v) return String(v.text)
+    if ('text' in v) return richPlain(v.text)
   }
   return String(v)
 }
@@ -44,18 +53,32 @@ const thin: Partial<ExcelJS.Borders> = {
 
 export abstract class ExcelService {
   static async readWorkbook(buffer: ArrayBuffer): Promise<Map<string, string[][]>> {
+    const out = new Map<string, string[][]>()
+    for (const [name, sheet] of await this.readWorkbookWithLinks(buffer)) out.set(name, sheet.rows)
+    return out
+  }
+
+  /** Cell text plus a same-shaped grid of hyperlink targets (empty string where a cell has none). */
+  static async readWorkbookWithLinks(buffer: ArrayBuffer): Promise<Map<string, { rows: string[][]; links: string[][] }>> {
     const wb = new ExcelJS.Workbook()
     await wb.xlsx.load(buffer)
-    const out = new Map<string, string[][]>()
+    const out = new Map<string, { rows: string[][]; links: string[][] }>()
     wb.eachSheet((ws) => {
       const rows: string[][] = []
+      const links: string[][] = []
       for (let r = 1; r <= Math.min(ws.rowCount, 300); r++) {
         const row = ws.getRow(r)
         const cells: string[] = []
-        for (let c = 1; c <= Math.min(ws.columnCount, 26); c++) cells.push(cellText(row.getCell(c)))
+        const urls: string[] = []
+        for (let c = 1; c <= Math.min(ws.columnCount, 26); c++) {
+          const cell = row.getCell(c)
+          cells.push(cellText(cell))
+          urls.push(cellLink(cell))
+        }
         rows.push(cells)
+        links.push(urls)
       }
-      out.set(ws.name, rows)
+      out.set(ws.name, { rows, links })
     })
     return out
   }
