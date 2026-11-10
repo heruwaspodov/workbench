@@ -31,7 +31,7 @@ Status: `TODO` · `IN PROGRESS` · `DONE` · `BLOCKED`
 | 4. Kanban | OD-21 … OD-23 | DONE (mock) |
 | 5. Pull Requests | OD-24 … OD-26 | DONE (mock) |
 | 6. Frontend shell & polish | OD-27 … OD-31 | DONE · OD-31 IN PROGRESS |
-| 7. Pindah ke laptop & run lokal | OD-32 … OD-35 | OD-32 lihat tiket · sisanya TODO |
+| 7. Pindah ke laptop & run lokal | OD-32 … OD-35 | OD-32 DONE · sisanya TODO |
 | 8. Hardening & integrasi nyata | OD-36 … OD-42 | TODO |
 | 9. Rilis MVP internal | OD-43 … OD-44 | TODO |
 
@@ -251,9 +251,10 @@ Toast sukses/error memakai `notifySuccess/notifyError`.
 
 ## Fase 7 — Pindah ke laptop & run lokal
 
-### OD-32 · Salin source ke `~/Works/one-desk` + git init · `IN PROGRESS`
+### OD-32 · Salin source ke `~/Works/one-desk` + git init · `DONE`
 **Description:** Di cloud: `git init` di `/home/claude/one-desk`, commit awal (`chore: scaffold One Desk MVP`) tanpa `node_modules`, `dist`, `.env`. Pack sebagai tar.gz (termasuk `.git`) → kirim ke `~/Works/one-desk-src.tar.gz` → extract ke `~/Works/one-desk` (PLAN.md & DESIGN.md ikut ter-update dari repo) → hapus tarball (minta izin delete; bila ditolak, biarkan dan beri tahu user). Commit dibuat di cloud karena VM laptop belum bisa menghapus lock file git sebelum izin delete diberikan. Belum push ke remote.
 **Acceptance:** `ls ~/Works/one-desk` berisi apps/, package.json, bun.lock, PLAN.md, DESIGN.md; `git -C ~/Works/one-desk log` menunjukkan 1 commit; `git status` bersih.
+**Log:** 2026-11-10 — 82 file ter-extract di `~/Works/one-desk`, commit awal `f9feff1`, tarball dihapus, working tree bersih. Commit kedua mencatat status tiket ini.
 
 ### OD-33 · README & panduan setup lokal · `TODO`
 **Description:** `README.md`: prasyarat (Bun ≥ 1.3, Docker/OrbStack), langkah `cp .env.example .env`, `docker compose up -d db`, `bun install`, `bun run db:migrate`, `bun run dev:server` + `bun run dev:web`, akses http://localhost:5173, dev login, cara bikin Jira API token / Bitbucket token / Google SA, daftar env, catatan known issues.
