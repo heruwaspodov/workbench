@@ -28,7 +28,7 @@ export abstract class AuthService {
   }
 
   static get redirectUri() {
-    return `${env.appUrl}/auth/callback`
+    return env.oauth.redirectUri
   }
 
   static async buildAuthorizeUrl() {

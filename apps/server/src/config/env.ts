@@ -14,10 +14,12 @@ const list = (key: string) =>
     .map((s) => s.trim().toLowerCase())
     .filter(Boolean)
 
+const appUrl = read('APP_URL', 'http://localhost:5173')!
+
 export const env = {
   isProd: process.env.NODE_ENV === 'production',
   port: Number(read('PORT', '3000')),
-  appUrl: read('APP_URL', 'http://localhost:5173')!,
+  appUrl,
   databaseUrl: required('DATABASE_URL'),
   sessionTtlDays: Number(read('SESSION_TTL_DAYS', '7')),
 
@@ -28,6 +30,8 @@ export const env = {
     clientId: read('MEKARI_OAUTH_CLIENT_ID'),
     clientSecret: read('MEKARI_OAUTH_CLIENT_SECRET'),
     scope: read('MEKARI_OAUTH_SCOPE', 'openid profile email')!,
+    /** Must match the redirect URI registered in Mekari SSO exactly. */
+    redirectUri: read('MEKARI_OAUTH_REDIRECT_URI') ?? `${appUrl.replace(/\/$/, '')}/sso-callback`,
     usePkce: read('MEKARI_OAUTH_PKCE', 'true') === 'true',
   },
   adminEmails: list('ADMIN_EMAILS'),

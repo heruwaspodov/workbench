@@ -6,6 +6,7 @@ const api = process.env.API_URL ?? 'http://localhost:3000'
 // The dev server follows APP_URL so OAuth redirect URIs can use a non-localhost host (e.g. http://one-desk.local).
 const app = new URL(process.env.APP_URL ?? 'http://localhost:5173')
 const port = Number(app.port || (app.protocol === 'https:' ? 443 : 80))
+const oauthCallback = new URL(process.env.MEKARI_OAUTH_REDIRECT_URI ?? `${app.origin}/sso-callback`).pathname
 const isLocalhost = ['localhost', '127.0.0.1'].includes(app.hostname)
 
 export default defineConfig({
@@ -29,6 +30,7 @@ export default defineConfig({
     proxy: {
       '/api': { target: api, changeOrigin: false },
       '/auth': { target: api, changeOrigin: false },
+      [oauthCallback]: { target: api, changeOrigin: false },
     },
   },
 })

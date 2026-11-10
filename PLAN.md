@@ -24,7 +24,7 @@ Status: `TODO` · `IN PROGRESS` · `DONE` · `BLOCKED`
 | Fase | Tiket | Status |
 |------|-------|--------|
 | 0. Fondasi | OD-01 … OD-04 | DONE |
-| 1. Auth (Mekari OAuth2) | OD-05 … OD-07, OD-51 | DONE · OD-07 BLOCKED (butuh info SSO) · OD-51 DONE |
+| 1. Auth (Mekari OAuth2) | OD-05 … OD-07, OD-51, OD-52 | DONE · OD-07 BLOCKED (butuh info SSO) · OD-51, OD-52 DONE |
 | 2. Connect Jira & Bitbucket | OD-08 … OD-11 | DONE (diverifikasi dengan mock) |
 | 3. PGP | OD-12 … OD-20 | DONE · OD-19 IN PROGRESS (butuh Google SA) |
 | 3b. Direct leader & PGP bawahan (2 arah) | OD-45 … OD-50 | DONE |
@@ -74,7 +74,7 @@ Status: `TODO` · `IN PROGRESS` · `DONE` · `BLOCKED`
 **Log:** Selesai.
 
 ### OD-07 · Konfigurasi Mekari OAuth2 nyata · `BLOCKED`
-**Description:** Daftarkan client One Desk di Mekari SSO; isi `MEKARI_OAUTH_AUTHORIZE_URL/TOKEN_URL/USERINFO_URL/CLIENT_ID/CLIENT_SECRET/SCOPE`, redirect URI `{APP_URL}/auth/callback`. Cek bentuk userinfo; bila field berbeda, sesuaikan `AuthService.fetchProfile` (mapping `pick(...)`). Set `MEKARI_OAUTH_PKCE=false` bila SSO tidak mendukung PKCE.
+**Description:** Daftarkan client One Desk di Mekari SSO; isi `MEKARI_OAUTH_AUTHORIZE_URL/TOKEN_URL/USERINFO_URL/CLIENT_ID/CLIENT_SECRET/SCOPE`, redirect URI `{APP_URL}/sso-callback` (OD-52). Cek bentuk userinfo; bila field berbeda, sesuaikan `AuthService.fetchProfile` (mapping `pick(...)`). Set `MEKARI_OAUTH_PKCE=false` bila SSO tidak mendukung PKCE.
 **Acceptance:** Login dengan akun @mekari.com sungguhan berhasil di lokal.
 **Blocked by:** butuh endpoint + client credential dari tim Mekari SSO (lihat DESIGN §9.1). Sementara pakai `DEV_LOGIN_EMAIL` (lokal saja).
 
@@ -83,6 +83,12 @@ Status: `TODO` · `IN PROGRESS` · `DONE` · `BLOCKED`
 **Acceptance:** Dengan `APP_URL=http://one-desk.local`: `bun run dev` melayani UI di host itu, `/auth/login` mengarahkan ke SSO dengan `redirect_uri=http://one-desk.local/auth/callback`, Origin guard (OD-36) menerima request dari host itu; tanpa `APP_URL` perilaku lama (localhost:5173) tidak berubah.
 **Depends:** OD-36. Mendukung OD-07.
 **Log:** 2026-11-10 — `apps/web/vite.config.ts` mengambil host & port dari `APP_URL` (`strictPort`, port < 1024 → `host: true`, `allowedHosts: [hostname]`); `dev:web` memuat `.env` root; README bagian "Host one-desk.local" + `.env.example`. Diverifikasi dengan `APP_URL=http://one-desk.local` di port 80 (Host header, karena `/etc/hosts` perlu sudo dan dilakukan user): UI 200, proxy API 200, `/auth/login` → `redirect_uri=http://one-desk.local/auth/callback`, POST dengan Origin host itu 200 dan Origin `localhost:5173` 403, Host `evil.example` 403; default `localhost:5173` tetap jalan; `typecheck` lulus, `test` 42 pass. Catatan keamanan: bind wildcard di port 80 membuat dev server terjangkau via IP di jaringan lokal (Vite selalu mengizinkan Host berupa IP) → kosongkan `DEV_LOGIN_EMAIL` setelah OAuth jalan. Belum diuji: login SSO sungguhan (OD-07, butuh client credential) dan `/etc/hosts` di Mac user. Commit: lihat git log.
+
+### OD-52 · Callback OAuth `/sso-callback` + konfigurasi scope · `DONE`
+**Description:** Redirect URI yang didaftarkan di Mekari SSO adalah `http://one-desk.local/sso-callback` (scope `esign`, authorization code). Callback pindah dari `/auth/callback` ke `/sso-callback`: env baru `MEKARI_OAUTH_REDIRECT_URI` (default `{APP_URL}/sso-callback`), route callback didaftarkan pada path URI itu, `redirect_uri` di authorize & token exchange memakai nilai yang sama, proxy Vite meneruskan path tsb. `MEKARI_OAUTH_SCOPE` diisi `esign` di `.env` lokal.
+**Acceptance:** `/auth/login` mengarahkan ke SSO dengan `redirect_uri=http://one-desk.local/sso-callback`; `GET /sso-callback` menjalankan alur callback (state salah → `/login?error=invalid_state`) baik langsung ke server maupun lewat Vite; test untuk route callback; typecheck & test hijau.
+**Depends:** OD-51. Mendukung OD-07 (endpoint SSO & credential tetap dibutuhkan untuk login sungguhan).
+**Log:** 2026-11-10 — env `MEKARI_OAUTH_REDIRECT_URI` (default `{APP_URL}/sso-callback`); `AuthService.redirectUri` memakainya; route callback dipindah keluar dari grup `/auth` dan didaftarkan pada path URI itu; proxy Vite ikut path tsb; `.env` lokal `MEKARI_OAUTH_SCOPE=esign`; README & `.env.example` diperbarui; `test/auth-callback.test.ts` (5 test). Diverifikasi dengan endpoint & credential **dummy** (`sso.example.test`): `/auth/login` → `redirect_uri=http%3A%2F%2Fone-desk.local%2Fsso-callback&scope=esign`; `/sso-callback` lewat Vite dan langsung ke API → 302 `/login?error=invalid_state`; `/auth/callback` lama → 404; `typecheck` lulus, `test` 47 pass. Belum diuji: login SSO sungguhan — URL authorize/token/userinfo, client id & secret belum ada (OD-07); asumsi yang masih perlu dikonfirmasi: client auth di token endpoint (saat ini `client_id`/`client_secret` di body), dukungan PKCE, bentuk userinfo untuk scope `esign` (butuh `email`). Commit: lihat git log.
 
 ## Fase 2 — Connect Jira & Bitbucket
 

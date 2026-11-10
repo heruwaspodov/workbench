@@ -29,7 +29,7 @@ Mekari SSO tidak menerima `localhost` sebagai redirect URI. Pakai host lokal:
    ```bash
    sudo sh -c 'printf "127.0.0.1       one-desk.local\n::1             one-desk.local\n" >> /etc/hosts'
    ```
-2. Di `.env` set `APP_URL=http://one-desk.local`. Redirect URI untuk didaftarkan di SSO: `http://one-desk.local/auth/callback`.
+2. Di `.env` set `APP_URL=http://one-desk.local`. Redirect URI untuk didaftarkan di SSO: `http://one-desk.local/sso-callback`.
 3. `bun run dev`, lalu buka http://one-desk.local (tanpa port).
 
 Vite mengikuti `APP_URL`: host dan port diambil dari URL itu. Port 80 butuh bind wildcard (macOS tanpa root hanya mengizinkan itu untuk port < 1024), jadi dev server terjangkau dari jaringan lokal lewat IP. Hostname lain ditolak (`allowedHosts`), tapi akses via IP tidak. Kosongkan `DEV_LOGIN_EMAIL` setelah OAuth jalan dan jangan pakai di jaringan yang tidak dipercaya. Bila port 80 dipakai proses lain, tidak ada fallback otomatis (`strictPort`); hentikan proses itu atau pakai `APP_URL` dengan port lain jika SSO mengizinkan.
@@ -64,7 +64,7 @@ Semua di `.env` (tidak di-commit). `.env.example` hanya berisi placeholder. Jang
 | `DATABASE_URL` | ya | Default `postgres://localhost:5432/one-desk` (user = user OS) |
 | `APP_URL`, `PORT` | tidak | Origin UI dan port API. Request `POST/PUT/PATCH/DELETE` ke `/api/*` hanya diterima bila `Origin`/`Referer` sama dengan `APP_URL` (proteksi CSRF); di production set ke URL publik, di lokal akses lewat http://localhost:5173 |
 | `DEV_LOGIN_EMAIL` | lokal | Email untuk dev login |
-| `MEKARI_OAUTH_*` | production | Authorize/token/userinfo URL, client id/secret, scope. `MEKARI_OAUTH_PKCE=false` bila SSO tidak mendukung PKCE |
+| `MEKARI_OAUTH_*` | production | Authorize/token/userinfo URL, client id/secret, scope (`esign` untuk app yang terdaftar). `MEKARI_OAUTH_REDIRECT_URI` opsional, default `{APP_URL}/sso-callback`; harus persis sama dengan yang didaftarkan di SSO. `MEKARI_OAUTH_PKCE=false` bila SSO tidak mendukung PKCE |
 | `ADMIN_EMAILS` | tidak | Email dipisah koma; jadi admin saat login pertama |
 | `ALLOWED_EMAIL_DOMAINS` | tidak | Default `mekari.com` |
 | `SESSION_TTL_DAYS` | tidak | Default 7 |
