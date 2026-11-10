@@ -24,7 +24,7 @@ Status: `TODO` · `IN PROGRESS` · `DONE` · `BLOCKED`
 | Fase | Tiket | Status |
 |------|-------|--------|
 | 0. Fondasi | OD-01 … OD-04 | DONE |
-| 1. Auth (Mekari OAuth2) | OD-05 … OD-07 | DONE · OD-07 BLOCKED (butuh info SSO) |
+| 1. Auth (Mekari OAuth2) | OD-05 … OD-07, OD-51 | DONE · OD-07 BLOCKED (butuh info SSO) · OD-51 DONE |
 | 2. Connect Jira & Bitbucket | OD-08 … OD-11 | DONE (diverifikasi dengan mock) |
 | 3. PGP | OD-12 … OD-20 | DONE · OD-19 IN PROGRESS (butuh Google SA) |
 | 3b. Direct leader & PGP bawahan (2 arah) | OD-45 … OD-50 | DONE |
@@ -77,6 +77,12 @@ Status: `TODO` · `IN PROGRESS` · `DONE` · `BLOCKED`
 **Description:** Daftarkan client One Desk di Mekari SSO; isi `MEKARI_OAUTH_AUTHORIZE_URL/TOKEN_URL/USERINFO_URL/CLIENT_ID/CLIENT_SECRET/SCOPE`, redirect URI `{APP_URL}/auth/callback`. Cek bentuk userinfo; bila field berbeda, sesuaikan `AuthService.fetchProfile` (mapping `pick(...)`). Set `MEKARI_OAUTH_PKCE=false` bila SSO tidak mendukung PKCE.
 **Acceptance:** Login dengan akun @mekari.com sungguhan berhasil di lokal.
 **Blocked by:** butuh endpoint + client credential dari tim Mekari SSO (lihat DESIGN §9.1). Sementara pakai `DEV_LOGIN_EMAIL` (lokal saja).
+
+### OD-51 · Host lokal `one-desk.local` untuk OAuth redirect · `DONE`
+**Description:** Mekari SSO tidak menerima `localhost` sebagai redirect URI. Dev server mengikuti `APP_URL`: bila `APP_URL=http://one-desk.local`, Vite memakai host & port dari URL itu (port 80 → bind wildcard karena macOS tanpa root hanya mengizinkan itu untuk port < 1024; `allowedHosts` dibatasi ke hostname tsb) dan redirect URI OAuth menjadi `http://one-desk.local/auth/callback`. Script `dev:web` memuat `.env` root. README: langkah `/etc/hosts` (dilakukan user, butuh sudo).
+**Acceptance:** Dengan `APP_URL=http://one-desk.local`: `bun run dev` melayani UI di host itu, `/auth/login` mengarahkan ke SSO dengan `redirect_uri=http://one-desk.local/auth/callback`, Origin guard (OD-36) menerima request dari host itu; tanpa `APP_URL` perilaku lama (localhost:5173) tidak berubah.
+**Depends:** OD-36. Mendukung OD-07.
+**Log:** 2026-11-10 — `apps/web/vite.config.ts` mengambil host & port dari `APP_URL` (`strictPort`, port < 1024 → `host: true`, `allowedHosts: [hostname]`); `dev:web` memuat `.env` root; README bagian "Host one-desk.local" + `.env.example`. Diverifikasi dengan `APP_URL=http://one-desk.local` di port 80 (Host header, karena `/etc/hosts` perlu sudo dan dilakukan user): UI 200, proxy API 200, `/auth/login` → `redirect_uri=http://one-desk.local/auth/callback`, POST dengan Origin host itu 200 dan Origin `localhost:5173` 403, Host `evil.example` 403; default `localhost:5173` tetap jalan; `typecheck` lulus, `test` 42 pass. Catatan keamanan: bind wildcard di port 80 membuat dev server terjangkau via IP di jaringan lokal (Vite selalu mengizinkan Host berupa IP) → kosongkan `DEV_LOGIN_EMAIL` setelah OAuth jalan. Belum diuji: login SSO sungguhan (OD-07, butuh client credential) dan `/etc/hosts` di Mac user. Commit: lihat git log.
 
 ## Fase 2 — Connect Jira & Bitbucket
 

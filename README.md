@@ -21,6 +21,19 @@ bun run dev                        # server :3000 + web :5173, log ber-prefix
 
 Buka http://localhost:5173. Selama Mekari OAuth belum dikonfigurasi (OD-07), login lewat tombol dev login. Tombol ini aktif bila `DEV_LOGIN_EMAIL` terisi dan hanya untuk lokal, mati di production.
 
+### Host `one-desk.local` (untuk Mekari OAuth)
+
+Mekari SSO tidak menerima `localhost` sebagai redirect URI. Pakai host lokal:
+
+1. Tambahkan ke `/etc/hosts` (butuh sudo, sekali saja). Entri `::1` mencegah jeda ~5 detik karena macOS mencoba mDNS untuk domain `.local`:
+   ```bash
+   sudo sh -c 'printf "127.0.0.1       one-desk.local\n::1             one-desk.local\n" >> /etc/hosts'
+   ```
+2. Di `.env` set `APP_URL=http://one-desk.local`. Redirect URI untuk didaftarkan di SSO: `http://one-desk.local/auth/callback`.
+3. `bun run dev`, lalu buka http://one-desk.local (tanpa port).
+
+Vite mengikuti `APP_URL`: host dan port diambil dari URL itu. Port 80 butuh bind wildcard (macOS tanpa root hanya mengizinkan itu untuk port < 1024), jadi dev server terjangkau dari jaringan lokal lewat IP. Hostname lain ditolak (`allowedHosts`), tapi akses via IP tidak. Kosongkan `DEV_LOGIN_EMAIL` setelah OAuth jalan dan jangan pakai di jaringan yang tidak dipercaya. Bila port 80 dipakai proses lain, tidak ada fallback otomatis (`strictPort`); hentikan proses itu atau pakai `APP_URL` dengan port lain jika SSO mengizinkan.
+
 Tanpa integrasi eksternal, PGP sudah bisa dipakai penuh: buat template dari scratch, isi plan, export Excel. Kanban dan PR butuh kredensial Jira/Bitbucket di bawah.
 
 ## Perintah
