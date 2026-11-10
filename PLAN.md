@@ -27,7 +27,7 @@ Status: `TODO` · `IN PROGRESS` · `DONE` · `BLOCKED`
 | 1. Auth (Mekari OAuth2) | OD-05 … OD-07 | DONE · OD-07 BLOCKED (butuh info SSO) |
 | 2. Connect Jira & Bitbucket | OD-08 … OD-11 | DONE (diverifikasi dengan mock) |
 | 3. PGP | OD-12 … OD-20 | DONE · OD-19 IN PROGRESS (butuh Google SA) |
-| 3b. Direct leader & PGP bawahan (2 arah) | OD-45 … OD-50 | TODO |
+| 3b. Direct leader & PGP bawahan (2 arah) | OD-45 … OD-50 | DONE |
 | 4. Kanban | OD-21 … OD-23 | DONE (mock) |
 | 5. Pull Requests | OD-24 … OD-26 | DONE (mock) |
 | 6. Frontend shell & polish | OD-27 … OD-31 | DONE |
@@ -200,10 +200,11 @@ Toast sukses/error via `notifySuccess/notifyError`; refresh `GET /api/org/me` se
 **Depends:** OD-47, OD-48.
 **Log:** 2026-11-10 — `GET /api/auth/me` + `reportCount`; route `/team` + `views/team/TeamView.vue` (select period default period template published terbaru, tabel nama/status/score/total weight/update, Lihat + Export); menu sidebar "Tim Saya" hanya bila `reportCount > 0` (di-refresh via `auth.load()` setelah aksi di `ReportingLinePanel`). `PlanEditorView`: banner "Kamu melihat PGP {nama} sebagai direct leader/admin (hanya baca)" bila bukan owner; kartu ringkasan Jira disembunyikan & tidak di-fetch untuk non-owner (datanya milik viewer, menyesatkan). Diverifikasi dengan Playwright sementara (4 user sintetis): menu muncul & `/team` terbuka, B Submitted 80% & C Belum mulai, period terpilih, Export 200, Lihat → read-only + banner (tanpa Simpan/kartu Jira), user tanpa bawahan tidak punya menu, menu muncul tanpa reload setelah menerima bawahan; tanpa error JS; screenshot dicek. `typecheck`, `build`, `test` (11 pass), `e2e` (10/10) lulus. Commit: lihat git log.
 
-### OD-50 · Test akses reporting line · `TODO`
+### OD-50 · Test akses reporting line · `DONE`
 **Description:** `apps/server/test/org.test.ts` (DB test dari OD-39 atau setup sendiri dengan `DATABASE_URL` test). Skenario: request dari bawahan → accept leader; request dari leader → accept bawahan; pengaju tidak bisa accept sendiri; reject; batal; request baru menggantikan pending lama; lepas leader / lepas report; validasi diri sendiri & saling; akses plan (owner, leader aktif, pihak pending, user lain, admin); admin set langsung menghapus pending.
 **Acceptance:** `bun run test` hijau.
 **Depends:** OD-47.
+**Log:** 2026-11-10 — `apps/server/test/db.ts` (helper: DB terpisah `one-desk-test`, nama wajib mengandung "test", dibuat & dimigrasi otomatis, `DATABASE_URL` di-override sebelum modul app di-import) dan `apps/server/test/org.test.ts` (20 test, data sintetis bertag, dibersihkan di `afterAll`): kedua arah request→accept, pengaju tidak bisa accept sendiri, pihak ketiga, reject, batal, request baru menggantikan pending, leader baru menggantikan lama, lepas leader/report, self/saling/sudah aktif/user tidak ada, accept memvalidasi ulang request bersilangan, search, admin set (hapus pending, validasi tetap berlaku), akses plan (owner, leader aktif, pending, user lain, admin, leader dilepas), prefill Direct Leader, `team`. `bun run test` 31 pass (11 lama + 20). Uji mutasi: menonaktifkan cek leader di `PlanService.get` → 2 test gagal; menghapus cek pengaju di `accept` → 1 test gagal (keduanya dikembalikan). DB dev `one-desk` tidak tersentuh; DB test tanpa sisa data. Commit: lihat git log.
 
 ## Fase 4 — Kanban
 
