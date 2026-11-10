@@ -2,6 +2,7 @@ import { Elysia } from 'elysia'
 import { authModule } from './modules/auth'
 import { connectionsModule } from './modules/connections'
 import { kanbanModule } from './modules/kanban'
+import { orgModule } from './modules/org'
 import { pgpModule } from './modules/pgp'
 import { pullRequestsModule } from './modules/pull-requests'
 import { AppError } from './shared/errors'
@@ -24,6 +25,7 @@ export const app = new Elysia()
   .use(connectionsModule)
   .use(pgpModule)
   .use(kanbanModule)
+  .use(orgModule)
   .use(pullRequestsModule)
 
 export type App = typeof app

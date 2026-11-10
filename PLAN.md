@@ -161,7 +161,7 @@ Generate migration `bunx drizzle-kit generate --name reporting_line` → `drizzl
 **Depends:** OD-34 (DB lokal jalan).
 **Log:** 2026-11-10 — `users.manager_id` (+ index, check `manager_id <> id`), tabel `reporting_requests` (unique `report_id`, check bukan diri sendiri & `requested_by in (report, leader)`), relation `users.manager|reports` dan `reportingRequests.report|leader`. Migration `0001_reporting_line.sql` diterapkan ke DB `one-desk` yang sudah berisi 1 user (data utuh). Constraint diuji di psql (transaksi, di-rollback): manager = diri sendiri, `requested_by` pihak ketiga, report = leader, dan pending ganda per bawahan semuanya ditolak; request valid diterima. `bun run typecheck` lulus, `bun run test` 11 pass. Commit: lihat git log.
 
-### OD-46 · Module `org` (API reporting line, 2 arah) · `TODO`
+### OD-46 · Module `org` (API reporting line, 2 arah) · `DONE`
 **Description:** Buat `apps/server/src/modules/org/{index,service,model}.ts` (pola module lain, guard `auth: true`), daftarkan di `app.ts`. Endpoint:
 - `GET /api/org/me` → `{ leader, reports[], incoming[], outgoing[] }`. `incoming` = permintaan yang menunggu konfirmasi **saya** (dari calon leader atau calon bawahan), `outgoing` = permintaan yang saya ajukan. Tiap item: `requestId`, `direction: 'as_report' | 'as_leader'`, user (id, name, email, avatarUrl), `createdAt`.
 - `GET /api/org/users?q=` → cari user terdaftar (nama/email, maks 20, exclude diri sendiri).
@@ -176,6 +176,7 @@ Generate migration `bunx drizzle-kit generate --name reporting_line` → `drizzl
 - `GET /api/org/team?period=` → daftar direct report aktif + plan mereka per period (`planId`, status, score, totalWeight, updatedAt; `null` bila belum membuat plan).
 **Acceptance:** Skenario curl kedua arah: (a) B ajukan A sebagai leader → A accept → `GET /team` A berisi B; (b) A tambah C → C accept → aktif; (c) pengaju tidak bisa accept permintaannya sendiri → 403; reject, batal, lepas, admin set berfungsi; validasi diri sendiri & saling → 400.
 **Depends:** OD-45.
+**Log:** 2026-11-10 — `modules/org/{index,service,model}.ts` + registrasi di `app.ts`; semua endpoint di Description ada. `direction` = peran **saya** di request (`as_leader` = saya calon leader). Request baru menggantikan pending lama; `accept` memvalidasi ulang (saling/aktif) di dalam transaksi; `team` default ke period template published terbaru. Diverifikasi dengan skrip sementara (4 user sintetis di DB `one-desk-e2e`): 34 pengecekan lulus — kedua arah accept, pengaju tidak bisa accept/reject sendiri (403), pihak ketiga 403, reject, batal, lepas leader/report, admin set langsung (menghapus pending), diri sendiri/saling/sudah aktif → 400, user tidak ada → 404, tanpa session → 401, search. `typecheck` lulus, `test` 11 pass. Test permanen → OD-50. Commit: lihat git log.
 
 ### OD-47 · Aturan akses plan untuk leader · `TODO`
 **Description:** Di `PlanService.get` (`modules/pgp/plan.service.ts`) izinkan mode `read` bila `plan.user.managerId === viewer.id` (relasi **aktif**; request pending tidak memberi akses); `canEdit` tetap hanya owner. Export Excel ikut aturan yang sama (memakai `get`). Tambahkan field `viewerRole: 'owner' | 'leader' | 'admin'` di response. Saat `PlanService.create`, prefill `directLeader` dari nama manager aktif bila belum ada dari plan sebelumnya.
