@@ -95,7 +95,7 @@ const grow = css({ minWidth: 0, flex: 1 })
 <template>
   <AsyncState :loading="loading && !plan" :error="error" @retry="run">
     <template v-if="plan">
-      <PageHeader :title="plan.template.title" :subtitle="`${plan.user.name} · ${plan.template.period}`">
+      <PageHeader :title="plan.title" :subtitle="`${plan.user.name} · ${plan.period}`">
         <template #before-title>
           <RouterLink to="/pgp"><MpButton variant="textLink" size="sm" left-icon="chevrons-left">My PGP</MpButton></RouterLink>
         </template>

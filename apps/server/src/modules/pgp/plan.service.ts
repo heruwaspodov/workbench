@@ -1,7 +1,8 @@
 import { and, asc, desc, eq, inArray, notInArray, sql } from 'drizzle-orm'
 import { db } from '../../db/client'
 import { planItems, plans, templateItems, templates, users, type PlanItem, type User } from '../../db/schema'
-import { BadRequestError, ForbiddenError, NotFoundError } from '../../shared/errors'
+import { BadRequestError, ForbiddenError, NotFoundError, PeriodExistsError } from '../../shared/errors'
+import { formatPeriod, parsePeriod } from '../../shared/period'
 import type { PlanItemInputT } from './model'
 
 const round = (n: number) => Math.round(n * 100) / 100
@@ -16,15 +17,16 @@ export abstract class PlanService {
     const rows = await db
       .select({
         id: plans.id, status: plans.status, updatedAt: plans.updatedAt, submittedAt: plans.submittedAt,
-        templateId: templates.id, templateTitle: templates.title, period: templates.period,
+        templateId: plans.templateId, templateTitle: sql<string>`coalesce(${templates.title}, 'PGP ' || "pgp_plans"."year" || '-Q' || "pgp_plans"."quarter")`,
+        year: plans.year, quarter: plans.quarter,
         totalWeight: sql<number>`(select coalesce(sum(pi.weight),0)::float from pgp_plan_items pi where pi.plan_id = "pgp_plans"."id")`,
         score: sql<number>`(select coalesce(sum(least(coalesce(pi.achievement,0), pi.weight)),0)::float from pgp_plan_items pi where pi.plan_id = "pgp_plans"."id")`,
       })
       .from(plans)
-      .innerJoin(templates, eq(templates.id, plans.templateId))
+      .leftJoin(templates, eq(templates.id, plans.templateId))
       .where(eq(plans.userId, user.id))
-      .orderBy(desc(templates.period))
-    return rows
+      .orderBy(desc(plans.year), desc(plans.quarter))
+    return rows.map((r) => ({ ...r, period: formatPeriod(r.year, r.quarter) }))
   }
 
   /** Owner, active direct leader or admin may read; only owner may write. Pending requests grant nothing. */
@@ -43,7 +45,9 @@ export abstract class PlanService {
     const isAdmin = user.role === 'admin'
     if (!isOwner && !(mode === 'read' && (isLeader || isAdmin))) throw new ForbiddenError()
     const viewerRole = isOwner ? 'owner' : isLeader ? 'leader' : 'admin'
-    return { ...plan, ...scoreOf(plan.items), canEdit: isOwner, viewerRole } as const
+    const period = formatPeriod(plan.year, plan.quarter)
+    const title = plan.template?.title ?? `PGP ${period}`
+    return { ...plan, period, title, ...scoreOf(plan.items), canEdit: isOwner, viewerRole } as const
   }
 
   static async create(user: User, templateId: string) {
@@ -53,8 +57,10 @@ export abstract class PlanService {
     })
     if (!tpl || tpl.status !== 'published') throw new NotFoundError('Published template')
 
-    const existing = await db.query.plans.findFirst({ where: and(eq(plans.templateId, templateId), eq(plans.userId, user.id)) })
-    if (existing) return this.get(existing.id, user)
+    const when = parsePeriod(tpl.period)
+    if (!when) throw new BadRequestError(`Template period "${tpl.period}" is not in YYYY-Qn format; ask an admin to fix it`)
+    const taken = await db.query.plans.findFirst({ where: and(eq(plans.userId, user.id), eq(plans.year, when.year), eq(plans.quarter, when.quarter)) })
+    if (taken) throw new PeriodExistsError(taken.id, tpl.period)
 
     // Prefill header from the user's previous plan.
     const previous = await db.query.plans.findFirst({ where: eq(plans.userId, user.id), orderBy: [desc(plans.createdAt)] })
@@ -63,10 +69,15 @@ export abstract class PlanService {
       : (await db.select({ name: users.name }).from(users).where(eq(users.id, user.managerId)))[0]?.name ?? null
 
     const id = await db.transaction(async (tx) => {
+      // A concurrent create for the same quarter loses on the unique index; report it like the check above.
       const [plan] = await tx.insert(plans).values({
-        templateId, userId: user.id,
+        templateId, userId: user.id, year: when.year, quarter: when.quarter,
         division: previous?.division, sbu: previous?.sbu, sbuDetail: previous?.sbuDetail, directLeader: previous?.directLeader || managerName,
-      }).returning()
+      }).onConflictDoNothing().returning()
+      if (!plan) {
+        const again = await tx.query.plans.findFirst({ where: and(eq(plans.userId, user.id), eq(plans.year, when.year), eq(plans.quarter, when.quarter)) })
+        throw new PeriodExistsError(again!.id, tpl.period)
+      }
       if (tpl.items.length) {
         await tx.insert(planItems).values(tpl.items.map((i) => ({
           planId: plan!.id, templateItemId: i.id, position: i.position,

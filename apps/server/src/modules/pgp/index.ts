@@ -36,7 +36,7 @@ const planRoutes = new Elysia({ name: 'module.pgp.plans', prefix: '/plans' })
       .get('/:id/export', async ({ user, params, set }) => {
         const plan = await PlanService.get(params.id, user)
         const file = await ExcelService.exportPlan(plan)
-        const name = `PGP ${plan.template.period} - ${plan.user.name}.xlsx`.replace(/[^\w .-]/g, '_')
+        const name = `PGP ${plan.period} - ${plan.user.name}.xlsx`.replace(/[^\w .-]/g, '_')
         set.headers['content-type'] = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         set.headers['content-disposition'] = `attachment; filename="${name}"`
         return new Response(new Uint8Array(file))

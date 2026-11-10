@@ -1,4 +1,5 @@
 import { t } from 'elysia'
+import { PERIOD_PATTERN } from '../../shared/period'
 
 const nullableText = t.Optional(t.Nullable(t.String({ maxLength: 4000 })))
 
@@ -34,14 +35,14 @@ export const PgpModel = {
 
   templateCreate: t.Object({
     title: t.String({ minLength: 1, maxLength: 200 }),
-    period: t.String({ minLength: 1, maxLength: 20 }),
+    period: t.String({ pattern: PERIOD_PATTERN, error: 'Period must look like 2026-Q4' }),
     source: t.Optional(t.Union([t.Literal('scratch'), t.Literal('google_sheet'), t.Literal('xlsx')])),
     sourceRef: t.Optional(t.String({ maxLength: 500 })),
     items: t.Optional(t.Array(TemplateItemInput, { maxItems: 300 })),
   }),
   templateUpdate: t.Object({
     title: t.Optional(t.String({ minLength: 1, maxLength: 200 })),
-    period: t.Optional(t.String({ minLength: 1, maxLength: 20 })),
+    period: t.Optional(t.String({ pattern: PERIOD_PATTERN, error: 'Period must look like 2026-Q4' })),
     status: t.Optional(t.Union([t.Literal('draft'), t.Literal('published'), t.Literal('archived')])),
   }),
   templateItems: t.Object({ items: t.Array(TemplateItemInput, { maxItems: 300 }) }),

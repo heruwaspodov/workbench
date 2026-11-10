@@ -24,3 +24,8 @@ export class NotConnectedError extends AppError {
     super(409, `Your ${service === 'jira' ? 'Jira' : 'Bitbucket'} account is not connected yet. Open Connections to link it.`, 'NOT_CONNECTED')
   }
 }
+export class PeriodExistsError extends AppError {
+  constructor(public existingPlanId: string, period: string) {
+    super(409, `You already have a PGP for ${period}.`, 'PERIOD_EXISTS')
+  }
+}

@@ -100,8 +100,12 @@ export const templateItems = pgTable('pgp_template_items', {
 
 export const plans = pgTable('pgp_plans', {
   id: uuid('id').primaryKey().defaultRandom(),
-  templateId: uuid('template_id').notNull().references(() => templates.id, { onDelete: 'restrict' }),
+  // Null for plans created from an uploaded file (no template).
+  templateId: uuid('template_id').references(() => templates.id, { onDelete: 'restrict' }),
   userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  year: integer('year').notNull(),
+  quarter: integer('quarter').notNull(),
+  sourceRef: text('source_ref'),
   division: text('division'),
   sbu: text('sbu'),
   sbuDetail: text('sbu_detail'),
@@ -109,7 +113,10 @@ export const plans = pgTable('pgp_plans', {
   status: planStatusEnum('status').default('draft').notNull(),
   submittedAt: timestamp('submitted_at', { withTimezone: true }),
   ...timestamps,
-}, (t) => [uniqueIndex('plans_template_user_uq').on(t.templateId, t.userId)])
+}, (t) => [
+  uniqueIndex('plans_template_user_uq').on(t.templateId, t.userId),
+  uniqueIndex('plans_user_period_uq').on(t.userId, t.year, t.quarter),
+])
 
 export const planItems = pgTable('pgp_plan_items', {
   ...itemColumns,

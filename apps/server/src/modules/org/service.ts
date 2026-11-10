@@ -2,6 +2,7 @@ import { and, desc, eq, inArray, ne, or, sql } from 'drizzle-orm'
 import { db } from '../../db/client'
 import { plans, reportingRequests, templates, users, type User } from '../../db/schema'
 import { BadRequestError, ForbiddenError, NotFoundError } from '../../shared/errors'
+import { parsePeriod } from '../../shared/period'
 import type { RequestDirection } from './model'
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0]
@@ -143,7 +144,8 @@ export abstract class OrgService {
   static async team(user: User, period?: string) {
     const reports = await db.select(publicUser).from(users).where(eq(users.managerId, user.id)).orderBy(users.name)
     const effective = period ?? (await this.latestPublishedPeriod())
-    if (!reports.length || !effective) return { period: effective ?? null, members: reports.map((u) => ({ user: u, plan: null })) }
+    const when = effective ? parsePeriod(effective) : null
+    if (!reports.length || !effective || !when) return { period: effective ?? null, members: reports.map((u) => ({ user: u, plan: null })) }
 
     const rows = await db
       .select({
@@ -152,8 +154,7 @@ export abstract class OrgService {
         score: sql<number>`(select coalesce(sum(least(coalesce(pi.achievement,0), pi.weight)),0)::float from pgp_plan_items pi where pi.plan_id = "pgp_plans"."id")`,
       })
       .from(plans)
-      .innerJoin(templates, eq(templates.id, plans.templateId))
-      .where(and(eq(templates.period, effective), inArray(plans.userId, reports.map((r) => r.id))))
+      .where(and(eq(plans.year, when.year), eq(plans.quarter, when.quarter), inArray(plans.userId, reports.map((r) => r.id))))
       .orderBy(desc(plans.updatedAt))
     const planOf = new Map<string, (typeof rows)[number]>()
     for (const r of rows) if (!planOf.has(r.userId)) planOf.set(r.userId, r)

@@ -7,7 +7,7 @@ export const client = treaty<App>(window.location.origin, { fetch: { credentials
 export const api = client.api
 
 export class ApiError extends Error {
-  constructor(public status: number, public code: string, message: string) { super(message) }
+  constructor(public status: number, public code: string, message: string, public existingPlanId?: string) { super(message) }
 }
 
 type EdenResult<T> = { data: T; error: null } | { data: null; error: { status: unknown; value: unknown } }
@@ -17,13 +17,13 @@ export async function unwrap<T>(promise: Promise<EdenResult<T>>): Promise<NonNul
   const res = await promise
   if (res.error) {
     const status = Number(res.error.status) || 0
-    const v = res.error.value as { code?: string; message?: string } | string | undefined
+    const v = res.error.value as { code?: string; message?: string; existingPlanId?: string } | string | undefined
     const message = typeof v === 'string' ? v : v?.message ?? 'Request failed'
     const code = typeof v === 'object' && v?.code ? v.code : 'ERROR'
     if (status === 401 && !location.pathname.startsWith('/login')) {
       location.href = `/login?redirect=${encodeURIComponent(location.pathname + location.search)}`
     }
-    throw new ApiError(status, code, message)
+    throw new ApiError(status, code, message, typeof v === 'object' ? v?.existingPlanId : undefined)
   }
   return res.data as NonNullable<T>
 }

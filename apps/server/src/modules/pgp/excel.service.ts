@@ -29,7 +29,7 @@ interface ExportPlan {
   directLeader: string | null
   status: string
   user: { name: string }
-  template: { title: string; period: string }
+  period: string
   items: PlanItem[]
   totalWeight: number
   score: number
@@ -64,14 +64,14 @@ export abstract class ExcelService {
   static async exportPlan(plan: ExportPlan): Promise<Buffer> {
     const wb = new ExcelJS.Workbook()
     wb.creator = 'One Desk'
-    const ws = wb.addWorksheet(plan.template.period.replace(/[\\/*?:[\]]/g, '-').slice(0, 31))
+    const ws = wb.addWorksheet(plan.period.replace(/[\\/*?:[\]]/g, '-').slice(0, 31))
     ws.columns = [
       { width: 24 }, { width: 28 }, { width: 36 }, { width: 11 }, { width: 52 },
       { width: 14 }, { width: 14 }, { width: 18 }, { width: 14 }, { width: 14 }, { width: 50 },
     ]
 
     ws.addRow(['Division Name', 'Your Name', 'SBU (Scope Product)', 'SBU (Detail)', 'Direct Leader', 'Period', 'Status'])
-    ws.addRow([plan.division ?? '', plan.user.name, plan.sbu ?? '', plan.sbuDetail ?? '', plan.directLeader ?? '', plan.template.period, plan.status])
+    ws.addRow([plan.division ?? '', plan.user.name, plan.sbu ?? '', plan.sbuDetail ?? '', plan.directLeader ?? '', plan.period, plan.status])
     ws.getRow(1).font = { bold: true }
     ws.getRow(1).eachCell((c) => { c.fill = HEADER_FILL; c.border = thin })
     ws.addRow([])

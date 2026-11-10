@@ -5,7 +5,7 @@ import { RouterLink, useRouter } from 'vue-router'
 import AsyncState from '@/components/AsyncState.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import ReportingLinePanel from '@/components/ReportingLinePanel.vue'
-import { api, notifyError, unwrap } from '@/lib/api'
+import { ApiError, api, notifyError, unwrap } from '@/lib/api'
 import { timeAgo } from '@/lib/format'
 import { ui } from '@/lib/ui'
 import { useAsync } from '@/lib/use-async'
@@ -21,17 +21,23 @@ onMounted(run)
 
 const available = computed(() => {
   if (!data.value) return []
-  const taken = new Set(data.value.plans.map((p) => p.templateId))
-  return data.value.templates.filter((t) => t.status === 'published' && !taken.has(t.id))
+  const havePeriod = new Set(data.value.plans.map((p) => p.period))
+  return data.value.templates.filter((t) => t.status === 'published' && !havePeriod.has(t.period))
 })
 
 const creating = ref<string | null>(null)
+/** Set when Create hits a quarter the user already has a PGP for. */
+const taken = ref<{ planId: string; message: string } | null>(null)
 async function start(templateId: string) {
   creating.value = templateId
+  taken.value = null
   try {
     const plan = await unwrap(api.pgp.plans.post({ templateId }))
     await router.push(`/pgp/plans/${plan.id}`)
-  } catch (e) { notifyError(e) } finally { creating.value = null }
+  } catch (e) {
+    if (e instanceof ApiError && e.code === 'PERIOD_EXISTS' && e.existingPlanId) taken.value = { planId: e.existingPlanId, message: e.message }
+    else notifyError(e)
+  } finally { creating.value = null }
 }
 
 const section = ui.section
@@ -55,6 +61,10 @@ const scoreText = css({ display: 'flex', flexDirection: 'column', gap: '1', widt
     <template v-if="data">
       <div v-if="available.length">
         <MpText size="h3" weight="semiBold" :class="css({ mb: '3' })">Start a new PGP</MpText>
+        <div v-if="taken" :class="[ui.note, css({ mb: '3', display: 'flex', alignItems: 'center', gap: '3', flexWrap: 'wrap' })]" role="alert">
+          <MpText size="label">{{ taken.message }}</MpText>
+          <RouterLink :to="`/pgp/plans/${taken.planId}`" :class="ui.link">Open existing PGP</RouterLink>
+        </div>
         <div :class="ui.list">
           <div v-for="t in available" :key="t.id" :class="ui.listRow">
             <div :class="ui.tile"><MpIcon name="goal" size="sm" /></div>

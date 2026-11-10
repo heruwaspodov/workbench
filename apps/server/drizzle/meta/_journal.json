@@ -15,6 +15,13 @@
       "when": 1794284859807,
       "tag": "0001_reporting_line",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794321513637,
+      "tag": "0002_plan_period",
+      "breakpoints": true
     }
   ]
 }
