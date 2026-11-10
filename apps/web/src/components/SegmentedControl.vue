@@ -8,7 +8,7 @@ const group = css({
   display: 'inline-flex', gap: '1', p: '1', rounded: 'lg', bg: 'background.stage', borderWidth: '1px', borderColor: 'border.default.subtle',
 })
 const item = css({
-  px: '3', py: '1.5', rounded: 'md', fontSize: 'md', lineHeight: '1.25rem', color: 'text.secondary', cursor: 'pointer', whiteSpace: 'nowrap',
+  px: '3', py: '1', rounded: 'md', fontSize: 'md', lineHeight: '1.25rem', color: 'text.secondary', cursor: 'pointer', whiteSpace: 'nowrap',
   transition: 'background .15s ease, color .15s ease', _hover: { bg: 'background.neutral.subtle.hovered', color: 'text.primary' },
   _disabled: { opacity: 0.5, cursor: 'not-allowed' }, _focusVisible: { outline: '2px solid', outlineColor: 'border.focused' },
 })

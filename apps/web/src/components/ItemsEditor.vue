@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ui } from '@/lib/ui'
 /**
  * Spreadsheet-like editor for PGP items, shared by templates and plans.
  * - mode "template": planning columns only
@@ -72,7 +73,7 @@ const setStatus = (idx: number, e: Event) =>
   patch(idx, { status: (e.target as HTMLSelectElement).value as EditableItem['status'] })
 
 
-const wrap = css({ overflowX: 'auto', bg: 'background.stage', rounded: 'xl', borderWidth: '1px', borderColor: 'border.default.subtle', shadow: 'xs' })
+const wrap = css({ overflowX: 'auto', bg: 'background.stage', rounded: 'xl', borderWidth: '1px', borderColor: 'border.default.subtle' })
 const th = css({ whiteSpace: 'nowrap' })
 const progressTh = css({ whiteSpace: 'nowrap', bg: 'background.highlight !important' })
 const cellTop = css({ verticalAlign: 'top' })
@@ -86,7 +87,7 @@ const pre = css({ whiteSpace: 'pre-wrap' })
 <template>
   <div :class="wrap">
     <MpTableContainer>
-      <MpTable is-hoverable>
+      <MpTable is-hoverable :class="ui.tableDense">
         <MpTableHead>
           <MpTableRow>
             <MpTableCell as="th" :class="th" :style="{ width: '40px' }">#</MpTableCell>

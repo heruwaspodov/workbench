@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { MpBadge, MpButton, MpInput, MpText, css } from '@mekari/pixel3'
+import { MpBadge, MpButton, MpText, css } from '@mekari/pixel3'
 import { computed, onMounted, ref, watch } from 'vue'
 import AsyncState from '@/components/AsyncState.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import SearchInput from '@/components/SearchInput.vue'
 import SegmentedControl from '@/components/SegmentedControl.vue'
 import { api, unwrap } from '@/lib/api'
 import { timeAgo } from '@/lib/format'
@@ -53,7 +54,7 @@ const count = css({ bg: 'background.stage', rounded: 'full', px: '2', py: '0.5',
       { value: 'sprint', label: 'Active sprint', disabled: data?.board?.scrum === false || data?.board === null },
       { value: 'active', label: 'All active + done 7 days' },
     ]" />
-    <div :class="ui.fieldWide"><MpInput v-model="search" size="sm" placeholder="Filter by key or summary" is-clearable /></div>
+    <div :class="ui.fieldWide"><SearchInput v-model="search" placeholder="Filter by key or summary" /></div>
     <MpText size="label" color="text.secondary">{{ total }} {{ total === 1 ? 'issue' : 'issues' }}</MpText>
   </div>
 

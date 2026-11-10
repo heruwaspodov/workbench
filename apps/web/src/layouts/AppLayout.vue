@@ -20,7 +20,7 @@ const nav = computed(() => [
 const isActive = (to: string) =>
   to === '/pgp' ? route.path === '/pgp' || route.path.startsWith('/pgp/plans') : route.path.startsWith(to)
 
-const shell = css({ display: 'flex', minHeight: '100vh', bg: 'background.surface' })
+const shell = css({ display: 'flex', minHeight: '100vh', bg: 'background.stage' })
 const sidebar = css({
   width: '248px', flexShrink: 0, bg: 'background.stage', borderRightWidth: '1px', borderColor: 'border.default.subtle',
   display: 'flex', flexDirection: 'column', position: 'sticky', top: 0, height: '100vh',

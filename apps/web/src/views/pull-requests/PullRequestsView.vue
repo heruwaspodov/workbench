@@ -48,7 +48,7 @@ const pager = css({ display: 'flex', justifyContent: 'flex-end', gap: '2', p: '3
       { value: 'reviewer', label: 'Needs my review' },
     ]" />
     <div :class="ui.field">
-      <MpSelect v-model="state" size="sm">
+      <MpSelect v-model="state">
         <option value="OPEN">Open</option>
         <option value="MERGED">Merged</option>
         <option value="DECLINED">Declined</option>
@@ -56,16 +56,16 @@ const pager = css({ display: 'flex', justifyContent: 'flex-end', gap: '2', p: '3
       </MpSelect>
     </div>
     <div :class="ui.field">
-      <MpSelect v-model="repo" size="sm" placeholder="All repositories" is-clearable>
+      <MpSelect v-model="repo" placeholder="All repositories" is-clearable>
         <option v-for="r in repos ?? []" :key="r" :value="r">{{ r }}</option>
       </MpSelect>
     </div>
   </div>
 
   <AsyncState :loading="loading && !data" :error="error" :empty="data?.items.length === 0" empty-text="No pull requests." @retry="run">
-    <div v-if="data" :class="ui.panel">
+    <div v-if="data" :class="ui.flat">
       <MpTableContainer>
-        <MpTable is-hoverable>
+        <MpTable is-hoverable :class="ui.table">
           <MpTableHead>
             <MpTableRow>
               <MpTableCell as="th">Repo</MpTableCell>

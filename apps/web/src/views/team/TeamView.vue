@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ui } from '@/lib/ui'
 import {
   MpAvatar, MpBadge, MpButton, MpFormControl, MpFormLabel, MpSelect, MpTable, MpTableBody, MpTableCell, MpTableContainer,
   MpTableHead, MpTableRow, MpText, css,
@@ -35,7 +36,6 @@ const label = (plan: { status: string } | null) => (!plan ? 'Not started' : plan
 const color = (plan: { status: string } | null) => (!plan ? 'gray' : plan.status === 'submitted' ? 'green' : 'orange')
 
 const bar = css({ display: 'flex', alignItems: 'flex-end', gap: '3', mb: '4' })
-const wrap = css({ bg: 'background.surface', rounded: 'lg', borderWidth: '1px', borderColor: 'border.default', overflow: 'hidden' })
 const person = css({ display: 'flex', alignItems: 'center', gap: '3' })
 const actions = css({ display: 'flex', gap: '2', justifyContent: 'flex-end' })
 </script>
@@ -54,9 +54,9 @@ const actions = css({ display: 'flex', gap: '2', justifyContent: 'flex-end' })
 
   <AsyncState :loading="team.loading.value && !team.data.value" :error="team.error.value"
     :empty="team.data.value?.members.length === 0" empty-text="No active direct reports yet." @retry="team.run(period)">
-    <div v-if="team.data.value" :class="wrap">
+    <div v-if="team.data.value" :class="ui.flat">
       <MpTableContainer>
-        <MpTable>
+        <MpTable :class="ui.table">
           <MpTableHead>
             <MpTableRow>
               <MpTableCell as="th">Name</MpTableCell>

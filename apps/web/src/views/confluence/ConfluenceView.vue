@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import {
-  MpBadge, MpButton, MpInput, MpTable, MpTableBody, MpTableCell, MpTableContainer, MpTableHead, MpTableRow, MpText, css,
+  MpBadge, MpButton, MpTable, MpTableBody, MpTableCell, MpTableContainer, MpTableHead, MpTableRow, MpText, css,
 } from '@mekari/pixel3'
 import { onMounted, ref, watch } from 'vue'
 import AsyncState from '@/components/AsyncState.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import SearchInput from '@/components/SearchInput.vue'
 import { api, unwrap } from '@/lib/api'
 import { copyText, isHttpUrl } from '@/lib/clipboard'
 import { formatDate } from '@/lib/format'
@@ -36,15 +37,15 @@ const pager = css({ display: 'flex', justifyContent: 'space-between', alignItems
   <PageHeader title="My Confluence" subtitle="Confluence pages you have created. Only the title, space and link are shown; page content is never displayed." />
 
   <div :class="bar">
-    <MpInput v-model="query" placeholder="Search page titles" @keyup.enter="search" />
+    <SearchInput v-model="query" placeholder="Search page titles" @enter="search" />
     <MpButton variant="secondary" @click="search">Search</MpButton>
   </div>
 
   <AsyncState :loading="loading && !data" :error="error" :empty="data?.items.length === 0"
     :empty-text="applied ? 'No pages match your search.' : 'You have not created any pages yet.'" @retry="run">
-    <div v-if="data" :class="ui.panel">
+    <div v-if="data" :class="ui.flat">
       <MpTableContainer>
-        <MpTable is-hoverable>
+        <MpTable is-hoverable :class="ui.table">
           <MpTableHead>
             <MpTableRow>
               <MpTableCell as="th">Page</MpTableCell>

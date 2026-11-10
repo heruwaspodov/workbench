@@ -33,9 +33,9 @@ const actions = css({ display: 'flex', gap: '2', justifyContent: 'flex-end' })
     <template #empty>
       <RouterLink to="/pgp/templates/new"><MpButton variant="secondary">Create or import a template</MpButton></RouterLink>
     </template>
-    <div :class="ui.panel">
+    <div :class="ui.flat">
       <MpTableContainer>
-        <MpTable is-hoverable>
+        <MpTable is-hoverable :class="ui.table">
           <MpTableHead>
             <MpTableRow>
               <MpTableCell as="th">Period</MpTableCell>

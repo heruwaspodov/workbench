@@ -130,6 +130,7 @@ async function setStatus(next: 'draft' | 'published' | 'archived') {
 
 const card = `${ui.card} ${css({ mb: '4' })}`
 const link = ui.link
+const tableCls = ui.table
 const twoCol = css({ display: 'grid', gridTemplateColumns: { base: '1fr', md: '2fr 1fr' }, gap: '4' })
 const row = css({ display: 'flex', gap: '2', alignItems: 'flex-end', flexWrap: 'wrap' })
 </script>
@@ -225,7 +226,7 @@ const row = css({ display: 'flex', gap: '2', alignItems: 'flex-end', flexWrap: '
       <MpText size="h3" weight="semiBold" :class="css({ mb: '3' })">PGPs using this template</MpText>
       <AsyncState :loading="plansLoading" :error="plansError" :empty="!planList?.length" empty-text="Nobody has filled this in yet.">
         <MpTableContainer>
-          <MpTable>
+          <MpTable :class="tableCls">
             <MpTableHead>
               <MpTableRow>
                 <MpTableCell as="th">Name</MpTableCell>
