@@ -331,9 +331,10 @@ Toast sukses/error via `notifySuccess/notifyError`; refresh `GET /api/org/me` se
 **Description:** Pastikan `bunfig.toml` & `postcss.config.cjs` ikut ter-copy, build image, jalankan dengan `docker compose --profile full up`, cek migrate + serve SPA.
 **Acceptance:** App jalan di container pada :3000.
 
-### OD-41 · Known issues UI · `TODO`
+### OD-41 · Known issues UI · `IN PROGRESS`
 **Description:** (a) Investigasi noise `🐼 error ... 'literal'` saat build (versi panda vs Pixel). (b) Icon Pixel diambil dari `cdn.mekari.design` — pastikan reachable dari jaringan kantor. (c) UX ItemsEditor: objective/KR berulang per baris → tampilkan grouping/merge visual. (d) Responsif lebar < 1280px.
 **Acceptance:** Tiap butir ditutup atau dicatat sebagai keputusan.
+**Log:** 2026-11-10 — (a) bagian `Error finding real module path` **selesai**: penyebab `@mekari/pixel3-postcss` mencari `node_modules/@mekari/pixel3` relatif terhadap cwd (`apps/web`) padahal paket di-hoist ke root; ditambal dengan `bun patch` (cari ke atas dari cwd seperti Node; `patches/@mekari%2Fpixel3-postcss@1.0.16.patch` + `patchedDependencies`), `Dockerfile` menyalin `patches/` sebelum `bun install`. Diverifikasi: reinstall dari nol menerapkan patch, `bun run build` dan `bun run dev` tanpa error itu (UI 200), `test`/`typecheck`/`e2e` hijau. Belum diverifikasi: build Docker (OD-40). Sisa OD-41: (a) noise `🐼 error ... 'literal'` (Panda vs Pixel), (b) icon CDN, (c) grouping ItemsEditor, (d) responsif < 1280px. Commit: lihat git log.
 
 ### OD-42 · Review keamanan & data · `TODO`
 **Description:** Checklist: tidak ada secret di repo/log, cookie `secure` di prod, akses PGP owner/admin, rate limit login, audit dependency (`bun audit` bila tersedia), masking data pribadi di log. Hasil dicatat di `SECURITY.md`.

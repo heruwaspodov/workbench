@@ -43,6 +43,9 @@
       },
     },
   },
+  "patchedDependencies": {
+    "@mekari/pixel3-postcss@1.0.16": "patches/@mekari%2Fpixel3-postcss@1.0.16.patch",
+  },
   "packages": {
     "@babel/helper-string-parser": ["@babel/helper-string-parser@7.29.13", "", {}, "sha512-fWegr+WsEsiMVW4KUNdIIzzMTZSzNiqhy0//6+2MRi2d5NFNsL/AYwBQW8eBnRbTBVRnDVzjaJEUqKaCWjMMdQ=="],
 

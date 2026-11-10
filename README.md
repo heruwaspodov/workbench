@@ -94,6 +94,6 @@ Production berupa monolith: server menyajikan `apps/web/dist` dan API di satu po
 
 ## Known issues
 
-- Build menampilkan `🐼 error ... reading 'literal'` dan `Error finding real module path` dari Pixel/Panda. Output tetap benar (OD-41).
+- Build menampilkan `🐼 error ... reading 'literal'` dari Pixel/Panda. Output tetap benar (OD-41). Error `Error finding real module path` sudah diperbaiki lewat `patches/` (`bun patch` untuk `@mekari/pixel3-postcss`).
 - Icon Pixel dimuat dari `cdn.mekari.design`; ikon kosong bila jaringan tidak bisa menjangkaunya.
 - Bun harus memakai `linker = "hoisted"` (`bunfig.toml`); jangan diubah, Pixel postcss bergantung padanya.

@@ -1,0 +1,48 @@
+diff --git a/dist/index.js b/dist/index.js
+index c0098d7329191755805f1b6e01ce02537ba299c5..d64b38378fa654dc4fedd9e8df00e5a73bbff8e9 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -58,9 +58,16 @@ var defaultConfig = {
+ var import_dev2 = require("@pandacss/dev");
+ function findRealModulePath(moduleName) {
+   try {
+-    const symlinkPath = import_path.default.join("node_modules", moduleName);
+-    const realPath = import_fs.default.realpathSync(symlinkPath);
+-    return realPath;
++    // Walk up from the cwd like Node does, so hoisted workspaces (deps in the repo root) work.
++    for (let dir = process.cwd(); ; ) {
++      const candidate = import_path.default.join(dir, "node_modules", moduleName);
++      if (import_fs.default.existsSync(candidate)) return import_fs.default.realpathSync(candidate);
++      const parent = import_path.default.dirname(dir);
++      if (parent === dir) break;
++      dir = parent;
++    }
++    console.error("Error finding real module path: " + moduleName + " not found from " + process.cwd());
++    return null;
+   } catch (error) {
+     console.error("Error finding real module path:", error);
+     return null;
+diff --git a/dist/index.mjs b/dist/index.mjs
+index b47e315a142d1a35e843bb3284562855a7c536a4..4acaa9136ed7ed66044b5921ea1824b77f1b8136 100644
+--- a/dist/index.mjs
++++ b/dist/index.mjs
+@@ -46,9 +46,16 @@ import path from "path";
+ import "@pandacss/dev";
+ function findRealModulePath(moduleName) {
+   try {
+-    const symlinkPath = path.join("node_modules", moduleName);
+-    const realPath = fs.realpathSync(symlinkPath);
+-    return realPath;
++    // Walk up from the cwd like Node does, so hoisted workspaces (deps in the repo root) work.
++    for (let dir = process.cwd(); ; ) {
++      const candidate = path.join(dir, "node_modules", moduleName);
++      if (fs.existsSync(candidate)) return fs.realpathSync(candidate);
++      const parent = path.dirname(dir);
++      if (parent === dir) break;
++      dir = parent;
++    }
++    console.error("Error finding real module path: " + moduleName + " not found from " + process.cwd());
++    return null;
+   } catch (error) {
+     console.error("Error finding real module path:", error);
+     return null;

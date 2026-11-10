@@ -81,5 +81,5 @@ Verifikasi minimal sebelum menandai DONE: `bun run typecheck` + `bun run test` +
 
 ## Known issues (jangan dikejar kecuali ada tiketnya)
 
-- Saat build muncul `🐼 error ... reading 'literal'` dan `Error finding real module path` dari Pixel/Panda — output tetap benar (OD-41).
+- Saat build muncul `🐼 error ... reading 'literal'` dari Pixel/Panda — output tetap benar (OD-41). `Error finding real module path` sudah ditambal lewat `patches/` (`bun patch` `@mekari/pixel3-postcss`); jangan hapus `patchedDependencies` dan `patches/`.
 - Icon Pixel dimuat dari `cdn.mekari.design`.
