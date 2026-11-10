@@ -48,7 +48,7 @@ const typeIcon = css({ width: '4', height: '4' })
   <div :class="toolbar">
     <MpButtonGroup>
       <MpButton size="sm" :variant="scope === 'sprint' ? 'primary' : 'secondary'" :is-disabled="data?.board?.scrum === false || data?.board === null" @click="scope = 'sprint'">Sprint aktif</MpButton>
-      <MpButton size="sm" :variant="scope === 'active' ? 'primary' : 'secondary'" @click="scope = 'active'">Semua aktif + done 14 hari</MpButton>
+      <MpButton size="sm" :variant="scope === 'active' ? 'primary' : 'secondary'" @click="scope = 'active'">Semua aktif + done 7 hari</MpButton>
     </MpButtonGroup>
     <MpInput v-model="search" size="sm" placeholder="Filter key / summary" :class="css({ maxWidth: '260px' })" is-clearable />
     <MpText size="label" color="text.secondary">{{ total }} issue</MpText>

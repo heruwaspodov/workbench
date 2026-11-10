@@ -26,6 +26,8 @@ export interface JiraBoardConfig {
   id: number
   name: string
   columnConfig: { columns: { name: string; statuses: { id: string }[] }[] }
+  /** Board sub-filter. Jira's UI applies it; the Agile board-issues API does not. */
+  subQuery?: { query?: string }
 }
 export interface JiraIssue {
   id: string

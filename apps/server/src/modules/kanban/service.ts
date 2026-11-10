@@ -35,11 +35,23 @@ const CATEGORY_COLUMNS = [
   { name: 'Done', category: 'done' },
 ] as const
 
+/**
+ * How long a finished issue stays visible. Jira's Kanban Done column hides issues not updated for 7 days
+ * (matched against the Jira UI: 18 = 18 on board 2508); `resolved >= -14d` showed 44.
+ */
+export const DONE_WINDOW = 'updated >= -7d'
+
+/** Applies the board's own sub-filter so the dashboard shows what the Jira board shows. */
+export const withSubQuery = (jql: string, subQuery?: string) => {
+  const sub = subQuery?.replace(/\s+order\s+by[\s\S]*$/i, '').trim()
+  return sub ? `${jql} AND (${sub})` : jql
+}
+
 export abstract class KanbanService {
   static async board(user: User, scope: 'sprint' | 'active' = 'sprint') {
     const { accountId, boardId } = await ConnectionsService.requireJira(user)
     const mine = `assignee = "${accountId}"`
-    const activeJql = `${mine} AND (statusCategory != Done OR resolved >= -14d)`
+    const activeJql = `${mine} AND (statusCategory != Done OR ${DONE_WINDOW})`
 
     if (boardId) {
       const [config, meta] = await Promise.all([
@@ -48,7 +60,8 @@ export abstract class KanbanService {
       ])
       const isScrum = meta.type === 'scrum'
       const effectiveScope = isScrum ? scope : 'active'
-      const jql = effectiveScope === 'sprint' ? `${mine} AND sprint in openSprints()` : activeJql
+      const base = effectiveScope === 'sprint' ? `${mine} AND sprint in openSprints()` : activeJql
+      const jql = withSubQuery(base, config.subQuery?.query)
       const { issues } = await jira.boardIssues(boardId, `${jql} ORDER BY Rank ASC`, CARD_FIELDS)
 
       const columnOf = new Map<string, string>()
