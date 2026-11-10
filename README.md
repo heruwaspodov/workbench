@@ -68,10 +68,10 @@ Semua di `.env` (tidak di-commit). `.env.example` hanya berisi placeholder. Jang
 | `ADMIN_EMAILS` | tidak | Email dipisah koma; jadi admin saat login pertama |
 | `ALLOWED_EMAIL_DOMAINS` | tidak | Default `mekari.com` |
 | `SESSION_TTL_DAYS` | tidak | Default 7 |
-| `JIRA_BASE_URL`, `JIRA_EMAIL`, `JIRA_API_TOKEN` | kanban | Service account Jira |
-| `JIRA_BOARD_ID`, `JIRA_STORY_POINT_FIELD` | tidak | Default field `customfield_10016` (belum diverifikasi, OD-37) |
+| `JIRA_BASE_URL`, `JIRA_EMAIL`, `JIRA_API_TOKEN` | kanban | Service account Jira. `ATLASSIAN_EMAIL` / `ATLASSIAN_API_TOKEN` diterima sebagai cadangan (satu token Atlassian untuk Jira dan Bitbucket) |
+| `JIRA_BOARD_ID`, `JIRA_STORY_POINT_FIELD` | tidak | Di `jurnal.atlassian.net` field "Story Points" = `customfield_10005` (terverifikasi); default Jira `customfield_10016` kosong di sini |
 | `BITBUCKET_WORKSPACE` | PR | Slug workspace |
-| `BITBUCKET_ACCESS_TOKEN` atau `BITBUCKET_EMAIL` + `BITBUCKET_API_TOKEN` | PR | Bearer atau Basic |
+| `BITBUCKET_ACCESS_TOKEN` atau `BITBUCKET_EMAIL` + `BITBUCKET_API_TOKEN` | PR | Bearer atau Basic. Token API Atlassian memakai email akun Atlassian (`ATLASSIAN_EMAIL` sebagai cadangan); `BITBUCKET_USERNAME` hanya untuk git dan tidak dibaca |
 | `BITBUCKET_API_URL` | tidak | Override untuk test/mock |
 | `GOOGLE_SERVICE_ACCOUNT_JSON` | import sheet | JSON satu baris |
 

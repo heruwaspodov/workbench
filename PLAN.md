@@ -314,15 +314,17 @@ Toast sukses/error via `notifySuccess/notifyError`; refresh `GET /api/org/me` se
 **Acceptance:** POST dari origin lain ditolak; UI tetap jalan.
 **Log:** 2026-11-10 — `shared/origin-guard.ts` (`originGuard(appUrl)`, hook `onRequest` global, didaftarkan paling awal di `app.ts`): method selain GET/HEAD/OPTIONS di `/api/*` → 403 `FORBIDDEN` bila `Origin` (fallback `Referer`) ≠ origin `APP_URL`; tanpa kedua header ditolak (fail closed), `Origin: null` ditolak; `/auth/*` tidak terpengaruh. `test/origin-guard.test.ts` (11 test: unit + app sungguhan). Helper test DB dibuat ter-cache & pool tidak ditutup per file (dua file test berbagi satu pool). `e2e/run.ts`: helper API kini mengirim `Origin` (Playwright `request.fetch` tidak mengirimnya). Diverifikasi: `bun run test` 42 pass, `typecheck` lulus, `bun run e2e` 10/10 (UI tetap jalan, termasuk Simpan/PUT dari browser), lewat proxy Vite dev: Origin :5173 → 200, origin lain → 403, tanpa Origin → 403. Catatan: akses UI langsung ke :3000 saat dev ditolak karena Origin ≠ `APP_URL` (pakai :5173). README diperbarui. Commit: lihat git log.
 
-### OD-37 · Uji integrasi Jira nyata · `TODO`
+### OD-37 · Uji integrasi Jira nyata · `IN PROGRESS`
 **Description:** Isi `JIRA_*` dengan service account; verifikasi auto-connect by email (catatan: email user bisa tersembunyi oleh privacy setting → fallback cari manual), pilih board MESIGN, kanban sprint aktif, issue detail, stats. Konfirmasi `JIRA_STORY_POINT_FIELD`.
 **Acceptance:** Data sama dengan yang terlihat di Jira.
 **Depends:** credential service account Jira.
+**Log (2026-11-10, sebagian):** Credential memakai `ATLASSIAN_EMAIL`/`ATLASSIAN_API_TOKEN` → `env.ts` menerimanya sebagai cadangan `JIRA_*`/`BITBUCKET_*`. Dicek lewat panggilan baca-saja dari klien aplikasi (hanya jumlah/status yang dicetak): cari user by email 1 cocok (auto-connect by email berfungsi), board project MESIGN ditemukan (mis. 212 DevOps scrum; kolom To Do | In Progress | Done), 82 issue aktif milik user di board, stats JQL 3 bulan 100 resolved. **Temuan:** `customfield_10016` kosong di instance ini; field "Story Points" yang benar `customfield_10005` (terisi di 54 dari 82 issue aktif, 82 dari 100 resolved 90 hari) → `JIRA_STORY_POINT_FIELD=customfield_10005` di `.env`/`.env.example`/README. Belum: pilih board & cek kanban/issue detail/stats di UI dan cocokkan dengan Jira oleh user.
 
-### OD-38 · Uji integrasi Bitbucket nyata · `TODO`
+### OD-38 · Uji integrasi Bitbucket nyata · `IN PROGRESS`
 **Description:** Isi `BITBUCKET_*`; verifikasi auto-connect (account_id), list PR author & reviewer, detail, diff, build status. Ukur latency fan-out reviewer; bila lambat, cache 1–2 menit.
 **Acceptance:** PR sama dengan yang terlihat di Bitbucket; list < 3 detik.
 **Depends:** token Bitbucket.
+**Log (2026-11-10, sebagian):** Basic auth memakai email Atlassian + API token (`BITBUCKET_USERNAME` hanya untuk git, tidak dipakai). Dicek baca-saja: members workspace `jurnal` 224; auto-connect by Atlassian `account_id` cocok; PR author halaman 1 (25 PR, 2 repo) **3154 ms** (target < 3 s, cold, sedikit di atas → pertimbangkan cache 1–2 menit); fan-out reviewer 2 repo 1370 ms (20 PR perlu review); detail + diffstat + commits + comments + statuses satu PR 1638 ms, semua 200. Belum: PR list/detail/diff di UI dicocokkan dengan Bitbucket oleh user; keputusan cache.
 
 ### OD-39 · Test API (service level) · `TODO`
 **Description:** `bun test` untuk PlanService/TemplateService (DB test via `DATABASE_URL` test), aturan score, submit 100%, lock saat submitted, akses owner/admin, template delete guard.

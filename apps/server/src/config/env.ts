@@ -41,8 +41,8 @@ export const env = {
 
   jira: {
     baseUrl: read('JIRA_BASE_URL', '')!.replace(/\/$/, ''),
-    email: read('JIRA_EMAIL'),
-    apiToken: read('JIRA_API_TOKEN'),
+    email: read('JIRA_EMAIL') ?? read('ATLASSIAN_EMAIL'),
+    apiToken: read('JIRA_API_TOKEN') ?? read('ATLASSIAN_API_TOKEN'),
     defaultBoardId: read('JIRA_BOARD_ID') ? Number(read('JIRA_BOARD_ID')) : undefined,
     storyPointField: read('JIRA_STORY_POINT_FIELD', 'customfield_10016')!,
   },
@@ -50,8 +50,9 @@ export const env = {
     apiUrl: read('BITBUCKET_API_URL', 'https://api.bitbucket.org/2.0')!.replace(/\/$/, ''),
     workspace: read('BITBUCKET_WORKSPACE'),
     accessToken: read('BITBUCKET_ACCESS_TOKEN'),
-    email: read('BITBUCKET_EMAIL'),
-    apiToken: read('BITBUCKET_API_TOKEN'),
+    // Atlassian API tokens authenticate with the Atlassian account email (BITBUCKET_USERNAME is for git, unused here).
+    email: read('BITBUCKET_EMAIL') ?? read('ATLASSIAN_EMAIL'),
+    apiToken: read('BITBUCKET_API_TOKEN') ?? read('ATLASSIAN_API_TOKEN'),
   },
   googleServiceAccountJson: read('GOOGLE_SERVICE_ACCOUNT_JSON'),
 } as const
