@@ -8,6 +8,7 @@ export const PullRequestsModel = {
     state: t.Optional(t.Union([t.Literal('OPEN'), t.Literal('MERGED'), t.Literal('DECLINED'), t.Literal('ALL')])),
     repo: t.Optional(t.String()),
     page: t.Optional(t.Numeric({ minimum: 1 })),
+    pagelen: t.Optional(t.Numeric({ minimum: 1, maximum: 50 })),
   }),
   detailParams: t.Object({
     repo: t.String({ pattern: '^[A-Za-z0-9._-]+$' }),

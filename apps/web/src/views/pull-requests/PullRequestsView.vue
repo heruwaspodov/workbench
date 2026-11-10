@@ -4,6 +4,7 @@ import { onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import AsyncState from '@/components/AsyncState.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import PaginationBar from '@/components/PaginationBar.vue'
 import SegmentedControl from '@/components/SegmentedControl.vue'
 import { api, unwrap } from '@/lib/api'
 import { timeAgo } from '@/lib/format'
@@ -16,14 +17,15 @@ const role = ref<'author' | 'reviewer'>('author')
 const state = ref<State>('OPEN')
 const repo = ref('')
 const page = ref(1)
+const pageSize = ref(20)
 
 const { data, loading, error, run } = useAsync(() => unwrap(api['pull-requests'].get({
-  query: { role: role.value, state: state.value, repo: repo.value || undefined, page: page.value },
+  query: { role: role.value, state: state.value, repo: repo.value || undefined, page: page.value, pagelen: pageSize.value },
 })))
 const { data: repos, run: loadRepos } = useAsync(() => unwrap(api['pull-requests'].repos.get()))
 
 onMounted(() => { run(); loadRepos() })
-watch([role, state, repo], () => { page.value = 1; run() })
+watch([role, state, repo, pageSize], () => { page.value = 1; run() })
 watch(page, run)
 
 // One compact block per pull request, so everything fits the page width without sideways scrolling.
@@ -44,7 +46,6 @@ const side = css({
   gridColumn: { base: '2', lg: 'auto' },
 })
 const stat = css({ display: 'flex', alignItems: 'center', gap: '1' })
-const pager = css({ display: 'flex', justifyContent: 'flex-end', gap: '2', p: '3' })
 </script>
 
 <template>
@@ -112,10 +113,7 @@ const pager = css({ display: 'flex', justifyContent: 'flex-end', gap: '2', p: '3
           </div>
         </RouterLink>
       </div>
-      <div :class="pager">
-        <MpButton size="sm" variant="secondary" :is-disabled="page === 1" @click="page--">Previous</MpButton>
-        <MpButton size="sm" variant="secondary" :is-disabled="!data.hasNext" @click="page++">Next</MpButton>
-      </div>
+      <PaginationBar v-model:page="page" v-model:page-size="pageSize" :shown="data.items.length" :total="data.total" :has-next="data.hasNext" />
     </div>
   </AsyncState>
 </template>

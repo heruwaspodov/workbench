@@ -3,6 +3,7 @@ import { MpBadge, MpButton, MpIcon, MpText, css } from '@mekari/pixel3'
 import { onMounted, ref, watch } from 'vue'
 import AsyncState from '@/components/AsyncState.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import PaginationBar from '@/components/PaginationBar.vue'
 import SearchInput from '@/components/SearchInput.vue'
 import { api, unwrap } from '@/lib/api'
 import { copyText, isHttpUrl } from '@/lib/clipboard'
@@ -13,12 +14,14 @@ import { useAsync } from '@/lib/use-async'
 const query = ref('')
 const applied = ref('')
 const page = ref(1)
+const pageSize = ref(20)
 
 const { data, loading, error, run } = useAsync(() =>
-  unwrap(api.confluence.pages.get({ query: { role: 'creator', q: applied.value || undefined, page: page.value } })),
+  unwrap(api.confluence.pages.get({ query: { role: 'creator', q: applied.value || undefined, page: page.value, pagelen: pageSize.value } })),
 )
 onMounted(run)
 watch(page, run)
+watch(pageSize, () => { if (page.value === 1) run(); else page.value = 1 })
 
 function search() {
   applied.value = query.value.trim()
@@ -37,14 +40,13 @@ const tile = css({ width: '9', height: '9', rounded: 'full', bg: 'background.sur
 const main = css({ minWidth: 0, display: 'flex', flexDirection: 'column', gap: '1' })
 const title = css({ display: 'block', truncate: true })
 const meta = css({ display: 'flex', alignItems: 'center', flexWrap: 'wrap', columnGap: '2', rowGap: '1' })
-const pager = css({ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: '3' })
 </script>
 
 <template>
   <PageHeader title="My Confluence" subtitle="Confluence pages you have created. Only the title, space and link are shown; page content is never displayed." />
 
   <div :class="bar">
-    <SearchInput v-model="query" placeholder="Search page titles" @enter="search" />
+    <SearchInput v-model="query" placeholder="Search your pages by title" @enter="search" />
     <MpButton variant="secondary" @click="search">Search</MpButton>
   </div>
 
@@ -65,13 +67,7 @@ const pager = css({ display: 'flex', justifyContent: 'space-between', alignItems
           <MpButton size="sm" variant="ghost" left-icon="copy" @click="copyText(p.url)">Copy link</MpButton>
         </div>
       </div>
-      <div :class="pager">
-        <MpText size="label" color="text.secondary">{{ data.total }} {{ data.total === 1 ? 'page' : 'pages' }} · page {{ data.page }}</MpText>
-        <div :class="css({ display: 'flex', gap: '2' })">
-          <MpButton size="sm" variant="secondary" :is-disabled="page === 1" @click="page--">Previous</MpButton>
-          <MpButton size="sm" variant="secondary" :is-disabled="!data.hasNext" @click="page++">Next</MpButton>
-        </div>
-      </div>
+      <PaginationBar v-model:page="page" v-model:page-size="pageSize" :shown="data.items.length" :total="data.total" :has-next="data.hasNext" />
     </div>
   </AsyncState>
 </template>

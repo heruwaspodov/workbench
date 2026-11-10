@@ -163,6 +163,10 @@ await step('My Confluence lists, searches and links my pages', async () => {
   await page.goto(`${APP}/confluence`)
   await text(page, 'Postmortem SEV1')
   await text(page, 'Roadmap Q4')
+  await text(page, 'Rows per page')
+  await text(page, 'Showing 1-4 of 4')
+  const cfReq = await page.evaluate(() => performance.getEntriesByType('resource').map((e) => e.name).filter((n) => n.includes('/api/confluence/pages')).at(-1) ?? '')
+  if (!cfReq.includes('pagelen=20') || !cfReq.includes('role=creator')) throw new Error(`Confluence request is not the 20-row creator list: ${cfReq}`)
   for (const width of [1440, 1024, 768]) {
     await page.setViewportSize({ width, height: 900 })
     const m = await page.evaluate(() => ({
@@ -175,7 +179,7 @@ await step('My Confluence lists, searches and links my pages', async () => {
   await page.waitForTimeout(400)
   const href = await page.getByRole('link', { name: 'Runbook Signing' }).first().getAttribute('href')
   if (!href?.startsWith('http://localhost:4010/wiki/spaces/')) throw new Error(`unexpected link ${href}`)
-  await page.getByPlaceholder('Search page titles').fill('runbook')
+  await page.getByPlaceholder('Search your pages by title').fill('runbook')
   await page.getByRole('button', { name: 'Search' }).click()
   await page.getByText('Postmortem SEV1').first().waitFor({ state: 'detached', timeout: 8000 })
   await text(page, 'Runbook Signing')
@@ -214,6 +218,10 @@ await step('issue drawer opens with panel and overlay', async () => {
 await step('PR list (author and reviewer)', async () => {
   await page.goto(`${APP}/pull-requests`)
   await text(page, 'MESIGN-101 Tidy up the signing endpoint')
+  await text(page, 'Rows per page')
+  await text(page, 'Showing 1-3 of 3')
+  const prReq = await page.evaluate(() => performance.getEntriesByType('resource').map((e) => e.name).filter((n) => n.includes('/api/pull-requests?')).at(-1) ?? '')
+  if (!prReq.includes('pagelen=20')) throw new Error(`PR list did not ask for 20 rows: ${prReq}`)
   await page.waitForTimeout(600) // avatars and icons load after the first paint
   for (const width of [1440, 1024, 768]) {
     await page.setViewportSize({ width, height: 900 })

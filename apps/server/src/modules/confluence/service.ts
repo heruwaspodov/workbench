@@ -4,7 +4,7 @@ import { cached } from '../../shared/cache'
 import { ConnectionsService } from '../connections/service'
 import type { ConfluencePage } from './model'
 
-const DEFAULT_PAGELEN = 25
+const DEFAULT_PAGELEN = 20
 
 /** Quote a value for a CQL string literal. */
 const quote = (v: string) => `"${v.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`

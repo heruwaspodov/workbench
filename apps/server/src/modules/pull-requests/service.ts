@@ -32,6 +32,8 @@ const toSummary = (pr: BbPullRequest): PullRequestSummary => {
   }
 }
 
+const DEFAULT_PAGELEN = 20
+
 export abstract class PullRequestsService {
   /** Repos the user has authored PRs in recently = "repos I'm involved in". */
   static async involvedRepos(user: User): Promise<string[]> {
@@ -42,16 +44,18 @@ export abstract class PullRequestsService {
     })
   }
 
-  static async list(user: User, opts: { role?: 'author' | 'reviewer'; state?: string; repo?: string; page?: number }) {
+  static async list(user: User, opts: { role?: 'author' | 'reviewer'; state?: string; repo?: string; page?: number; pagelen?: number }) {
     const { uuid } = await ConnectionsService.requireBitbucket(user)
     const states = !opts.state || opts.state === 'ALL' ? [...PR_STATES] : [opts.state]
     const page = opts.page ?? 1
+    const pagelen = opts.pagelen ?? DEFAULT_PAGELEN
 
     if ((opts.role ?? 'author') === 'author') {
-      const res = await bitbucket.userPullRequests(uuid, states, page, 25)
+      const res = await bitbucket.userPullRequests(uuid, states, page, pagelen)
       let items = res.values.map(toSummary)
       if (opts.repo) items = items.filter((p) => p.repo === opts.repo)
-      return { items, page, hasNext: Boolean(res.next) }
+      // The repository filter is applied after the page was fetched, so the workspace total no longer describes the list.
+      return { items, page, pagelen, total: opts.repo ? null : res.size ?? null, hasNext: Boolean(res.next) }
     }
 
     // Reviewer: Bitbucket has no workspace-wide reviewer endpoint, so fan out over involved repos.
@@ -60,7 +64,7 @@ export abstract class PullRequestsService {
     const q = `reviewers.uuid="${uuid}" AND (${stateQ})`
     const results = await Promise.all(repos.map((r) => bitbucket.repoPullRequests(r, q, 25).catch(() => ({ values: [] as BbPullRequest[] }))))
     const items = results.flatMap((r) => r.values).map(toSummary).sort((a, b) => b.updatedOn.localeCompare(a.updatedOn))
-    return { items: items.slice((page - 1) * 25, page * 25), page, hasNext: items.length > page * 25 }
+    return { items: items.slice((page - 1) * pagelen, page * pagelen), page, pagelen, total: items.length, hasNext: items.length > page * pagelen }
   }
 
   static async detail(user: User, repo: string, id: number) {

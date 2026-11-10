@@ -71,12 +71,12 @@ describe('ConfluenceService', () => {
     expect(last().path).toBe('/wiki/rest/api/search')
     expect(last().cql).toBe(`type = page AND creator = "${ACCOUNT}" ORDER BY lastmodified DESC`)
     expect(last().auth).toMatch(/^Basic /)
-    expect([last().start, last().limit]).toEqual(['0', '25'])
+    expect([last().start, last().limit]).toEqual(['0', '20'])
     expect(res.items).toEqual([
       { id: '1001', title: 'Doc 1', space: 'Engineering', url: `http://localhost:${server.port}/wiki/spaces/ENG/pages/1001/Doc-1`, lastModified: '2026-11-01T10:00:00.000Z' },
       { id: '1002', title: 'Doc 2', space: 'Engineering', url: `http://localhost:${server.port}/wiki/spaces/ENG/pages/1002/Doc-2`, lastModified: '2026-11-01T10:00:00.000Z' },
     ])
-    expect(res).toMatchObject({ total: 60, page: 1, pagelen: 25, hasNext: true })
+    expect(res).toMatchObject({ total: 60, page: 1, pagelen: 20, hasNext: true })
   })
 
   test('never returns page body or excerpt', async () => {
