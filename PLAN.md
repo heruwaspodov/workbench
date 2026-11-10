@@ -392,6 +392,12 @@ Toast sukses/error via `notifySuccess/notifyError`; refresh `GET /api/org/me` se
 **Depends:** OD-54, OD-60.
 **Log:** 2026-11-10 — `ConfluenceView` ditulis ulang tanpa `MpTable` (grid `ikon | isi | aksi`, `minmax(0,1fr)`, judul `truncate` + `title`), data `data-row` untuk pemeriksaan lebar. Mock e2e + halaman berjudul panjang; e2e mengukur `scrollWidth` halaman dan tiap baris di 1440/1024/768. Screenshot dicek. `typecheck`, `build`, `test` (81 pass), `e2e` (13/13) hijau. Commit: lihat git log.
 
+### OD-62 · Nama menu "My Pull Requests" · `DONE`
+**Description:** Samakan penamaan menu: My Kanban, My Confluence, **My Pull Requests** (label sidebar, judul halaman, judul route, dan tautan kembali di detail PR).
+**Acceptance:** Semua kemunculan "Pull Requests" sebagai nama menu/halaman menjadi "My Pull Requests"; typecheck, build, e2e hijau.
+**Depends:** OD-26.
+**Log:** 2026-11-10 — `AppLayout` (label), `router.ts` (`meta.title`), `PullRequestsView` (judul), `PullRequestDetailView` (tombol kembali). `typecheck`, `build`, `e2e` (13/13) hijau. Commit: lihat git log.
+
 ## Fase 10 — Confluence (read-only)
 
 ### OD-54 · Confluence: My Confluence + evidence PGP · `IN PROGRESS`

@@ -56,7 +56,7 @@ const comment = css({ display: 'flex', gap: '3', py: '3', borderBottomWidth: '1p
     <template v-if="pr">
       <PageHeader :title="`#${pr.id} ${pr.title}`" :subtitle="`${pr.repo} · created ${formatDate(pr.createdOn)} by ${pr.author.name}`">
         <template #before-title>
-          <RouterLink to="/pull-requests"><MpButton variant="textLink" size="sm" left-icon="chevrons-left">Pull Requests</MpButton></RouterLink>
+          <RouterLink to="/pull-requests"><MpButton variant="textLink" size="sm" left-icon="chevrons-left">My Pull Requests</MpButton></RouterLink>
         </template>
         <MpBadge variant="subtle" :variant-color="prStateColor(pr.state)">{{ pr.state }}</MpBadge>
         <a :href="pr.url" target="_blank" rel="noopener noreferrer"><MpButton variant="secondary" right-icon="newtab">Open in Bitbucket</MpButton></a>

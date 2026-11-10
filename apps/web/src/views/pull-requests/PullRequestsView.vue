@@ -48,7 +48,7 @@ const pager = css({ display: 'flex', justifyContent: 'flex-end', gap: '2', p: '3
 </script>
 
 <template>
-  <PageHeader title="Pull Requests" subtitle="Your Bitbucket pull requests across every repository you work in.">
+  <PageHeader title="My Pull Requests" subtitle="Your Bitbucket pull requests across every repository you work in.">
     <MpButton variant="secondary" left-icon="refresh" :is-loading="loading" @click="run">Refresh</MpButton>
   </PageHeader>
 
