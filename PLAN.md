@@ -31,7 +31,7 @@ Status: `TODO` · `IN PROGRESS` · `DONE` · `BLOCKED`
 | 4. Kanban | OD-21 … OD-23 | DONE (mock) |
 | 5. Pull Requests | OD-24 … OD-26 | DONE (mock) |
 | 6. Frontend shell & polish | OD-27 … OD-31 | DONE · OD-31 IN PROGRESS |
-| 7. Pindah ke laptop & run lokal | OD-32 … OD-35 | OD-32 DONE · sisanya TODO |
+| 7. Pindah ke laptop & run lokal | OD-32 … OD-35 | OD-32, OD-33 DONE · sisanya TODO |
 | 8. Hardening & integrasi nyata | OD-36 … OD-42 | TODO |
 | 9. Rilis MVP internal | OD-43 … OD-44 | TODO |
 
@@ -264,9 +264,11 @@ Toast sukses/error via `notifySuccess/notifyError`; refresh `GET /api/org/me` se
 **Acceptance:** `ls ~/Works/one-desk` berisi apps/, package.json, bun.lock, PLAN.md, DESIGN.md; `git -C ~/Works/one-desk log` menunjukkan 1 commit; `git status` bersih.
 **Log:** 2026-11-10 — 82 file ter-extract di `~/Works/one-desk`, commit awal `f9feff1`, tarball dihapus, working tree bersih. Commit kedua mencatat status tiket ini.
 
-### OD-33 · README & panduan setup lokal · `TODO`
-**Description:** `README.md`: prasyarat (Bun ≥ 1.3, Docker/OrbStack), langkah `cp .env.example .env`, `docker compose up -d db`, `bun install`, `bun run db:migrate`, `bun run dev:server` + `bun run dev:web`, akses http://localhost:5173, dev login, cara bikin Jira API token / Bitbucket token / Google SA, daftar env, catatan known issues.
-**Acceptance:** Orang lain bisa menjalankan app hanya dari README.
+### OD-33 · README & panduan setup lokal · `DONE`
+**Description:** `README.md`: prasyarat (Bun ≥ 1.3, Docker/OrbStack), langkah `cp .env.example .env`, `docker compose up -d db`, `bun install`, `bun run db:migrate`, `bun run dev:server` + `bun run dev:web`, akses http://localhost:5173, dev login, cara bikin Jira API token / Bitbucket token / Google SA, daftar env, catatan known issues. Postgres lokal (localhost, database `one-desk`) sebagai default; Docker hanya opsi.
+**Scope tambahan (disetujui 2026-11-10):** perbaiki script root `package.json` yang rusak di Bun 1.4.4 — bentuk `bun --cwd X run ...` mencetak help tanpa menjalankan script (exit 0), diganti `bun run --cwd X ...`; script server memuat `.env` root via `--env-file=../../.env`. `DATABASE_URL` di `.env.example` → `postgres://localhost:5432/one-desk`.
+**Acceptance:** Orang lain bisa menjalankan app hanya dari README; `bun run db:migrate` dari root menerapkan migration ke DB lokal; `bun run dev:server` start dan `/api/auth/config` menjawab 200; `bun run typecheck` & `bun run test` benar-benar berjalan.
+**Log:** 2026-11-10 — `README.md` ditulis (Postgres lokal default, Docker opsi). Script root diperbaiki (`bun run --cwd`, `--env-file=../../.env`); `.env.example` → `postgres://localhost:5432/one-desk`. Diverifikasi di Bun 1.4.4 + Postgres lokal: `db:migrate` menerapkan 7 tabel ke DB `one-desk`, `dev:server` start (`/api/auth/config` 200, `/auth/dev-login` 302), `typecheck` lulus, `test` 11 pass, `build` sukses. Alur UI (template/plan/export) belum diuji → OD-34. Commit: lihat git log.
 
 ### OD-34 · Run lokal di laptop · `TODO`
 **Description:** Di Mac user: install deps, jalankan Postgres via OrbStack/Docker, migrate, start server & web, login via dev-login, buat template dari scratch, isi plan, export Excel. (Dijalankan oleh user di terminal Mac karena VM Claude tidak punya Bun/Docker; Claude memandu.)
