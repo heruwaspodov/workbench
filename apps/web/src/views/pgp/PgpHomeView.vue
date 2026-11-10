@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { MpBadge, MpButton, MpProgress, MpText, css } from '@mekari/pixel3'
+import { MpBadge, MpButton, MpIcon, MpProgress, MpText, css } from '@mekari/pixel3'
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import AsyncState from '@/components/AsyncState.vue'
@@ -34,12 +34,12 @@ async function start(templateId: string) {
   } catch (e) { notifyError(e) } finally { creating.value = null }
 }
 
-const col = css({ display: 'flex', flexDirection: 'column', gap: '3' })
-const card = `${ui.card} ${col}`
-const linkCard = `${ui.card} ${col} ${ui.lift}`
-const grid = ui.cards
-const between = ui.between
 const section = ui.section
+const main = css({ minWidth: 0, display: 'flex', flexDirection: 'column', gap: '1' })
+const title = css({ truncate: true, fontWeight: 'semiBold' })
+const meta = css({ display: 'flex', alignItems: 'center', flexWrap: 'wrap', columnGap: '3', rowGap: '1' })
+const score = css({ display: 'grid', gridTemplateColumns: { base: 'auto auto', lg: '150px 84px' }, columnGap: '4', rowGap: '1', alignItems: 'center', justifyItems: 'start' })
+const scoreText = css({ display: 'flex', flexDirection: 'column', gap: '1', width: '100%' })
 </script>
 
 <template>
@@ -55,37 +55,42 @@ const section = ui.section
     <template v-if="data">
       <div v-if="available.length">
         <MpText size="h3" weight="semiBold" :class="css({ mb: '3' })">Start a new PGP</MpText>
-        <div :class="grid">
-          <div v-for="t in available" :key="t.id" :class="card">
-            <div :class="between">
-              <MpBadge variant="subtle" variant-color="blue">{{ t.period }}</MpBadge>
-              <MpText size="label-small" color="text.secondary">{{ t.itemCount }} {{ t.itemCount === 1 ? 'item' : 'items' }}</MpText>
+        <div :class="ui.list">
+          <div v-for="t in available" :key="t.id" :class="ui.listRow">
+            <div :class="ui.tile"><MpIcon name="goal" size="sm" /></div>
+            <div :class="main">
+              <MpText size="label" :class="title" :title="t.title">{{ t.title }}</MpText>
+              <div :class="meta">
+                <MpBadge size="sm" variant="subtle" variant-color="blue">{{ t.period }}</MpBadge>
+                <MpText size="label-small" color="text.secondary">{{ t.itemCount }} {{ t.itemCount === 1 ? 'item' : 'items' }}</MpText>
+              </div>
             </div>
-            <MpText weight="semiBold">{{ t.title }}</MpText>
-            <MpButton size="sm" :is-loading="creating === t.id" @click="start(t.id)">Fill in this PGP</MpButton>
+            <MpButton size="sm" variant="secondary" :is-loading="creating === t.id" @click="start(t.id)">Fill in this PGP</MpButton>
           </div>
         </div>
       </div>
 
       <MpText size="h3" weight="semiBold" :class="section">My PGP</MpText>
       <AsyncState :empty="!data.plans.length" empty-text="No PGP yet. Pick a template above to start.">
-        <div :class="grid">
-          <RouterLink v-for="p in data.plans" :key="p.id" :to="`/pgp/plans/${p.id}`" :class="linkCard">
-            <div :class="between">
-              <MpBadge variant="subtle" variant-color="blue">{{ p.period }}</MpBadge>
+        <div :class="ui.list">
+          <RouterLink v-for="p in data.plans" :key="p.id" :to="`/pgp/plans/${p.id}`" :class="ui.listRow">
+            <div :class="ui.tile"><MpIcon name="goal" size="sm" /></div>
+            <div :class="main">
+              <MpText size="label" :class="title" :title="p.templateTitle">{{ p.templateTitle }}</MpText>
+              <div :class="meta">
+                <MpBadge size="sm" variant="subtle" variant-color="blue">{{ p.period }}</MpBadge>
+                <MpText size="label-small" color="text.secondary">Updated {{ timeAgo(p.updatedAt) }}</MpText>
+              </div>
+            </div>
+            <div :class="score">
+              <div :class="scoreText">
+                <MpText size="label" weight="semiBold">{{ p.score }}% <MpText as="span" size="label" color="text.secondary">of {{ p.totalWeight }}%</MpText></MpText>
+                <MpProgress :value="String(p.score)" />
+              </div>
               <MpBadge :variant-color="p.status === 'submitted' ? 'green' : 'gray'" variant="subtle">
                 {{ p.status === 'submitted' ? 'Submitted' : 'Draft' }}
               </MpBadge>
             </div>
-            <MpText weight="semiBold">{{ p.templateTitle }}</MpText>
-            <div>
-              <div :class="between">
-                <MpText size="label" color="text.secondary">Score</MpText>
-                <MpText size="label" weight="semiBold">{{ p.score }}% / {{ p.totalWeight }}%</MpText>
-              </div>
-              <MpProgress :value="String(p.score)" :class="css({ mt: '1' })" />
-            </div>
-            <MpText size="label-small" color="text.secondary">Updated {{ timeAgo(p.updatedAt) }}</MpText>
           </RouterLink>
         </div>
       </AsyncState>

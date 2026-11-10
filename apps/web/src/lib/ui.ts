@@ -53,6 +53,15 @@ export const ui = {
   cards: css({ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '4' }),
   twoCol: css({ display: 'grid', gridTemplateColumns: { base: 'minmax(0, 1fr)', xl: 'repeat(2, minmax(0, 1fr))' }, gap: '5', alignItems: 'start' }),
   link: css({ color: 'text.link', fontWeight: 'semiBold', textDecoration: 'none', _hover: { textDecoration: 'underline' } }),
+  /** Compact list: one block per record, hairline separators, hover tint (pull requests, Confluence, PGP). */
+  list: css({ borderTopWidth: '1px', borderColor: 'border.default.subtle' }),
+  listRow: css({
+    display: 'grid', gridTemplateColumns: 'auto minmax(0, 1fr) auto', columnGap: '3', alignItems: 'center', px: '4', py: '3',
+    borderBottomWidth: '1px', borderColor: 'border.default.subtle', textDecoration: 'none', color: 'inherit',
+    _hover: { bg: 'background.surface' }, _focusVisible: { outline: '2px solid', outlineColor: 'border.focused', outlineOffset: '-2px' },
+  }),
+  /** Round tile that holds the row's icon. */
+  tile: css({ width: '9', height: '9', rounded: 'full', bg: 'background.surface', display: 'grid', placeItems: 'center', flexShrink: 0 }),
   /** Light inset box for a short note or a selected item. */
   note: css({ bg: 'background.surface', rounded: 'lg', p: '3' }),
 }

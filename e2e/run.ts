@@ -126,6 +126,16 @@ await step('admin creates & publishes template (API), shown on home', async () =
   await api('PATCH', `/api/pgp/templates/${t.id}`, { status: 'published' })
   await page.reload()
   await text(page, title)
+  for (const width of [1440, 1024, 768]) {
+    await page.setViewportSize({ width, height: 900 })
+    await page.waitForTimeout(200)
+    const m = await page.evaluate(() => ({ page: document.documentElement.scrollWidth - innerWidth, wide: [...document.querySelectorAll('main *')].filter((e) => e.getBoundingClientRect().right > innerWidth + 1).length }))
+    if (m.page > 1 || m.wide > 0) throw new Error(`PGP home overflows at ${width}px (page +${m.page}px, ${m.wide} elements past the edge)`)
+    if (width === 1024) await shot('01b-pgp-home-1024')
+  }
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.waitForTimeout(300)
+  await shot('01a-pgp-home')
 })
 
 await step('connect Jira, Bitbucket and board (API), connections page', async () => {
