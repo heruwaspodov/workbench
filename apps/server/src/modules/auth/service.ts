@@ -21,6 +21,9 @@ const pick = (obj: unknown, paths: string[]): string | undefined => {
   return undefined
 }
 
+const fullName = (json: unknown) =>
+  [pick(json, ['data.attributes.first_name']), pick(json, ['data.attributes.last_name'])].filter(Boolean).join(' ') || undefined
+
 export abstract class AuthService {
   static get oauthConfigured() {
     const o = env.oauth
@@ -71,7 +74,7 @@ export abstract class AuthService {
     return token
   }
 
-  /** ASSUMPTION: userinfo shape is OIDC-like; we also accept a `{ data: {...} }` envelope. */
+  /** Mekari SSO `GET /v1/users/me` returns `{ data: { id, attributes: { email, full_name, sso_id, avatar } } }`; OIDC-like flat shapes are accepted too. */
   static async fetchProfile(accessToken: string): Promise<OAuthProfile> {
     const res = await fetch(env.oauth.userinfoUrl!, {
       headers: { authorization: `Bearer ${accessToken}`, accept: 'application/json' },
@@ -79,12 +82,22 @@ export abstract class AuthService {
     if (!res.ok) throw new AppError(401, `OAuth userinfo failed (${res.status})`, 'OAUTH_FAILED')
     const json = await res.json()
     const email = pick(json, ['email', 'data.email', 'data.attributes.email'])
-    if (!email) throw new AppError(401, 'OAuth profile has no email', 'OAUTH_FAILED')
+    if (!email) {
+      // Field names only, never values: helps map an undocumented userinfo response.
+      const names = (o: unknown) => (o && typeof o === 'object' ? Object.keys(o).join(', ') : typeof o)
+      const data = (json as Record<string, unknown> | null)?.data as Record<string, unknown> | undefined
+      const attrs = data && typeof data === 'object' ? data.attributes : undefined
+      throw new AppError(
+        401,
+        `OAuth profile has no email (fields: ${names(json)}${data ? `; data: ${names(data)}` : ''}${attrs ? `; attributes: ${names(attrs)}` : ''})`,
+        'OAUTH_FAILED',
+      )
+    }
     return {
-      subject: pick(json, ['sub', 'id', 'data.sub', 'data.id']) ?? email,
+      subject: pick(json, ['sub', 'id', 'data.attributes.sso_id', 'data.sub', 'data.id']) ?? email,
       email: email.toLowerCase(),
-      name: pick(json, ['name', 'full_name', 'data.name', 'data.full_name', 'data.attributes.name']) ?? email.split('@')[0]!,
-      avatarUrl: pick(json, ['picture', 'avatar', 'data.picture', 'data.avatar']),
+      name: pick(json, ['name', 'full_name', 'data.name', 'data.full_name', 'data.attributes.full_name', 'data.attributes.name']) ?? fullName(json) ?? email.split('@')[0]!,
+      avatarUrl: pick(json, ['picture', 'avatar', 'data.picture', 'data.avatar', 'data.attributes.avatar']),
     }
   }
 
