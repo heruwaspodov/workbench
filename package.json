@@ -1,0 +1,16 @@
+{
+  "name": "one-desk",
+  "private": true,
+  "workspaces": ["apps/*"],
+  "scripts": {
+    "dev": "bun run --filter '*' dev",
+    "dev:server": "bun --cwd apps/server run dev",
+    "dev:web": "bun --cwd apps/web run dev",
+    "build": "bun --cwd apps/web run build",
+    "start": "bun --cwd apps/server run start",
+    "typecheck": "bun --cwd apps/server run typecheck && bun --cwd apps/web run typecheck",
+    "test": "bun --cwd apps/server test",
+    "db:generate": "bun --cwd apps/server run db:generate",
+    "db:migrate": "bun --cwd apps/server run db:migrate"
+  }
+}

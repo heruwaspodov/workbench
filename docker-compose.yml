@@ -1,0 +1,19 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: onedesk
+      POSTGRES_PASSWORD: onedesk
+      POSTGRES_DB: onedesk
+    ports: ["5432:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+  app:
+    build: .
+    profiles: [full]
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://onedesk:onedesk@db:5432/onedesk
+    ports: ["3000:3000"]
+    depends_on: [db]
+volumes:
+  pgdata:

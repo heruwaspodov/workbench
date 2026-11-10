@@ -1,0 +1,150 @@
+import { and, asc, desc, eq, inArray, notInArray, sql } from 'drizzle-orm'
+import { db } from '../../db/client'
+import { planItems, plans, templateItems, templates, users, type PlanItem, type User } from '../../db/schema'
+import { BadRequestError, ForbiddenError, NotFoundError } from '../../shared/errors'
+import type { PlanItemInputT } from './model'
+
+const round = (n: number) => Math.round(n * 100) / 100
+
+export const scoreOf = (items: Pick<PlanItem, 'weight' | 'achievement'>[]) => ({
+  totalWeight: round(items.reduce((s, i) => s + i.weight, 0)),
+  score: round(items.reduce((s, i) => s + Math.min(i.achievement ?? 0, i.weight), 0)),
+})
+
+export abstract class PlanService {
+  static async listMine(user: User) {
+    const rows = await db
+      .select({
+        id: plans.id, status: plans.status, updatedAt: plans.updatedAt, submittedAt: plans.submittedAt,
+        templateId: templates.id, templateTitle: templates.title, period: templates.period,
+        totalWeight: sql<number>`(select coalesce(sum(pi.weight),0)::float from pgp_plan_items pi where pi.plan_id = "pgp_plans"."id")`,
+        score: sql<number>`(select coalesce(sum(least(coalesce(pi.achievement,0), pi.weight)),0)::float from pgp_plan_items pi where pi.plan_id = "pgp_plans"."id")`,
+      })
+      .from(plans)
+      .innerJoin(templates, eq(templates.id, plans.templateId))
+      .where(eq(plans.userId, user.id))
+      .orderBy(desc(templates.period))
+    return rows
+  }
+
+  /** Owner or admin may read; only owner may write. */
+  static async get(id: string, user: User, mode: 'read' | 'write' = 'read') {
+    const plan = await db.query.plans.findFirst({
+      where: eq(plans.id, id),
+      with: {
+        items: { orderBy: [asc(planItems.position)] },
+        template: { columns: { id: true, title: true, period: true, status: true } },
+        user: { columns: { id: true, name: true, email: true } },
+      },
+    })
+    if (!plan) throw new NotFoundError('Plan')
+    const isOwner = plan.userId === user.id
+    if (!isOwner && !(mode === 'read' && user.role === 'admin')) throw new ForbiddenError()
+    return { ...plan, ...scoreOf(plan.items), canEdit: isOwner }
+  }
+
+  static async create(user: User, templateId: string) {
+    const tpl = await db.query.templates.findFirst({
+      where: eq(templates.id, templateId),
+      with: { items: { orderBy: [asc(templateItems.position)] } },
+    })
+    if (!tpl || tpl.status !== 'published') throw new NotFoundError('Published template')
+
+    const existing = await db.query.plans.findFirst({ where: and(eq(plans.templateId, templateId), eq(plans.userId, user.id)) })
+    if (existing) return this.get(existing.id, user)
+
+    // Prefill header from the user's previous plan.
+    const previous = await db.query.plans.findFirst({ where: eq(plans.userId, user.id), orderBy: [desc(plans.createdAt)] })
+
+    const id = await db.transaction(async (tx) => {
+      const [plan] = await tx.insert(plans).values({
+        templateId, userId: user.id,
+        division: previous?.division, sbu: previous?.sbu, sbuDetail: previous?.sbuDetail, directLeader: previous?.directLeader,
+      }).returning()
+      if (tpl.items.length) {
+        await tx.insert(planItems).values(tpl.items.map((i) => ({
+          planId: plan!.id, templateItemId: i.id, position: i.position,
+          companyOkr: i.companyOkr, objective: i.objective, keyResult: i.keyResult, weight: i.weight, initiative: i.initiative,
+        })))
+      }
+      return plan!.id
+    })
+    return this.get(id, user)
+  }
+
+  static async updateHeader(id: string, user: User, patch: { division?: string | null; sbu?: string | null; sbuDetail?: string | null; directLeader?: string | null }) {
+    await this.get(id, user, 'write')
+    await db.update(plans).set(patch).where(eq(plans.id, id))
+    return this.get(id, user)
+  }
+
+  /**
+   * Draft plans: full edit (add / remove / reorder / change weights).
+   * Submitted plans: planning columns are locked — only progress columns of existing items are updated.
+   */
+  static async replaceItems(id: string, user: User, input: PlanItemInputT[]) {
+    const plan = await this.get(id, user, 'write')
+    let items = input
+    if (plan.status === 'submitted') {
+      const incoming = new Map(input.filter((i) => i.id).map((i) => [i.id!, i]))
+      items = plan.items.map((orig) => {
+        const i = incoming.get(orig.id)
+        return {
+          id: orig.id, templateItemId: orig.templateItemId, companyOkr: orig.companyOkr, objective: orig.objective,
+          keyResult: orig.keyResult, weight: orig.weight, initiative: orig.initiative,
+          startValue: i ? i.startValue : orig.startValue,
+          targetValue: i ? i.targetValue : orig.targetValue,
+          currentValue: i ? i.currentValue : orig.currentValue,
+          achievement: i ? i.achievement : orig.achievement,
+          status: i?.status ?? orig.status,
+          evidenceLinks: i?.evidenceLinks ?? orig.evidenceLinks,
+          notes: i ? i.notes : orig.notes,
+        }
+      })
+    }
+    for (const i of items) {
+      if (i.achievement != null && i.achievement > i.weight) {
+        throw new BadRequestError(`Achievement (${i.achievement}) cannot exceed weight (${i.weight}) for "${i.initiative.slice(0, 60)}"`)
+      }
+    }
+    await db.transaction(async (tx) => {
+      const keepIds = items.map((i) => i.id).filter((x): x is string => Boolean(x))
+      await tx.delete(planItems).where(and(eq(planItems.planId, id), keepIds.length ? notInArray(planItems.id, keepIds) : undefined))
+      const existing = keepIds.length
+        ? new Set((await tx.select({ id: planItems.id }).from(planItems).where(and(eq(planItems.planId, id), inArray(planItems.id, keepIds)))).map((r) => r.id))
+        : new Set<string>()
+      for (const [position, i] of items.entries()) {
+        const row = {
+          planId: id, position,
+          templateItemId: i.templateItemId ?? null,
+          companyOkr: i.companyOkr ?? null, objective: i.objective, keyResult: i.keyResult, weight: i.weight, initiative: i.initiative,
+          startValue: i.startValue ?? null, targetValue: i.targetValue ?? null, currentValue: i.currentValue ?? null,
+          achievement: i.achievement ?? null, status: i.status ?? 'not_started',
+          evidenceLinks: (i.evidenceLinks ?? []).map((l) => l.trim()).filter(Boolean), notes: i.notes ?? null,
+        }
+        if (i.id && existing.has(i.id)) await tx.update(planItems).set(row).where(eq(planItems.id, i.id))
+        else await tx.insert(planItems).values(row)
+      }
+      await tx.update(plans).set({ updatedAt: new Date() }).where(eq(plans.id, id))
+    })
+    return this.get(id, user)
+  }
+
+  static async setStatus(id: string, user: User, status: 'draft' | 'submitted') {
+    const plan = await this.get(id, user, 'write')
+    if (status === 'submitted' && plan.totalWeight !== 100) {
+      throw new BadRequestError(`Total weight must be 100% before submitting (currently ${plan.totalWeight}%)`)
+    }
+    await db.update(plans).set({ status, submittedAt: status === 'submitted' ? new Date() : null }).where(eq(plans.id, id))
+    return this.get(id, user)
+  }
+
+  static async remove(id: string, user: User) {
+    await this.get(id, user, 'write')
+    await db.delete(plans).where(eq(plans.id, id))
+    return { ok: true }
+  }
+
+  static ownerOf = async (id: string) =>
+    (await db.select({ name: users.name }).from(plans).innerJoin(users, eq(users.id, plans.userId)).where(eq(plans.id, id)))[0]
+}
