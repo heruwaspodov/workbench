@@ -137,6 +137,14 @@ const prs = [
   pr(201, 'msign-web', 'MESIGN-104 Migrate the email template', other, 'OPEN', [dev]),
 ]
 
+// A long title and long branch names: the list must truncate them instead of scrolling sideways.
+{
+  const long = pr(301, 'msign-backend', 'MESIGN-24481 feat: add DOCUMENT_PERMANENTLY_DELETED terminal error and audit labels to the document history and the activity feed [FULL_COPILOT]', dev, 'OPEN', [other, bbUser('{00000000-0000-4000-8000-000000000003}', 'Third Reviewer')])
+  long.source.branch.name = 'feat/MESIGN-24481/document-permanently-deleted-terminal-error-and-audit-labels'
+  long.destination.branch.name = 'release/2026-11-stabilisation-branch'
+  prs.push(long)
+}
+
 const diff = `diff --git a/app/signing.rb b/app/signing.rb
 --- a/app/signing.rb
 +++ b/app/signing.rb

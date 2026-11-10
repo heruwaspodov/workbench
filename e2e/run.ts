@@ -204,6 +204,17 @@ await step('issue drawer opens with panel and overlay', async () => {
 await step('PR list (author and reviewer)', async () => {
   await page.goto(`${APP}/pull-requests`)
   await text(page, 'MESIGN-101 Tidy up the signing endpoint')
+  await page.waitForTimeout(600) // avatars and icons load after the first paint
+  for (const width of [1440, 1024, 768]) {
+    await page.setViewportSize({ width, height: 900 })
+    const m = await page.evaluate(() => ({
+      page: document.documentElement.scrollWidth - innerWidth,
+      rows: [...document.querySelectorAll('main a[href^="/pull-requests/"], a[href^="/pull-requests/"]')].filter((a) => a.scrollWidth > a.clientWidth + 1).length,
+    }))
+    if (m.page > 1 || m.rows > 0) throw new Error(`PR list scrolls sideways at ${width}px (page +${m.page}px, ${m.rows} rows)`)
+    if (width === 1024) await shot('06b-pr-1024')
+  }
+  await page.setViewportSize({ width: 1440, height: 900 })
   await shot('06-pr-author')
   await page.getByRole('button', { name: 'Needs my review' }).click()
   await text(page, 'MESIGN-104 Migrate the email template')

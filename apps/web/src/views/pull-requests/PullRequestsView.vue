@@ -1,10 +1,7 @@
 <script setup lang="ts">
-import {
-  MpAvatar, MpAvatarGroup, MpBadge, MpButton, MpIcon, MpSelect, MpTable, MpTableBody, MpTableCell,
-  MpTableContainer, MpTableHead, MpTableRow, MpText, css,
-} from '@mekari/pixel3'
+import { MpAvatar, MpAvatarGroup, MpBadge, MpButton, MpIcon, MpSelect, MpText, css } from '@mekari/pixel3'
 import { onMounted, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { RouterLink } from 'vue-router'
 import AsyncState from '@/components/AsyncState.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import SegmentedControl from '@/components/SegmentedControl.vue'
@@ -15,7 +12,6 @@ import { useAsync } from '@/lib/use-async'
 import { prStateColor } from './pr-ui'
 
 type State = 'OPEN' | 'MERGED' | 'DECLINED' | 'ALL'
-const router = useRouter()
 const role = ref<'author' | 'reviewer'>('author')
 const state = ref<State>('OPEN')
 const repo = ref('')
@@ -30,11 +26,25 @@ onMounted(() => { run(); loadRepos() })
 watch([role, state, repo], () => { page.value = 1; run() })
 watch(page, run)
 
-const open = (r: string, id: number) => router.push(`/pull-requests/${r}/${id}`)
-
-const rowCls = css({ cursor: 'pointer' })
-const branch = css({ fontFamily: 'mono', fontSize: 'xs', bg: 'background.neutral', px: '1.5', py: '0.5', rounded: 'sm', whiteSpace: 'nowrap' })
-const pager = css({ display: 'flex', justifyContent: 'flex-end', gap: '2', p: '3', borderTopWidth: '1px', borderColor: 'border.default.subtle' })
+// One compact block per pull request, so everything fits the page width without sideways scrolling.
+const list = css({ borderTopWidth: '1px', borderColor: 'border.default.subtle' })
+const row = css({
+  display: 'grid', gridTemplateColumns: { base: 'auto minmax(0, 1fr)', lg: 'auto minmax(0, 1fr) auto' }, columnGap: '3', rowGap: '2', alignItems: 'center',
+  px: '4', py: '3', borderBottomWidth: '1px', borderColor: 'border.default.subtle', textDecoration: 'none', color: 'inherit',
+  _hover: { bg: 'background.surface' }, _focusVisible: { outline: '2px solid', outlineColor: 'border.focused', outlineOffset: '-2px' },
+})
+const main = css({ minWidth: 0, display: 'flex', flexDirection: 'column', gap: '1' })
+const titleLine = css({ display: 'flex', alignItems: 'center', gap: '2', minWidth: 0 })
+const title = css({ truncate: true, fontWeight: 'semiBold' })
+const meta = css({ display: 'flex', alignItems: 'center', flexWrap: 'wrap', columnGap: '3', rowGap: '1', minWidth: 0 })
+const branches = css({ display: 'flex', alignItems: 'center', gap: '2', minWidth: 0 })
+const chip = css({ fontFamily: 'mono', fontSize: 'xs', bg: 'background.surface', px: '2', py: '0.5', rounded: 'md', maxWidth: '240px', truncate: true })
+const side = css({
+  display: 'grid', gridTemplateColumns: { base: 'repeat(3, auto)', lg: '104px 40px 40px 72px' }, columnGap: '3', alignItems: 'center', justifyContent: 'start',
+  gridColumn: { base: '2', lg: 'auto' },
+})
+const stat = css({ display: 'flex', alignItems: 'center', gap: '1' })
+const pager = css({ display: 'flex', justifyContent: 'flex-end', gap: '2', p: '3' })
 </script>
 
 <template>
@@ -63,56 +73,45 @@ const pager = css({ display: 'flex', justifyContent: 'flex-end', gap: '2', p: '3
   </div>
 
   <AsyncState :loading="loading && !data" :error="error" :empty="data?.items.length === 0" empty-text="No pull requests." @retry="run">
-    <div v-if="data" :class="ui.flat">
-      <MpTableContainer>
-        <MpTable is-hoverable :class="ui.table">
-          <MpTableHead>
-            <MpTableRow>
-              <MpTableCell as="th">Repo</MpTableCell>
-              <MpTableCell as="th">Pull request</MpTableCell>
-              <MpTableCell as="th">Branch</MpTableCell>
-              <MpTableCell as="th">State</MpTableCell>
-              <MpTableCell as="th">Reviewers</MpTableCell>
-              <MpTableCell as="th">Activity</MpTableCell>
-              <MpTableCell as="th">Updated</MpTableCell>
-            </MpTableRow>
-          </MpTableHead>
-          <MpTableBody>
-            <MpTableRow v-for="pr in data.items" :key="`${pr.repo}-${pr.id}`" :class="rowCls" @click="open(pr.repo, pr.id)">
-              <MpTableCell><MpText size="label" color="text.secondary">{{ pr.repo }}</MpText></MpTableCell>
-              <MpTableCell :style="{ minWidth: '320px' }">
-                <MpText size="label" weight="semiBold">#{{ pr.id }} {{ pr.title }}</MpText>
-                <div :class="css({ display: 'flex', gap: '1', mt: '1', flexWrap: 'wrap' })">
-                  <MpBadge v-if="pr.draft" size="sm" variant="subtle" variant-color="gray">Draft</MpBadge>
-                  <MpBadge v-for="k in pr.jiraKeys" :key="k" size="sm" variant="subtle" variant-color="blue">{{ k }}</MpBadge>
-                  <MpText v-if="role === 'reviewer'" size="label-small" color="text.secondary">by {{ pr.author.name }}</MpText>
-                </div>
-              </MpTableCell>
-              <MpTableCell>
-                <span :class="branch">{{ pr.sourceBranch }}</span>
-                <MpText as="span" size="label-small" color="text.secondary"> → </MpText>
-                <span :class="branch">{{ pr.destinationBranch }}</span>
-              </MpTableCell>
-              <MpTableCell><MpBadge variant="subtle" :variant-color="prStateColor(pr.state)">{{ pr.state }}</MpBadge></MpTableCell>
-              <MpTableCell>
-                <div :class="css({ display: 'flex', alignItems: 'center', gap: '2' })">
-                  <MpAvatarGroup v-if="pr.reviewers.length" size="sm" :max="3">
-                    <MpAvatar v-for="r in pr.reviewers" :key="r.name" :name="r.name" :src="r.avatarUrl ?? undefined" />
-                  </MpAvatarGroup>
-                  <MpText size="label-small" :color="pr.approvals ? 'text.success' : 'text.secondary'">{{ pr.approvals }} ✓</MpText>
-                </div>
-              </MpTableCell>
-              <MpTableCell>
-                <div :class="css({ display: 'flex', gap: '3', alignItems: 'center' })">
-                  <span :class="css({ display: 'flex', gap: '1', alignItems: 'center' })"><MpIcon name="comment" size="sm" /><MpText size="label">{{ pr.commentCount }}</MpText></span>
-                  <span v-if="pr.taskCount" :class="css({ display: 'flex', gap: '1', alignItems: 'center' })"><MpIcon name="task-todo" size="sm" /><MpText size="label">{{ pr.taskCount }}</MpText></span>
-                </div>
-              </MpTableCell>
-              <MpTableCell><MpText size="label" color="text.secondary">{{ timeAgo(pr.updatedOn) }}</MpText></MpTableCell>
-            </MpTableRow>
-          </MpTableBody>
-        </MpTable>
-      </MpTableContainer>
+    <div v-if="data">
+      <div :class="list">
+        <RouterLink v-for="pr in data.items" :key="`${pr.repo}-${pr.id}`" :to="`/pull-requests/${pr.repo}/${pr.id}`" :class="row">
+          <MpAvatar :name="pr.author.name" :src="pr.author.avatarUrl ?? undefined" />
+
+          <div :class="main">
+            <div :class="titleLine">
+              <MpBadge v-if="pr.draft" size="sm" variant="subtle" variant-color="gray">Draft</MpBadge>
+              <MpText size="label" :class="title" :title="pr.title">{{ pr.title }}</MpText>
+            </div>
+            <div :class="meta">
+              <MpText size="label-small" color="text.secondary">{{ pr.repo }} · {{ pr.author.name }} · #{{ pr.id }} · updated {{ timeAgo(pr.updatedOn) }}</MpText>
+              <div :class="branches">
+                <span :class="chip" :title="pr.sourceBranch">{{ pr.sourceBranch }}</span>
+                <MpText as="span" size="label-small" color="text.secondary">→</MpText>
+                <span :class="chip" :title="pr.destinationBranch">{{ pr.destinationBranch }}</span>
+              </div>
+              <MpBadge v-for="k in pr.jiraKeys" :key="k" size="sm" variant="subtle" variant-color="blue">{{ k }}</MpBadge>
+            </div>
+          </div>
+
+          <div :class="side">
+            <div :class="stat">
+              <MpAvatarGroup v-if="pr.reviewers.length" size="sm" :max="3">
+                <MpAvatar v-for="r in pr.reviewers" :key="r.name" :name="r.name" :src="r.avatarUrl ?? undefined" />
+              </MpAvatarGroup>
+            </div>
+            <div :class="stat" title="Approvals">
+              <MpIcon name="check" size="sm" />
+              <MpText size="label" :color="pr.approvals ? 'text.success' : 'text.secondary'">{{ pr.approvals }}</MpText>
+            </div>
+            <div :class="stat" title="Comments">
+              <MpIcon name="comment" size="sm" />
+              <MpText size="label">{{ pr.commentCount }}</MpText>
+            </div>
+            <MpBadge variant="subtle" :variant-color="prStateColor(pr.state)">{{ pr.state }}</MpBadge>
+          </div>
+        </RouterLink>
+      </div>
       <div :class="pager">
         <MpButton size="sm" variant="secondary" :is-disabled="page === 1" @click="page--">Previous</MpButton>
         <MpButton size="sm" variant="secondary" :is-disabled="!data.hasNext" @click="page++">Next</MpButton>
