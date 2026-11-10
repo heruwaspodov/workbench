@@ -8,7 +8,7 @@ export const bitbucketConfigured = () =>
 
 const http = createHttpClient({
   service: 'Bitbucket',
-  baseUrl: env.bitbucket.apiUrl,
+  baseUrl: () => env.bitbucket.apiUrl,
   authorization: () => {
     if (!bitbucketConfigured()) throw new AppError(503, 'Bitbucket service account is not configured', 'BITBUCKET_NOT_CONFIGURED')
     return env.bitbucket.accessToken

@@ -25,7 +25,13 @@ const searchJira = async () => {
 const boards = ref<{ id: number; name: string; type: string; project: string | null }[]>([])
 const boardQuery = ref('')
 const searchBoards = async () => {
-  try { boards.value = await unwrap(api.connections.jira.boards.get({ query: { q: boardQuery.value } })) } catch (e) { notifyError(e) }
+  try {
+    boards.value = await unwrap(api.connections.jira.boards.get({ query: { q: boardQuery.value } }))
+    // A pasted board URL or id resolves exactly one board: select it right away.
+    const pasted = /\/boards\/\d+/.test(boardQuery.value) || /^\s*\d+\s*$/.test(boardQuery.value)
+    if (pasted && boards.value.length === 1) await onBoardChange(String(boards.value[0]!.id))
+    else if (pasted) notifyError(new Error('Board tidak ditemukan'))
+  } catch (e) { notifyError(e) }
 }
 const onBoardChange = (value: string | number) =>
   act('board', () => unwrap(api.connections.jira.board.put({ boardId: value ? Number(value) : null })), 'Board tersimpan')
@@ -99,14 +105,18 @@ const muted = css({ bg: 'background.neutral.subtle', rounded: 'md', p: '3' })
             <MpText weight="semiBold">Board untuk Kanban</MpText>
             <MpText size="label-small" color="text.secondary">
               Opsional. Tanpa board, kanban dikelompokkan per status category (To Do / In Progress / Done).
+              Cari lewat nama board atau project key (mis. MESIGN), atau tempel URL / ID board Jira.
+            </MpText>
+            <MpText v-if="overview.jira.boardIsDefault" size="label-small" color="text.secondary">
+              Memakai board default tim{{ overview.jira.boardName ? `: ${overview.jira.boardName}` : '' }}. Pilih board lain untuk menggantinya.
             </MpText>
             <div :class="row">
-              <MpInput v-model="boardQuery" placeholder="Cari nama board, mis. MESIGN" @keyup.enter="searchBoards" />
+              <MpInput v-model="boardQuery" placeholder="Nama, project key (MESIGN), atau URL board" @keyup.enter="searchBoards" />
               <MpButton variant="secondary" @click="searchBoards">Cari</MpButton>
             </div>
             <MpSelect :model-value="overview.jira.boardId ?? ''" placeholder="Tanpa board" is-clearable @change="(e: Event) => onBoardChange((e.target as HTMLSelectElement).value)" @clear="onBoardChange('')">
               <option v-if="overview.jira.boardId && !boards.some((b) => b.id === overview?.jira.boardId)" :value="overview.jira.boardId">
-                Board #{{ overview.jira.boardId }}
+                {{ overview.jira.boardName ?? `Board #${overview.jira.boardId}` }}
               </option>
               <option v-for="b in boards" :key="b.id" :value="b.id">{{ b.name }} ({{ b.type }}{{ b.project ? ` · ${b.project}` : '' }})</option>
             </MpSelect>

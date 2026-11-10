@@ -7,7 +7,7 @@ export const jiraConfigured = () => Boolean(env.jira.baseUrl && env.jira.email &
 
 const http = createHttpClient({
   service: 'Jira',
-  baseUrl: env.jira.baseUrl,
+  baseUrl: () => env.jira.baseUrl,
   authorization: () => {
     if (!jiraConfigured()) throw new AppError(503, 'Jira service account is not configured', 'JIRA_NOT_CONFIGURED')
     return basicAuth(env.jira.email!, env.jira.apiToken!)

@@ -128,6 +128,16 @@ await step('connect Jira, Bitbucket and board (API), connections page', async ()
   await shot('03-connections')
 })
 
+await step('pick the Kanban board by pasting its Jira URL (Connections)', async () => {
+  await api('PUT', '/api/connections/jira/board', { boardId: null })
+  await page.goto(`${APP}/connections`)
+  const box = page.getByPlaceholder('Nama, project key (MESIGN), atau URL board')
+  await box.fill('https://example.atlassian.net/jira/software/c/projects/MESIGN/boards/7?assignee=abc')
+  await box.press('Enter')
+  await page.waitForFunction(async () => (await (await fetch('/api/connections')).json()).jira.boardName === 'MESIGN board', undefined, { timeout: 10_000 })
+  await shot('03b-connections-board')
+})
+
 await step('open plan, fill achievement, save', async () => {
   await page.goto(`${APP}/pgp`)
   await page.getByRole('button', { name: 'Isi PGP ini' }).first().click()

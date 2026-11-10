@@ -3,7 +3,7 @@ import { env } from '../../config/env'
 import { db } from '../../db/client'
 import { connections, type Connection, type User } from '../../db/schema'
 import { bitbucket, bitbucketConfigured, type BbUser } from '../../integrations/bitbucket.client'
-import { jira, jiraConfigured } from '../../integrations/jira.client'
+import { jira, jiraConfigured, type JiraBoard } from '../../integrations/jira.client'
 import { cached } from '../../shared/cache'
 import { NotConnectedError, NotFoundError } from '../../shared/errors'
 
@@ -25,13 +25,19 @@ export abstract class ConnectionsService {
 
   static async overview(user: User) {
     const c = await this.get(user.id)
+    const boardId = c.jiraBoardId ?? env.jira.defaultBoardId ?? null
+    const boardName = boardId && c.jiraAccountId && jiraConfigured()
+      ? await cached(`jira:board:${boardId}`, 30 * 60_000, () => jira.getBoard(boardId)).then((b) => b.name, () => null)
+      : null
     return {
       jira: {
         configured: jiraConfigured(),
         baseUrl: env.jira.baseUrl || null,
         accountId: c.jiraAccountId,
         displayName: c.jiraDisplayName,
-        boardId: c.jiraBoardId ?? env.jira.defaultBoardId ?? null,
+        boardId,
+        boardName,
+        boardIsDefault: c.jiraBoardId == null && env.jira.defaultBoardId != null,
       },
       bitbucket: {
         configured: bitbucketConfigured(),
@@ -63,10 +69,27 @@ export abstract class ConnectionsService {
 
   static disconnectJira = (user: User) => this.update(user.id, { jiraAccountId: null, jiraDisplayName: null, jiraBoardId: null })
 
-  static listBoards = async (q?: string) =>
-    (await jira.listBoards(q || undefined)).values.map((b) => ({
+  /**
+   * Board search: a pasted Jira board URL or numeric id resolves that board; a project key (e.g. MESIGN)
+   * lists the project's boards in addition to name matches; anything else is a name search.
+   */
+  static async listBoards(q?: string) {
+    const term = q?.trim() ?? ''
+    const shape = (b: JiraBoard) => ({
       id: b.id, name: b.name, type: b.type, project: b.location?.projectKey ?? b.location?.displayName ?? null,
-    }))
+    })
+    if (!term) return (await jira.listBoards()).values.map(shape)
+
+    const boardId = term.match(/\/boards\/(\d+)/)?.[1] ?? (/^\d+$/.test(term) ? term : undefined)
+    if (boardId) return jira.getBoard(Number(boardId)).then((b) => [shape(b)], () => [])
+
+    const searches = [jira.listBoards(term)]
+    // A word that is not a real project key makes Jira answer 400; that must not break the name search.
+    if (/^[A-Za-z][A-Za-z0-9]{1,9}$/.test(term)) searches.push(jira.listBoards(undefined, term.toUpperCase()).catch(() => ({ values: [] as JiraBoard[] })))
+    const found = new Map<number, JiraBoard>()
+    for (const res of await Promise.all(searches)) for (const b of res.values) found.set(b.id, b)
+    return [...found.values()].map(shape)
+  }
 
   static setBoard = (user: User, boardId: number | null) => this.update(user.id, { jiraBoardId: boardId })
 

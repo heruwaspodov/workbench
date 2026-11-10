@@ -5,7 +5,8 @@ export const basicAuth = (user: string, secret: string) =>
 
 export interface HttpClientOptions {
   service: string
-  baseUrl: string
+  /** A function lets tests (and config reloads) change the target after the client is created. */
+  baseUrl: string | (() => string)
   authorization: () => string
 }
 
@@ -13,7 +14,8 @@ export interface HttpClientOptions {
 export function createHttpClient({ service, baseUrl, authorization }: HttpClientOptions) {
   return async function request<T>(path: string, init: RequestInit & { query?: Record<string, string | number | string[] | undefined> } = {}): Promise<T> {
     const auth = authorization() // throws a 503 AppError when the integration isn't configured
-    const url = new URL(path.startsWith('http') ? path : `${baseUrl}${path}`)
+    const base = typeof baseUrl === 'function' ? baseUrl() : baseUrl
+    const url = new URL(path.startsWith('http') ? path : `${base}${path}`)
     for (const [k, v] of Object.entries(init.query ?? {})) {
       if (v === undefined) continue
       for (const item of Array.isArray(v) ? v : [v]) url.searchParams.append(k, String(item))
