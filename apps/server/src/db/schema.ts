@@ -1,6 +1,6 @@
-import { relations } from 'drizzle-orm'
+import { relations, sql } from 'drizzle-orm'
 import {
-  integer, jsonb, numeric, pgEnum, pgTable, text, timestamp, uniqueIndex, uuid, index,
+  type AnyPgColumn, check, integer, jsonb, numeric, pgEnum, pgTable, text, timestamp, uniqueIndex, uuid, index,
 } from 'drizzle-orm/pg-core'
 
 export const roleEnum = pgEnum('user_role', ['admin', 'member'])
@@ -21,9 +21,36 @@ export const users = pgTable('users', {
   avatarUrl: text('avatar_url'),
   oauthSubject: text('oauth_subject'),
   role: roleEnum('role').default('member').notNull(),
+  /** Active direct leader. Pending requests live in `reporting_requests`. */
+  managerId: uuid('manager_id').references((): AnyPgColumn => users.id, { onDelete: 'set null' }),
   lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
   ...timestamps,
-})
+}, (t) => [
+  index('users_manager_idx').on(t.managerId),
+  check('users_manager_not_self', sql`${t.managerId} <> ${t.id}`),
+])
+
+/** Unconfirmed leader/report link. `requested_by` is the side that proposed it; the other side must confirm. */
+export const reportingRequests = pgTable('reporting_requests', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  reportId: uuid('report_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  leaderId: uuid('leader_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  requestedBy: uuid('requested_by').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  uniqueIndex('reporting_requests_report_uq').on(t.reportId),
+  check('reporting_requests_not_self', sql`${t.reportId} <> ${t.leaderId}`),
+  check('reporting_requests_requester', sql`${t.requestedBy} in (${t.reportId}, ${t.leaderId})`),
+])
+
+export const usersRelations = relations(users, ({ one, many }) => ({
+  manager: one(users, { fields: [users.managerId], references: [users.id], relationName: 'reporting_line' }),
+  reports: many(users, { relationName: 'reporting_line' }),
+}))
+export const reportingRequestsRelations = relations(reportingRequests, ({ one }) => ({
+  report: one(users, { fields: [reportingRequests.reportId], references: [users.id], relationName: 'request_report' }),
+  leader: one(users, { fields: [reportingRequests.leaderId], references: [users.id], relationName: 'request_leader' }),
+}))
 
 /** One row per user: their linked Jira / Bitbucket identities and preferences. */
 export const connections = pgTable('connections', {

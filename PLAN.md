@@ -151,7 +151,7 @@ Status: `TODO` · `IN PROGRESS` · `DONE` · `BLOCKED`
 
 > Keputusan (lihat DESIGN §4 "Direct leader — 2 arah"): `users.manager_id → users.id` untuk relasi aktif; permintaan bisa diajukan dari bawahan **atau** atasan dan aktif setelah pihak lain mengonfirmasi; hanya direct report; leader read-only; admin bisa set langsung.
 
-### OD-45 · Schema reporting line · `TODO`
+### OD-45 · Schema reporting line · `DONE`
 **Description:** Di `apps/server/src/db/schema.ts`:
 - `users`: tambah `managerId uuid references users.id on delete set null` + index `users_manager_idx` + check constraint `manager_id <> id`.
 - Tabel baru `reporting_requests`: `id uuid pk`, `reportId uuid not null → users.id on delete cascade`, `leaderId uuid not null → users.id on delete cascade`, `requestedBy uuid not null → users.id on delete cascade`, `createdAt timestamptz default now()`. Unique index pada `report_id` (satu pending per bawahan). Check `report_id <> leader_id` dan `requested_by in (report_id, leader_id)`.
@@ -159,6 +159,7 @@ Status: `TODO` · `IN PROGRESS` · `DONE` · `BLOCKED`
 Generate migration `bunx drizzle-kit generate --name reporting_line` → `drizzle/0001_reporting_line.sql`, jalankan `bun run db:migrate`.
 **Acceptance:** Migration jalan di DB yang sudah berisi data; `bun run typecheck` lulus; insert manager = diri sendiri dan `requested_by` pihak ketiga ditolak DB.
 **Depends:** OD-34 (DB lokal jalan).
+**Log:** 2026-11-10 — `users.manager_id` (+ index, check `manager_id <> id`), tabel `reporting_requests` (unique `report_id`, check bukan diri sendiri & `requested_by in (report, leader)`), relation `users.manager|reports` dan `reportingRequests.report|leader`. Migration `0001_reporting_line.sql` diterapkan ke DB `one-desk` yang sudah berisi 1 user (data utuh). Constraint diuji di psql (transaksi, di-rollback): manager = diri sendiri, `requested_by` pihak ketiga, report = leader, dan pending ganda per bawahan semuanya ditolak; request valid diterima. `bun run typecheck` lulus, `bun run test` 11 pass. Commit: lihat git log.
 
 ### OD-46 · Module `org` (API reporting line, 2 arah) · `TODO`
 **Description:** Buat `apps/server/src/modules/org/{index,service,model}.ts` (pola module lain, guard `auth: true`), daftarkan di `app.ts`. Endpoint:
