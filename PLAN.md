@@ -35,6 +35,7 @@ Status: `TODO` · `IN PROGRESS` · `DONE` · `BLOCKED`
 | 8. Hardening & integrasi nyata | OD-36 … OD-42 | TODO |
 | 9. Rilis MVP internal | OD-43 … OD-44 | TODO |
 | 10. Confluence (read-only) | OD-54 | IN PROGRESS |
+| 11. Evidence otomatis dari Jira & Confluence | OD-68 … OD-70 | TODO |
 
 **Urutan kerja berikutnya (disarankan):** OD-32 → OD-33 → OD-34 → OD-35 → OD-31 → OD-45 … OD-50 → OD-36 → sisanya.
 
@@ -428,6 +429,33 @@ Keamanan (SSRF & data): hanya host `docs.google.com` dengan id `[A-Za-z0-9_-]{20
 **Acceptance:** Tanpa elemen yang melewati tepi di 1440, 1024, dan 768 px; klik baris plan membuka editor; "Fill in this PGP" membuat plan; e2e memeriksa lebar; typecheck, build, test, e2e hijau.
 **Depends:** OD-59, OD-60, OD-61.
 **Log:** 2026-11-10 — `PgpHomeView` ditulis ulang; `lib/ui.ts` + `list`, `listRow`, `tile`; tombol "Fill in this PGP" bervarian sekunder agar baris tidak didominasi tombol solid. Panel direct leader/report di atasnya tidak diubah. e2e menambah pemeriksaan lebar halaman `/pgp` di 1440/1024/768 dan screenshot. `typecheck`, `build`, `test` (86 pass), `e2e` (13/13) hijau. Catatan: daftar tidak berpaging (jumlah plan per orang kecil); PR dan Confluence belum dipindah ke `ui.list` bersama (masih definisi lokal yang setara). Commit: lihat git log.
+
+## Fase 11 — Evidence otomatis dari Jira & Confluence
+
+> **Dasar (2026-11-10):** dua file PGP milik user dibaca (struktur & pola saja; isi pribadi tidak disalin). Kolom evidence = kolom K "Hyperlink to key result, initiative or other evidence" (sel berisi label dengan hyperlink tersembunyi + beberapa daftar URL multi-baris). Tab Q3-2026 berisi: (a) **epic Jira** satu per baris initiative (8 key `MESIGN-N`, judul diawali `26Q3 ESC …`) di KR "Deliver End-to-End Initiatives as PIC" dan "Tech Debt"; (b) **halaman Confluence** space MESign (17 halaman; RFC, RCA, dokumen teknis, AI-assisted review) dalam daftar `- <url>` per sel; (c) **statistik delivery** per bulan ("Juli 2026 (162 SP, 62 tickets)") dengan link pencarian Jira, dan Current Value berupa angka hasil hitung Jira (rata-rata SP per sprint, jumlah bug per prioritas, lead time, jumlah RCA). **Uji kelayakan** terhadap Jira/Confluence sungguhan (periode 2026-07-01..2026-09-30, baca-saja): query "epic assignee = saya, aktif/resolved di Q3" menemukan **6 dari 8** key di sheet **tanpa epic ekstra** (presisi 100%); 2 yang terlewat: satu epic tanpa assignee, satu epic assigned ke saya tetapi resolved setelah akhir kuartal; query halaman Confluence (creator/contributor di Q3) menemukan **14 dari 17** halaman yang dipakai sheet dari 35 kandidat (RCA 20, RFC 3, lainnya 12). Kesimpulan: deteksi otomatis layak sebagai **saran yang dikonfirmasi user** (bukan isi otomatis tanpa konfirmasi); hasilnya menjadi baris evidence biasa yang tetap bisa diedit.
+
+### OD-68 · API saran evidence (Jira epic, halaman Confluence, statistik delivery) · `TODO`
+**Description:** `GET /api/pgp/plans/:id/suggestions` (hanya owner plan; 403 untuk leader/admin karena memakai akun Atlassian si owner). Rentang waktu dari `template.period` (`YYYY-Qn` → tanggal awal/akhir kuartal). Mengembalikan metadata saja (key/judul/status/space/tanggal/url; tanpa isi halaman atau deskripsi):
+- `epics`: epic Jira yang relevan bagi user pada kuartal itu = (1) epic `assignee = akun user` yang aktif pada kuartal (`created <= akhir AND (resolved kosong OR resolved >= awal)`; memperbaiki kasus epic yang baru resolved setelah kuartal) **ditambah** (2) epic induk (`parent`) dari issue user yang resolved di kuartal (menangkap epic tanpa assignee). Tiap item: `key`, `summary`, `status`, `statusCategory`, `resolvedAt`, `url`, `source: 'assigned' | 'child'`, urut: judul berawalan `{YY}Q{n}` dulu.
+- `pages`: halaman Confluence `creator`/`contributor` = user, `lastmodified` dalam kuartal; tiap item diberi `kind` dari judul saja: `rfc` (`\bRFC\b`), `rca` (`\bRCA\b`, post-mortem), `tech-doc` (technical/design/architecture), `other`.
+- `delivery`: per bulan dalam kuartal: `storyPoints`, `tickets`, `url` pencarian Jira (JQL yang sama dengan hitungannya, format `…/issues/?jql=…`), dan `label` siap pakai ("July 2026 (162 SP, 62 tickets)").
+Cache 5 menit per (user, plan). `NOT_CONNECTED` bila Jira belum terhubung; 503 bila Atlassian belum dikonfigurasi; bila Confluence gagal, bagian `pages` kosong dengan `errors.pages` (Jira tetap dikembalikan) agar satu sumber yang gagal tidak mematikan semuanya. `KanbanService.monthlyStats` diperumum menerima rentang tanggal.
+**Acceptance:** Test (Jira & Confluence palsu): rentang kuartal benar untuk Q1–Q4 dan tahun berbeda; JQL memuat `accountId` user; gabungan epic assigned + child tanpa duplikat; klasifikasi `kind`; label & url delivery; cache; owner-only (403 leader/admin); degradasi bila Confluence error; tidak ada isi/excerpt yang bocor. Uji baca-saja terhadap Jira/Confluence sungguhan untuk Q3-2026: hasil mencakup ≥ 7 dari 8 epic dan ≥ 14 dari 17 halaman pada sheet user. typecheck, build, test, e2e hijau.
+**Depends:** OD-37, OD-54, OD-66.
+
+### OD-69 · UI saran evidence di editor plan (konfirmasi, bisa diedit) · `TODO`
+**Description:** Di editor plan (owner, draft atau submitted untuk kolom pemantauan) tampilkan saran dari OD-68 dan biarkan user memilih:
+- Tombol **Suggest** di blok pemantauan tiap initiative membuka drawer "Suggested evidence": daftar saran terurut menurut kecocokan kata kunci baris itu (objective/KR/initiative) — mis. RFC/documentation → halaman `rfc` & `tech-doc`; RCA/SLO/reliability/incident → halaman `rca`; delivery/story point → statistik per bulan; initiative/tech debt/epic → epic. Tiap saran punya **Add** (menambah URL ke Evidence baris itu, tanpa duplikat; yang sudah ada ditandai "Added") dan, untuk statistik delivery, **Use as current value** (mengisi Current hanya bila kosong). Tidak ada isi otomatis tanpa klik; semuanya tetap tampil di kolom Evidence/Current dan bisa diedit atau dihapus.
+- Aksi grup **Add initiatives from my Jira epics**: membuat baris initiative baru di grup itu untuk tiap epic yang belum ada (dedupe lewat URL di evidence mana pun): initiative = judul epic, evidence = URL epic, status dari Jira (Done → Done, In Progress → On Track, lainnya → Not Started). Ditampilkan sebagai daftar centang untuk dikonfirmasi lebih dulu.
+- Aside "Evidence sources" yang ada tetap, dan memakai data yang sama (tanpa panggilan ganda).
+- Keadaan kosong/error menyebut sebab dan tindakan ("Jira belum terhubung → Connections"; "Confluence tidak dapat dimuat, coba lagi").
+**Acceptance:** Menambah saran memasukkan URL ke Evidence tanpa duplikat dan menandai dirty (menunggu Save); urutan saran mengikuti kata kunci; aksi epic membuat baris dengan status & evidence benar dan tidak membuat duplikat saat diulang; e2e (mock) mencakup Suggest → Add → Save dan Add initiatives from epics; tanpa scroll horizontal di 1440/1024/768; typecheck, build, test, e2e hijau.
+**Depends:** OD-68.
+
+### OD-70 · Current Value otomatis dari Jira (riset + metrik sederhana) · `TODO`
+**Description:** Banyak Current Value di sheet adalah angka hasil hitung Jira: rata-rata story point per sprint ("AVG 44"), jumlah bug per prioritas ("P2: 7"), jumlah tiket resolved/bulan, lead time median ("3d 7h"), jumlah RCA. Riset kecil + implementasi metrik yang bisa dihitung dengan JQL yang pasti (SP & tiket per bulan sudah ada; tambahkan jumlah bug per prioritas yang bocor ke staging/production bila label/field-nya jelas, rata-rata SP per sprint) dan tampilkan sebagai saran **Use as current value** di drawer OD-69. Metrik yang bergantung pada definisi internal (carry-over, DORA, SLA) hanya didokumentasikan, tidak ditebak.
+**Acceptance:** Daftar metrik yang didukung beserta JQL/rumusnya tercatat; tiap metrik diverifikasi terhadap angka di sheet Q3 user (selisih dicatat); yang tidak bisa dihitung pasti ditandai sebagai keputusan; test dan e2e hijau.
+**Depends:** OD-69.
 
 ## Fase 10 — Confluence (read-only)
 
