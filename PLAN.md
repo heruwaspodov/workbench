@@ -184,7 +184,7 @@ Generate migration `bunx drizzle-kit generate --name reporting_line` → `drizzl
 **Depends:** OD-46.
 **Log:** 2026-11-10 — `PlanService.get`: mode `read` kini juga untuk leader aktif (`users.manager_id = viewer`); `canEdit` tetap owner; response + `viewerRole` (`owner` > `leader` > `admin`). Export ikut `get`. `create`: `directLeader` = plan sebelumnya, kalau kosong nama manager aktif. Diverifikasi (skrip sementara, 5 user sintetis, DB `one-desk-e2e`): 18 pengecekan lulus — leader aktif GET & export 200; PUT items/PATCH/submit/reopen/DELETE oleh leader 403; pihak pending 403 (GET & export); user lain 403; admin 200 (`viewerRole=admin`); setelah leader dilepas 403; prefill leader benar. `typecheck` lulus, `test` 11 pass. Test permanen → OD-50. Commit: lihat git log.
 
-### OD-48 · UI dashboard: atasan & direct report (2 arah) · `TODO`
+### OD-48 · UI dashboard: atasan & direct report (2 arah) · `DONE`
 **Description:** Komponen baru `components/ReportingLinePanel.vue` (Mekari Pixel), dipasang di `views/pgp/PgpHomeView.vue`:
 - **Banner permintaan masuk** (`incoming`): "X mengajukan kamu sebagai direct leader" (`as_leader`) atau "X ingin menambahkan kamu sebagai direct report" (`as_report`), tombol *Terima* / *Tolak*.
 - **Direct leader saya**: nama leader aktif + tombol *Lepas*; bila belum ada → input cari user + tombol *Ajukan sebagai atasan*; permintaan keluar tampil dengan badge "Menunggu konfirmasi" + *Batalkan*.
@@ -192,6 +192,7 @@ Generate migration `bunx drizzle-kit generate --name reporting_line` → `drizzl
 Toast sukses/error via `notifySuccess/notifyError`; refresh `GET /api/org/me` setelah tiap aksi.
 **Acceptance:** Seluruh alur OD-46 (kedua arah) bisa dilakukan dari UI tanpa curl; vue-tsc & build lulus.
 **Depends:** OD-46.
+**Log:** 2026-11-10 — `components/ReportingLinePanel.vue` (banner permintaan masuk Terima/Tolak, kartu Direct leader saya, kartu Direct report saya, badge "Menunggu konfirmasi" + Batalkan, Lepas) dan `components/UserPicker.vue` (cari user + aksi; dipakai dua kali), dipasang di atas `PgpHomeView`. Toast via `notifySuccess/notifyError`, `GET /api/org/me` di-refresh setelah tiap aksi. Diverifikasi dengan Playwright sementara (4 user sintetis, 4 konteks browser): B ajukan A → A Terima; A tambah C → C Terima; A tambah D → D Tolak; tambah lagi → Batalkan; A lepas B; C lepas leader; tanpa error JS; screenshot dicek. `typecheck`, `build`, `test` (11 pass), dan `bun run e2e` (10/10) lulus. Test UI permanen tidak ditambahkan (di luar scope; test API → OD-50). Commit: lihat git log.
 
 ### OD-49 · Halaman "Tim Saya" · `TODO`
 **Description:** Route baru `/team` (`views/team/TeamView.vue`) + menu sidebar "Tim Saya" (tampil bila user punya ≥ 1 direct report aktif — tambah `reportCount` di `GET /api/auth/me`). Isi: pilih period (default period template published terbaru), tabel ala "Team Members / Score" di sheet: nama, status PGP (Belum mulai / Draft / Submitted), score, total weight, terakhir update, link "Lihat" → `/pgp/plans/:id` (read-only, banner "Kamu melihat PGP {nama} sebagai direct leader") dan tombol Export.

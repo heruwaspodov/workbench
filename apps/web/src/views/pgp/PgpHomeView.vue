@@ -4,6 +4,7 @@ import { computed, onMounted, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import AsyncState from '@/components/AsyncState.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import ReportingLinePanel from '@/components/ReportingLinePanel.vue'
 import { api, notifyError, unwrap } from '@/lib/api'
 import { timeAgo } from '@/lib/format'
 import { useAsync } from '@/lib/use-async'
@@ -48,6 +49,8 @@ const section = css({ mt: '8', mb: '3' })
       <MpButton variant="secondary" left-icon="plans">Kelola template</MpButton>
     </RouterLink>
   </PageHeader>
+
+  <ReportingLinePanel />
 
   <AsyncState :loading="loading && !data" :error="error" @retry="run">
     <template v-if="data">
