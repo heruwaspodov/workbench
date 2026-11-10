@@ -31,7 +31,7 @@ Status: `TODO` · `IN PROGRESS` · `DONE` · `BLOCKED`
 | 4. Kanban | OD-21 … OD-23 | DONE (mock) |
 | 5. Pull Requests | OD-24 … OD-26 | DONE (mock) |
 | 6. Frontend shell & polish | OD-27 … OD-31 | DONE · OD-31 IN PROGRESS |
-| 7. Pindah ke laptop & run lokal | OD-32 … OD-35 | OD-32, OD-33 DONE · sisanya TODO |
+| 7. Pindah ke laptop & run lokal | OD-32 … OD-35 | OD-32 … OD-34 DONE · sisanya TODO |
 | 8. Hardening & integrasi nyata | OD-36 … OD-42 | TODO |
 | 9. Rilis MVP internal | OD-43 … OD-44 | TODO |
 
@@ -270,9 +270,10 @@ Toast sukses/error via `notifySuccess/notifyError`; refresh `GET /api/org/me` se
 **Acceptance:** Orang lain bisa menjalankan app hanya dari README; `bun run db:migrate` dari root menerapkan migration ke DB lokal; `bun run dev:server` start dan `/api/auth/config` menjawab 200; `bun run typecheck` & `bun run test` benar-benar berjalan.
 **Log:** 2026-11-10 — `README.md` ditulis (Postgres lokal default, Docker opsi). Script root diperbaiki (`bun run --cwd`, `--env-file=../../.env`); `.env.example` → `postgres://localhost:5432/one-desk`. Diverifikasi di Bun 1.4.4 + Postgres lokal: `db:migrate` menerapkan 7 tabel ke DB `one-desk`, `dev:server` start (`/api/auth/config` 200, `/auth/dev-login` 302), `typecheck` lulus, `test` 11 pass, `build` sukses. Alur UI (template/plan/export) belum diuji → OD-34. Commit: lihat git log.
 
-### OD-34 · Run lokal di laptop · `TODO`
+### OD-34 · Run lokal di laptop · `DONE`
 **Description:** Di Mac user: install deps, jalankan Postgres via OrbStack/Docker, migrate, start server & web, login via dev-login, buat template dari scratch, isi plan, export Excel. (Dijalankan oleh user di terminal Mac karena VM Claude tidak punya Bun/Docker; Claude memandu.)
 **Acceptance:** Flow PGP berjalan di laptop tanpa integrasi eksternal.
+**Log:** 2026-11-10 — Bun 1.4.4 + Postgres lokal (DB `one-desk`), `ADMIN_EMAILS` diisi di `.env` lokal. Diuji via proxy Vite (:5173): dev login → buat template (2 item, bobot 60/40) → publish → buat plan → isi header & achievement → score 95 (55+40), total weight 100 → submit → reopen → export .xlsx (200, header/item/Total/Score ada). UI `/pgp` render PGP saya dengan score 95%, tanpa error console. Belum diuji lewat klik UI penuh (editor) → dicakup OD-31. Commit: lihat git log.
 
 ### OD-35 · Script `dev` gabungan · `TODO`
 **Description:** Pastikan `bun run dev` di root menjalankan server (watch) + web (vite) paralel dengan log ber-prefix; tambah `bun run setup` (install + migrate).
