@@ -290,9 +290,10 @@ Toast sukses/error via `notifySuccess/notifyError`; refresh `GET /api/org/me` se
 
 ## Fase 8 — Hardening & integrasi nyata
 
-### OD-36 · Proteksi CSRF (Origin check) · `TODO`
+### OD-36 · Proteksi CSRF (Origin check) · `DONE`
 **Description:** Plugin `shared/origin-guard.ts`: untuk method non-GET di `/api/*`, tolak (403) bila header `Origin`/`Referer` tidak sama dengan `APP_URL`. Tambah test.
 **Acceptance:** POST dari origin lain ditolak; UI tetap jalan.
+**Log:** 2026-11-10 — `shared/origin-guard.ts` (`originGuard(appUrl)`, hook `onRequest` global, didaftarkan paling awal di `app.ts`): method selain GET/HEAD/OPTIONS di `/api/*` → 403 `FORBIDDEN` bila `Origin` (fallback `Referer`) ≠ origin `APP_URL`; tanpa kedua header ditolak (fail closed), `Origin: null` ditolak; `/auth/*` tidak terpengaruh. `test/origin-guard.test.ts` (11 test: unit + app sungguhan). Helper test DB dibuat ter-cache & pool tidak ditutup per file (dua file test berbagi satu pool). `e2e/run.ts`: helper API kini mengirim `Origin` (Playwright `request.fetch` tidak mengirimnya). Diverifikasi: `bun run test` 42 pass, `typecheck` lulus, `bun run e2e` 10/10 (UI tetap jalan, termasuk Simpan/PUT dari browser), lewat proxy Vite dev: Origin :5173 → 200, origin lain → 403, tanpa Origin → 403. Catatan: akses UI langsung ke :3000 saat dev ditolak karena Origin ≠ `APP_URL` (pakai :5173). README diperbarui. Commit: lihat git log.
 
 ### OD-37 · Uji integrasi Jira nyata · `TODO`
 **Description:** Isi `JIRA_*` dengan service account; verifikasi auto-connect by email (catatan: email user bisa tersembunyi oleh privacy setting → fallback cari manual), pilih board MESIGN, kanban sprint aktif, issue detail, stats. Konfirmasi `JIRA_STORY_POINT_FIELD`.

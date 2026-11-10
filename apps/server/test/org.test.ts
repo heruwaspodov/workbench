@@ -28,7 +28,6 @@ beforeAll(async () => {
 afterAll(async () => {
   await ctx.db.delete(S.users).where(like(S.users.email, `${tag}-%`)) // cascades requests and plans
   await ctx.db.delete(S.templates).where(eq(S.templates.id, templateId))
-  await ctx.sql.end()
 })
 
 const mk = async (name: string, role: 'admin' | 'member' = 'member'): Promise<U> => {

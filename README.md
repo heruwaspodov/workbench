@@ -49,7 +49,7 @@ Semua di `.env` (tidak di-commit). `.env.example` hanya berisi placeholder. Jang
 | Variabel | Wajib | Keterangan |
 |----------|-------|------------|
 | `DATABASE_URL` | ya | Default `postgres://localhost:5432/one-desk` (user = user OS) |
-| `APP_URL`, `PORT` | tidak | Origin UI dan port API |
+| `APP_URL`, `PORT` | tidak | Origin UI dan port API. Request `POST/PUT/PATCH/DELETE` ke `/api/*` hanya diterima bila `Origin`/`Referer` sama dengan `APP_URL` (proteksi CSRF); di production set ke URL publik, di lokal akses lewat http://localhost:5173 |
 | `DEV_LOGIN_EMAIL` | lokal | Email untuk dev login |
 | `MEKARI_OAUTH_*` | production | Authorize/token/userinfo URL, client id/secret, scope. `MEKARI_OAUTH_PKCE=false` bila SSO tidak mendukung PKCE |
 | `ADMIN_EMAILS` | tidak | Email dipisah koma; jadi admin saat login pertama |

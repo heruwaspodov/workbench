@@ -5,10 +5,13 @@ import { kanbanModule } from './modules/kanban'
 import { orgModule } from './modules/org'
 import { pgpModule } from './modules/pgp'
 import { pullRequestsModule } from './modules/pull-requests'
+import { env } from './config/env'
 import { AppError } from './shared/errors'
+import { originGuard } from './shared/origin-guard'
 
 /** Composes all feature modules. Imported by index.ts (server) and by the web app (types only). */
 export const app = new Elysia()
+  .use(originGuard(env.appUrl))
   .onError(({ code, error, status }) => {
     if (error instanceof AppError) return status(error.status as 400, { code: error.code, message: error.message })
     if (code === 'VALIDATION') {

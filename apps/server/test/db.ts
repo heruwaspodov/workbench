@@ -5,7 +5,12 @@ import postgres from 'postgres'
  * Points the app at a dedicated test database (never the dev one), creates and migrates it,
  * then loads the db client. Import app modules only after this runs: env is read at import time.
  */
-export async function setupTestDb() {
+let shared: Promise<{ db: typeof import('../src/db/client').db; sql: typeof import('../src/db/client').sql }> | undefined
+
+/** Cached: test files share one pool, so callers must not end it (bun test exits the process). */
+export const setupTestDb = () => (shared ??= init())
+
+async function init() {
   const url = new URL(process.env.TEST_DATABASE_URL ?? 'postgres://localhost:5432/one-desk-test')
   const name = decodeURIComponent(url.pathname.slice(1))
   if (!/test/i.test(name)) throw new Error(`Refusing to run DB tests on "${name}": database name must contain "test"`)

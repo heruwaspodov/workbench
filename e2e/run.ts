@@ -90,7 +90,7 @@ async function step(name: string, fn: () => Promise<void>) {
 const shot = (n: string) => page.screenshot({ path: join(OUT, `${n}.png`), fullPage: true })
 const text = (p: Page, s: string) => p.getByText(s).first().waitFor({ timeout: 10_000 })
 const api = async (method: string, path: string, data?: unknown) => {
-  const r = await page.request.fetch(APP + path, { method, data: data as never, headers: data ? { 'content-type': 'application/json' } : undefined })
+  const r = await page.request.fetch(APP + path, { method, data: data as never, headers: { origin: APP, ...(data ? { 'content-type': 'application/json' } : {}) } })
   if (!r.ok()) throw new Error(`${method} ${path} -> ${r.status()}`)
   return r.json().catch(() => null)
 }
