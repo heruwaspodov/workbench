@@ -50,18 +50,20 @@ export abstract class AuthService {
   }
 
   static async exchangeCode(code: string, verifier?: string): Promise<string> {
-    const body = new URLSearchParams({
+    // Mekari Account takes a JSON body (not form-urlencoded) with the client secret inside it.
+    const body: Record<string, string> = {
       grant_type: 'authorization_code',
       code,
       redirect_uri: this.redirectUri,
       client_id: env.oauth.clientId!,
       client_secret: env.oauth.clientSecret!,
-    })
-    if (verifier) body.set('code_verifier', verifier)
+      scope: env.oauth.scope,
+    }
+    if (verifier) body.code_verifier = verifier
     const res = await fetch(env.oauth.tokenUrl!, {
       method: 'POST',
-      headers: { 'content-type': 'application/x-www-form-urlencoded', accept: 'application/json' },
-      body,
+      headers: { 'content-type': 'application/json', accept: 'application/json' },
+      body: JSON.stringify(body),
     })
     const json = (await res.json().catch(() => ({}))) as Record<string, unknown>
     const token = pick(json, ['access_token', 'data.access_token'])

@@ -24,7 +24,7 @@ Status: `TODO` · `IN PROGRESS` · `DONE` · `BLOCKED`
 | Fase | Tiket | Status |
 |------|-------|--------|
 | 0. Fondasi | OD-01 … OD-04 | DONE |
-| 1. Auth (Mekari OAuth2) | OD-05 … OD-07, OD-51, OD-52 | DONE · OD-07 BLOCKED (butuh info SSO) · OD-51, OD-52 DONE |
+| 1. Auth (Mekari OAuth2) | OD-05 … OD-07, OD-51 … OD-53 | DONE · OD-07 BLOCKED (butuh info SSO) · OD-51 … OD-53 DONE |
 | 2. Connect Jira & Bitbucket | OD-08 … OD-11 | DONE (diverifikasi dengan mock) |
 | 3. PGP | OD-12 … OD-20 | DONE · OD-19 IN PROGRESS (butuh Google SA) |
 | 3b. Direct leader & PGP bawahan (2 arah) | OD-45 … OD-50 | DONE |
@@ -89,6 +89,12 @@ Status: `TODO` · `IN PROGRESS` · `DONE` · `BLOCKED`
 **Acceptance:** `/auth/login` mengarahkan ke SSO dengan `redirect_uri=http://one-desk.local/sso-callback`; `GET /sso-callback` menjalankan alur callback (state salah → `/login?error=invalid_state`) baik langsung ke server maupun lewat Vite; test untuk route callback; typecheck & test hijau.
 **Depends:** OD-51. Mendukung OD-07 (endpoint SSO & credential tetap dibutuhkan untuk login sungguhan).
 **Log:** 2026-11-10 — env `MEKARI_OAUTH_REDIRECT_URI` (default `{APP_URL}/sso-callback`); `AuthService.redirectUri` memakainya; route callback dipindah keluar dari grup `/auth` dan didaftarkan pada path URI itu; proxy Vite ikut path tsb; `.env` lokal `MEKARI_OAUTH_SCOPE=esign`; README & `.env.example` diperbarui; `test/auth-callback.test.ts` (5 test). Diverifikasi dengan endpoint & credential **dummy** (`sso.example.test`): `/auth/login` → `redirect_uri=http%3A%2F%2Fone-desk.local%2Fsso-callback&scope=esign`; `/sso-callback` lewat Vite dan langsung ke API → 302 `/login?error=invalid_state`; `/auth/callback` lama → 404; `typecheck` lulus, `test` 47 pass. Belum diuji: login SSO sungguhan — URL authorize/token/userinfo, client id & secret belum ada (OD-07); asumsi yang masih perlu dikonfirmasi: client auth di token endpoint (saat ini `client_id`/`client_secret` di body), dukungan PKCE, bentuk userinfo untuk scope `esign` (butuh `email`). Commit: lihat git log.
+
+### OD-53 · Sesuaikan OAuth ke Mekari Account (endpoint & token JSON) · `DONE`
+**Description:** Sumber: https://developers.mekari.com/docs/kb/authentication/oauth2. Authorize `https://account.mekari.com/auth` (`client_id`, `response_type=code`, `scope`); token `POST https://account.mekari.com/auth/oauth2/token` dengan body **JSON** (`client_id`, `client_secret`, `grant_type`, `code`, `scope`), respons `access_token`, `token_type`, `expires_in`, `refresh_token`. Ubah `AuthService.exchangeCode` dari form-urlencoded ke JSON (+ `scope`), isi URL authorize/token di `.env.example`, `MEKARI_OAUTH_PKCE=false` (PKCE tidak disebut di dokumen). Userinfo/profile **tidak terdokumentasi** → `MEKARI_OAUTH_USERINFO_URL` dikosongkan sampai tim SSO/portal developer menjawab (endpoint + scope yang memberi `email`).
+**Acceptance:** Test memverifikasi token request berupa JSON dengan field di atas terhadap token server palsu; `/auth/login` mengarah ke `https://account.mekari.com/auth` dengan `redirect_uri=http://one-desk.local/sso-callback` dan `scope=esign`; typecheck & test hijau.
+**Depends:** OD-52. Mendukung OD-07.
+**Log:** 2026-11-10 — `exchangeCode` kini JSON (`grant_type`, `code`, `redirect_uri`, `client_id`, `client_secret`, `scope`, + `code_verifier` bila PKCE); `.env.example` & `.env` lokal berisi URL authorize/token Mekari dan `MEKARI_OAUTH_PKCE=false`; README diperbarui. `test/auth-exchange.test.ts` (4 test, token server palsu): body JSON & field, verifier hanya bila ada, error tidak membocorkan secret, 200 tanpa token ditolak. `/auth/login` (credential dummy) → `https://account.mekari.com/auth?...redirect_uri=http%3A%2F%2Fone-desk.local%2Fsso-callback&scope=esign`. `typecheck` lulus, `test` 51 pass. Keputusan masih terbuka (tidak terdokumentasi): endpoint userinfo & scope yang memberi `email` (`MEKARI_OAUTH_USERINFO_URL` kosong → `/auth/login` 503 sampai terisi), apakah `state`/`redirect_uri` di authorize dan `redirect_uri` di token diterima/dikembalikan (dokumen hanya menyebut `client_id`, `response_type`, `scope`), refresh token (30 hari, sekali pakai) belum dipakai. Semua baru bisa dipastikan dengan client credential sungguhan (OD-07). Commit: lihat git log.
 
 ## Fase 2 — Connect Jira & Bitbucket
 

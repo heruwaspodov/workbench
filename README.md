@@ -64,7 +64,7 @@ Semua di `.env` (tidak di-commit). `.env.example` hanya berisi placeholder. Jang
 | `DATABASE_URL` | ya | Default `postgres://localhost:5432/one-desk` (user = user OS) |
 | `APP_URL`, `PORT` | tidak | Origin UI dan port API. Request `POST/PUT/PATCH/DELETE` ke `/api/*` hanya diterima bila `Origin`/`Referer` sama dengan `APP_URL` (proteksi CSRF); di production set ke URL publik, di lokal akses lewat http://localhost:5173 |
 | `DEV_LOGIN_EMAIL` | lokal | Email untuk dev login |
-| `MEKARI_OAUTH_*` | production | Authorize/token/userinfo URL, client id/secret, scope (`esign` untuk app yang terdaftar). `MEKARI_OAUTH_REDIRECT_URI` opsional, default `{APP_URL}/sso-callback`; harus persis sama dengan yang didaftarkan di SSO. `MEKARI_OAUTH_PKCE=false` bila SSO tidak mendukung PKCE |
+| `MEKARI_OAUTH_*` | production | Authorize `https://account.mekari.com/auth`, token `https://account.mekari.com/auth/oauth2/token` (body JSON), userinfo (belum terdokumentasi, tanya tim SSO), client id/secret, scope (`esign` untuk app yang terdaftar). `MEKARI_OAUTH_REDIRECT_URI` opsional, default `{APP_URL}/sso-callback`; harus persis sama dengan yang didaftarkan di SSO. `MEKARI_OAUTH_PKCE=false` karena dokumen Mekari tidak menyebut PKCE |
 | `ADMIN_EMAILS` | tidak | Email dipisah koma; jadi admin saat login pertama |
 | `ALLOWED_EMAIL_DOMAINS` | tidak | Default `mekari.com` |
 | `SESSION_TTL_DAYS` | tidak | Default 7 |
