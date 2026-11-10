@@ -141,6 +141,28 @@ await step('open plan, fill achievement, save', async () => {
   await shot('02-plan-editor')
 })
 
+await step('plan editor shows Confluence evidence card (no page body)', async () => {
+  await page.goto(`${APP}/pgp/plans/${planId}`)
+  await text(page, 'Dokumen Confluence kamu')
+  await text(page, 'Runbook Signing')
+  if (await page.getByText('CONFIDENTIAL BODY TEXT').count()) throw new Error('page body/excerpt leaked into the UI')
+  await shot('02b-plan-confluence')
+})
+
+await step('My Confluence lists, searches and links my pages', async () => {
+  await page.goto(`${APP}/confluence`)
+  await text(page, 'Postmortem SEV1')
+  await text(page, 'Roadmap Q4')
+  const href = await page.getByRole('link', { name: 'Runbook Signing' }).first().getAttribute('href')
+  if (!href?.startsWith('http://localhost:4010/wiki/spaces/')) throw new Error(`unexpected link ${href}`)
+  await page.getByPlaceholder('Cari judul halaman').fill('runbook')
+  await page.getByRole('button', { name: 'Cari' }).click()
+  await page.getByText('Postmortem SEV1').first().waitFor({ state: 'detached', timeout: 8000 })
+  await text(page, 'Runbook Signing')
+  if (await page.getByText('CONFIDENTIAL BODY TEXT').count()) throw new Error('page body/excerpt leaked into the UI')
+  await shot('02c-my-confluence')
+})
+
 await step('kanban shows columns and cards', async () => {
   await page.goto(`${APP}/kanban`)
   await text(page, 'Rapikan endpoint signing')

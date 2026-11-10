@@ -111,6 +111,7 @@ Aturan bisnis PGP:
 | Mekari OAuth2 | authorize / token / userinfo (env) | **ASSUMPTION**: bentuk userinfo OIDC-like atau `{data:{...}}`; perlu konfirmasi tim SSO |
 | Jira Cloud | `/rest/api/3/search/jql`, `/rest/agile/1.0/board/{id}/configuration|issue`, `/rest/api/3/issue/{key}` | Basic auth service account; story point field via env |
 | Bitbucket Cloud | `/workspaces/{ws}/pullrequests/{user}`, `/repositories/{ws}/{repo}/pullrequests/...`, `/workspaces/{ws}/members` | "Repo yang terlibat" = repo dari PR yang pernah dibuat user; reviewer view fan-out ke repo tsb (maks 20) |
+| Confluence Cloud | `/wiki/rest/api/search` (CQL) | Service account yang sama dengan Jira; hanya metadata halaman (judul, space, tanggal, link), difilter `accountId` user; isi halaman tidak pernah dibaca/ditampilkan |
 | Google Sheets | Sheets API v4 (service account, readonly) | Sheet harus di-share ke email service account. Alternatif tanpa setup: upload .xlsx |
 
 ## 8. Prinsip keamanan & data (UU PDP / ISO 27001 / 27701)

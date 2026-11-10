@@ -57,7 +57,33 @@ const issues = [
   issue(105, 'Hapus flag lama', S.done, 1, 5),
 ]
 
+// ---------- Confluence (search only; excerpt included on purpose, the app must never forward it) ----------
+const wikiPages = [
+  { id: '5001', title: 'Runbook Signing', space: 'Engineering' },
+  { id: '5002', title: 'Postmortem SEV1', space: 'Engineering' },
+  { id: '5003', title: 'Roadmap Q4', space: 'Product' },
+]
+function wikiSearch(url: URL): Response {
+  const cql = url.searchParams.get('cql') ?? ''
+  const term = cql.match(/title ~ "([^"]*)"/)?.[1]?.toLowerCase()
+  // Only the signed-in user's own pages: the filter must carry their account id.
+  const mine = cql.includes('"acc-dev"') ? wikiPages.filter((p) => !term || p.title.toLowerCase().includes(term)) : []
+  return json({
+    results: mine.map((p) => ({
+      content: { id: p.id, type: 'page' },
+      title: p.title,
+      excerpt: 'CONFIDENTIAL BODY TEXT',
+      url: `/spaces/${p.space.slice(0, 3).toUpperCase()}/pages/${p.id}/${p.title.replaceAll(' ', '+')}`,
+      lastModified: iso(2),
+      resultGlobalContainer: { title: p.space },
+    })),
+    totalSize: mine.length,
+    size: mine.length,
+  })
+}
+
 function jiraRoute(path: string, url: URL, method: string): Response | null {
+  if (path === '/wiki/rest/api/search') return wikiSearch(url)
   if (path === '/rest/api/3/user/search') {
     const q = (url.searchParams.get('query') ?? '').toLowerCase()
     const hit = q === DEV_EMAIL.toLowerCase() || jiraUser.displayName.toLowerCase().includes(q)

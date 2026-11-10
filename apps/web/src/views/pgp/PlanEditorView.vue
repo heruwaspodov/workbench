@@ -8,6 +8,7 @@ import AsyncState from '@/components/AsyncState.vue'
 import ItemsEditor from '@/components/ItemsEditor.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import { api, notifyError, notifySuccess, unwrap } from '@/lib/api'
+import { copyText, isHttpUrl } from '@/lib/clipboard'
 import { formatDate } from '@/lib/format'
 import { type EditableItem, stripKeys, toEditable, totals } from '@/lib/pgp'
 import { useAsync } from '@/lib/use-async'
@@ -63,6 +64,13 @@ const exportUrl = computed(() => `/api/pgp/plans/${props.id}/export`)
 // Jira delivery stats as evidence helper (silently hidden when Jira isn't connected)
 const stats = ref<{ month: string; tickets: number; storyPoints: number }[]>([])
 watch(plan, async (p) => { if (p?.canEdit && !stats.value.length) stats.value = await unwrap(api.kanban.stats.get()).catch(() => []) }, { once: true })
+// Confluence pages the user touched recently, as ready-to-copy evidence links (owner only, hidden when unavailable)
+type Doc = { id: string; title: string; space: string | null; url: string; lastModified: string | null }
+const docs = ref<Doc[] | null>(null)
+watch(plan, async (p) => {
+  if (!p?.canEdit) return
+  docs.value = (await unwrap(api.confluence.pages.get({ query: { role: 'contributor', days: 90, pagelen: 8 } })).catch(() => null))?.items ?? null
+}, { once: true })
 const monthLabel = (m: string) => new Date(`${m}-01`).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })
 
 const beforeUnload = (e: BeforeUnloadEvent) => { if (dirty.value) e.preventDefault() }
@@ -71,6 +79,9 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 onBeforeRouteLeave(() => !dirty.value || window.confirm('Ada perubahan yang belum disimpan. Tinggalkan halaman?'))
 
 const card = css({ bg: 'background.surface', rounded: 'lg', borderWidth: '1px', borderColor: 'border.default', p: '5', mb: '4' })
+const docsHead = css({ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '3', mb: '3', flexWrap: 'wrap' })
+const docRow = css({ display: 'flex', alignItems: 'center', gap: '3', py: '2', borderTopWidth: '1px', borderColor: 'border.default' })
+const docLink = css({ color: 'text.link', fontWeight: 'semiBold', textDecoration: 'none', display: 'block', truncate: true, _hover: { textDecoration: 'underline' } })
 const headerGrid = css({ display: 'grid', gridTemplateColumns: { base: '1fr', md: 'repeat(2, 1fr)', xl: 'repeat(4, 1fr)' }, gap: '4' })
 const summary = css({ display: 'grid', gridTemplateColumns: { base: '1fr', md: '2fr 3fr' }, gap: '4', mb: '4' })
 const statRow = css({ display: 'flex', gap: '4', flexWrap: 'wrap' })
@@ -126,6 +137,22 @@ const stat = css({ bg: 'background.neutral.subtle', rounded: 'md', px: '3', py: 
           <MpText v-else size="label" color="text.secondary">
             Hubungkan Jira di <RouterLink to="/connections" :class="css({ color: 'text.link' })">Connections</RouterLink> untuk melihat ringkasan story point.
           </MpText>
+        </div>
+      </div>
+
+      <div v-if="plan.canEdit && docs" :class="card">
+        <div :class="docsHead">
+          <MpText size="label" color="text.secondary">Dokumen Confluence kamu (dibuat atau diedit, 90 hari terakhir). Salin link lalu tempel di kolom Evidence.</MpText>
+          <RouterLink to="/confluence"><MpButton variant="textLink" size="sm">Lihat semua</MpButton></RouterLink>
+        </div>
+        <MpText v-if="!docs.length" size="label" color="text.secondary">Belum ada dokumen dalam 90 hari terakhir.</MpText>
+        <div v-for="d in docs" :key="d.id" :class="docRow">
+          <div :class="css({ minWidth: 0, flex: 1 })">
+            <a v-if="isHttpUrl(d.url)" :href="d.url" target="_blank" rel="noopener noreferrer" :class="docLink">{{ d.title }}</a>
+            <MpText v-else size="label" weight="semiBold">{{ d.title }}</MpText>
+            <MpText size="label-small" color="text.secondary">{{ d.space ?? '-' }} · {{ formatDate(d.lastModified) }}</MpText>
+          </div>
+          <MpButton size="sm" variant="ghost" left-icon="link" @click="copyText(d.url)">Salin link</MpButton>
         </div>
       </div>
 

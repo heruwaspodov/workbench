@@ -1,5 +1,6 @@
 import { Elysia } from 'elysia'
 import { authModule } from './modules/auth'
+import { confluenceModule } from './modules/confluence'
 import { connectionsModule } from './modules/connections'
 import { kanbanModule } from './modules/kanban'
 import { orgModule } from './modules/org'
@@ -26,6 +27,7 @@ export const app = new Elysia()
   .get('/api/health', () => ({ ok: true }))
   .use(authModule)
   .use(connectionsModule)
+  .use(confluenceModule)
   .use(pgpModule)
   .use(kanbanModule)
   .use(orgModule)

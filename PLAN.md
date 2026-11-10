@@ -34,6 +34,7 @@ Status: `TODO` · `IN PROGRESS` · `DONE` · `BLOCKED`
 | 7. Pindah ke laptop & run lokal | OD-32 … OD-35 | OD-32 … OD-35 DONE |
 | 8. Hardening & integrasi nyata | OD-36 … OD-42 | TODO |
 | 9. Rilis MVP internal | OD-43 … OD-44 | TODO |
+| 10. Confluence (read-only) | OD-54 | IN PROGRESS |
 
 **Urutan kerja berikutnya (disarankan):** OD-32 → OD-33 → OD-34 → OD-35 → OD-31 → OD-45 … OD-50 → OD-36 → sisanya.
 
@@ -348,6 +349,18 @@ Toast sukses/error via `notifySuccess/notifyError`; refresh `GET /api/org/me` se
 ### OD-42 · Review keamanan & data · `TODO`
 **Description:** Checklist: tidak ada secret di repo/log, cookie `secure` di prod, akses PGP owner/admin, rate limit login, audit dependency (`bun audit` bila tersedia), masking data pribadi di log. Hasil dicatat di `SECURITY.md`.
 **Acceptance:** Checklist terisi, temuan jadi tiket.
+
+## Fase 10 — Confluence (read-only)
+
+### OD-54 · Confluence: My Confluence + evidence PGP · `IN PROGRESS`
+**Description:** Memakai service account Atlassian yang sama (Basic auth, `{JIRA_BASE_URL}/wiki`). Data difilter dengan `accountId` Atlassian user (dari koneksi Jira), **hanya metadata** (judul, space, tanggal, link; tanpa isi/excerpt halaman) dan dirender sebagai teks.
+- `integrations/confluence.client.ts` + `modules/confluence/{index,service,model}.ts`, daftarkan di `app.ts`: `GET /api/confluence/pages?role=creator|contributor&days=&q=&page=` (CQL `type=page AND creator|contributor = "<accountId>"`, cache 60 dtk, 25/halaman). 409 `NOT_CONNECTED` bila Jira belum terhubung, 503 bila belum dikonfigurasi.
+- Menu **My Confluence** (`/confluence`): halaman yang pernah **dibuat user** (semua waktu), cari judul, paging, link buka & salin link.
+- **Evidence PGP**: kartu "Dokumen Confluence (90 hari terakhir)" di editor plan (hanya owner) berisi halaman yang user buat/edit, dengan Salin link untuk ditempel ke kolom Evidence.
+- Mock `/wiki/rest/api/search` di `e2e/mock-atlassian.ts` + langkah e2e.
+**Acceptance:** Data cocok dengan Confluence (dicek user); user lain tidak bisa melihat halaman user ini; tanpa Jira terhubung → pesan "belum terhubung"; test server (CQL memuat accountId, pemetaan, paging, error) hijau; typecheck, build, test, e2e hijau.
+**Depends:** OD-37 (credential Atlassian), OD-10 (koneksi Jira).
+**Log:** 2026-11-10 — Server: `integrations/confluence.client.ts` (Basic auth service account, `{JIRA_BASE_URL}/wiki`), `modules/confluence/{index,service,model}.ts`, `GET /api/confluence/pages?role&days&q&page&pagelen` (CQL difilter `accountId` user, hanya `id/title/space/url/lastModified`, excerpt/isi tidak pernah dikembalikan, cache 60 dtk, `NOT_CONNECTED` bila Jira belum terhubung, 503 bila belum dikonfigurasi; nilai `q` di-escape). Web: menu **My Confluence** (`/confluence`: halaman yang dibuat user, cari judul, paging, link & Salin link), kartu "Dokumen Confluence kamu (90 hari)" di editor plan untuk owner, `lib/clipboard.ts` (fallback `execCommand` karena `http://one-desk.local` bukan secure context sehingga `navigator.clipboard` tidak ada). Verifikasi: `test/confluence.test.ts` (9 test, server Atlassian palsu: CQL & accountId, pemetaan, excerpt tak bocor, role/days, escape, paging, cache, tanpa koneksi, tak terkonfigurasi, 401); mock `/wiki/rest/api/search` + 2 langkah e2e (kartu evidence & My Confluence, termasuk cek isi halaman tidak muncul) → `e2e` 12/12; CQL yang sama dijalankan ke Confluence sungguhan: creator 212 halaman, contributor 90 hari 28, pencarian judul & escape kutip valid (200, 220–300 ms); `typecheck`, `build`, `test` (66 pass) hijau. **Belum:** user mencocokkan daftar di UI dengan Confluence-nya (acceptance 1). Catatan: ikon sidebar `draft` (Pixel tidak punya `document`).
 
 ## Fase 9 — Rilis MVP internal
 

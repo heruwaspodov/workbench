@@ -12,6 +12,7 @@ const nav = computed(() => [
   ...((auth.me?.reportCount ?? 0) > 0 ? [{ to: '/team', label: 'Tim Saya', icon: 'team' as const }] : []),
   { to: '/kanban', label: 'My Kanban', icon: 'table-view-column' as const },
   { to: '/pull-requests', label: 'Pull Requests', icon: 'file-code' as const },
+  { to: '/confluence', label: 'My Confluence', icon: 'draft' as const },
   ...(auth.me?.role === 'admin' ? [{ to: '/pgp/templates', label: 'PGP Templates', icon: 'plans' as const }] : []),
   { to: '/connections', label: 'Connections', icon: 'connected_apps' as const },
 ])
