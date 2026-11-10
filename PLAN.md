@@ -31,7 +31,7 @@ Status: `TODO` · `IN PROGRESS` · `DONE` · `BLOCKED`
 | 4. Kanban | OD-21 … OD-23 | DONE (mock) |
 | 5. Pull Requests | OD-24 … OD-26 | DONE (mock) |
 | 6. Frontend shell & polish | OD-27 … OD-31 | DONE · OD-31 IN PROGRESS |
-| 7. Pindah ke laptop & run lokal | OD-32 … OD-35 | OD-32 … OD-34 DONE · sisanya TODO |
+| 7. Pindah ke laptop & run lokal | OD-32 … OD-35 | OD-32 … OD-35 DONE |
 | 8. Hardening & integrasi nyata | OD-36 … OD-42 | TODO |
 | 9. Rilis MVP internal | OD-43 … OD-44 | TODO |
 
@@ -275,9 +275,10 @@ Toast sukses/error via `notifySuccess/notifyError`; refresh `GET /api/org/me` se
 **Acceptance:** Flow PGP berjalan di laptop tanpa integrasi eksternal.
 **Log:** 2026-11-10 — Bun 1.4.4 + Postgres lokal (DB `one-desk`), `ADMIN_EMAILS` diisi di `.env` lokal. Diuji via proxy Vite (:5173): dev login → buat template (2 item, bobot 60/40) → publish → buat plan → isi header & achievement → score 95 (55+40), total weight 100 → submit → reopen → export .xlsx (200, header/item/Total/Score ada). UI `/pgp` render PGP saya dengan score 95%, tanpa error console. Belum diuji lewat klik UI penuh (editor) → dicakup OD-31. Commit: lihat git log.
 
-### OD-35 · Script `dev` gabungan · `TODO`
+### OD-35 · Script `dev` gabungan · `DONE`
 **Description:** Pastikan `bun run dev` di root menjalankan server (watch) + web (vite) paralel dengan log ber-prefix; tambah `bun run setup` (install + migrate).
 **Acceptance:** Satu perintah untuk development.
+**Log:** 2026-11-10 — `dev` = `bun run --parallel dev:server dev:web` (Bun 1.4, log ber-prefix `dev:server |` / `dev:web |`; sebelumnya `--filter '*'` tidak memuat `.env` root). `setup` = `bun install && bun run db:migrate`. Diverifikasi: `bun run setup` sukses, `bun run dev` → API :3000 200 dan Vite :5173 200. README diperbarui. `PLAN-1.md` (salinan usang, untracked) dihapus atas permintaan user. Commit: lihat git log.
 
 ## Fase 8 — Hardening & integrasi nyata
 

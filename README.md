@@ -15,10 +15,8 @@ Goals & arsitektur: [DESIGN.md](./DESIGN.md) · Tiket kerja: [PLAN.md](./PLAN.md
 ```bash
 createdb -h localhost one-desk     # sekali saja
 cp .env.example .env               # lalu isi DEV_LOGIN_EMAIL
-bun install
-bun run db:migrate
-bun run dev:server                 # API di :3000
-bun run dev:web                    # UI di :5173 (proxy /api dan /auth ke :3000)
+bun run setup                      # bun install + migrate
+bun run dev                        # server :3000 + web :5173, log ber-prefix
 ```
 
 Buka http://localhost:5173. Selama Mekari OAuth belum dikonfigurasi (OD-07), login lewat tombol dev login. Tombol ini aktif bila `DEV_LOGIN_EMAIL` terisi dan hanya untuk lokal, mati di production.
@@ -29,7 +27,9 @@ Tanpa integrasi eksternal, PGP sudah bisa dipakai penuh: buat template dari scra
 
 | Perintah | Fungsi |
 |----------|--------|
-| `bun run dev:server` / `dev:web` | Jalankan server (watch) / Vite |
+| `bun run setup` | `bun install` + `db:migrate` |
+| `bun run dev` | Server (watch) + Vite paralel |
+| `bun run dev:server` / `dev:web` | Salah satunya saja |
 | `bun run typecheck` | `tsc` server + `vue-tsc` web |
 | `bun run test` | `bun test` di `apps/server` |
 | `bun run build` | Build web ke `apps/web/dist` |
