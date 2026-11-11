@@ -35,7 +35,7 @@ Status: `TODO` · `IN PROGRESS` · `DONE` · `BLOCKED`
 | 8. Hardening & integrasi nyata | OD-36 … OD-42 | TODO |
 | 9. Rilis MVP internal | OD-43 … OD-44 | TODO |
 | 10. Confluence (read-only) | OD-54 | IN PROGRESS |
-| 11. Create PGP per tahun+kuartal & evidence otomatis | OD-71 … OD-73 (create), OD-68 … OD-70 (saran), OD-74 (accordion) | OD-68 … OD-75 DONE, OD-76 TODO |
+| 11. Create PGP per tahun+kuartal & evidence otomatis | OD-71 … OD-73 (create), OD-68 … OD-70 (saran), OD-74 (accordion) | semua DONE |
 
 **Urutan kerja berikutnya (disarankan):** OD-32 → OD-33 → OD-34 → OD-35 → OD-31 → OD-45 … OD-50 → OD-36 → sisanya.
 
@@ -500,11 +500,12 @@ Cache 5 menit per (user, plan, query); `NOT_CONNECTED` bila Jira belum terhubung
 **Depends:** OD-72.
 **Log:** 2026-11-11 — `parsePgpSheet` kini melewati baris header yang diulang hanya bila sel Objective persis "Objective" atau sel Key Results persis "Key Results" (sebelumnya semua pola header diuji tanpa jangkar pada isi sel). Uji regresi baru di `sheet-parser.test.ts`: KR yang memuat kata achievement/weight/status/value tetap terbaca, header ulang tetap dilewati. Verifikasi terhadap file asli (baca saja, lewat service): tab Q3 - 2026 = **31 item, total 100%, tanpa peringatan** (sebelumnya 29 item/95%; 21 berstatus, 13 dengan link evidence); tab Q4 - 26 tetap 18 item/100%. `bun run typecheck`, `bun run test` (118 lulus), `bun run build`, `bun run e2e` 16/16. Plan yang sudah dibuat sebelum perbaikan tidak berubah (data tersimpan tanpa dua baris itu); buat ulang dari upload atau tambah manual. Commit: lihat git log.
 
-### OD-76 · Hapus PGP dari halaman detail dan dari daftar · `TODO`
+### OD-76 · Hapus PGP dari halaman detail dan dari daftar · `DONE`
 **Description:** Owner bisa menghapus PGP-nya sendiri dari dua tempat: (1) halaman detail `/pgp/plans/:id` (tombol **Delete** di header, di samping Export/Submit/Save) dan (2) daftar "My PGP" di `/pgp` (menu aksi per baris, tanpa mengganggu klik baris yang membuka detail). Keduanya membuka dialog konfirmasi (`MpModal`, bukan `window.confirm`) yang menyebut judul/periode, bahwa semua item, nilai, dan evidence ikut terhapus dan **tidak bisa dibatalkan**; plan berstatus Submitted mendapat kalimat tambahan "This plan was submitted". Tombol hapus di dialog berwarna bahaya dan menjadi `is-loading` selama request. Sesudah berhasil: dari detail kembali ke `/pgp` (tanpa peringatan perubahan belum tersimpan), dari daftar baris hilang; toast sukses. Backend memakai `DELETE /api/pgp/plans/:id` yang sudah ada (owner saja, 403 untuk leader/admin, 404 bila sudah tidak ada) dan tidak diubah; leader/admin yang melihat plan orang lain tidak melihat tombol. Kegagalan (mis. 404/403) tampil lewat `notifyError` dan daftar dimuat ulang.
 **ASSUMPTION (belum dikonfirmasi):** plan Submitted boleh dihapus owner (dengan peringatan tambahan), sama seperti aturan backend sekarang; hapus bersifat permanen (tanpa tempat sampah).
 **Acceptance:** Dari detail dan dari daftar, hapus membuka dialog yang benar, Cancel tidak mengubah apa pun, Delete menghapus lalu kembali/menyegarkan; plan Submitted menampilkan peringatan tambahan; leader/admin tidak melihat tombol; setelah hapus kuartal itu bisa dibuat lagi (unik per kuartal bebas); e2e mencakup hapus dari daftar dan dari detail (cek lewat API 404); tanpa overflow 1440/1024/768; typecheck, build, test, e2e hijau.
 **Depends:** OD-71.
+**Log:** 2026-11-11 — Komponen bersama `DeletePlanModal.vue` (judul + periode, apa yang terhapus, "cannot be undone", peringatan tambahan untuk plan Submitted, tombol `danger` dengan loading, Cancel). Halaman detail: tombol **Delete** di header (owner saja; leader/admin yang read-only tidak melihatnya); setelah berhasil toast, `router.replace('/pgp')` tanpa peringatan perubahan belum tersimpan. Daftar My PGP: tiap baris kini `div` berisi link ke detail dan tombol ikon hapus terpisah (tombol tidak boleh di dalam `<a>`); setelah hapus daftar dimuat ulang (juga bila plan sudah tidak ada). Backend `DELETE /api/pgp/plans/:id` tidak diubah. Verifikasi: `bun run typecheck`, `bun run test` (118 lulus), `bun run build`, `bun run e2e` 17/17 (langkah baru: dari daftar Cancel menjaga plan, Delete menghapus dan baris hilang, API 404; dari detail plan Submitted tampil peringatan tambahan, kembali ke `/pgp`, API 404; kuartal yang sama bisa dibuat lagi; tanpa overflow 1440/1024/768) dan cek screenshot. Hapus bersifat permanen (tanpa tempat sampah), sesuai asumsi tiket. Commit: lihat git log.
 
 ## Fase 10 — Confluence (read-only)
 

@@ -3,8 +3,9 @@ import {
   MpBadge, MpBanner, MpBannerDescription, MpButton, MpFormControl, MpFormLabel, MpInput, MpProgress, MpText, css,
 } from '@mekari/pixel3'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { onBeforeRouteLeave, RouterLink } from 'vue-router'
+import { onBeforeRouteLeave, RouterLink, useRouter } from 'vue-router'
 import AsyncState from '@/components/AsyncState.vue'
+import DeletePlanModal from '@/components/DeletePlanModal.vue'
 import type { EpicSuggestion } from '@/components/EpicsModal.vue'
 import ItemsEditor from '@/components/ItemsEditor.vue'
 import PageHeader from '@/components/PageHeader.vue'
@@ -61,6 +62,21 @@ async function setStatus(action: 'submit' | 'reopen') {
   } catch (e) { notifyError(e) }
 }
 
+// ----- delete (owner only; the confirmation dialog is shared with the My PGP list) -----
+const router = useRouter()
+const deleting = ref(false)
+const deleteOpen = ref(false)
+let leaving = false
+async function remove() {
+  deleting.value = true
+  try {
+    await unwrap(api.pgp.plans({ id: props.id }).delete())
+    leaving = true // unsaved edits belong to the plan that no longer exists
+    notifySuccess('PGP deleted')
+    await router.replace('/pgp')
+  } catch (e) { notifyError(e) } finally { deleting.value = false; deleteOpen.value = false }
+}
+
 const exportUrl = computed(() => `/api/pgp/plans/${props.id}/export`)
 
 // ----- suggestions: edit the form only; the plan still needs Save -----
@@ -92,7 +108,7 @@ function addEpics(groupKey: string | null, epics: EpicSuggestion[]) {
 const beforeUnload = (e: BeforeUnloadEvent) => { if (dirty.value) e.preventDefault() }
 onMounted(() => window.addEventListener('beforeunload', beforeUnload))
 onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
-onBeforeRouteLeave(() => !dirty.value || window.confirm('You have unsaved changes. Leave this page?'))
+onBeforeRouteLeave(() => leaving || !dirty.value || window.confirm('You have unsaved changes. Leave this page?'))
 
 // Layout: plan details and items on the left; suggestions beside them on wide screens, below on narrow ones.
 const layout = css({ display: 'grid', gridTemplateColumns: { base: 'minmax(0, 1fr)', xl: 'minmax(0, 1fr) 320px' }, columnGap: '6', rowGap: '5', alignItems: 'start' })
@@ -117,6 +133,7 @@ const headerGrid = css({ display: 'grid', gridTemplateColumns: { base: 'minmax(0
           <MpButton v-if="plan.status === 'draft'" variant="secondary" :is-disabled="sum.weight !== 100" @click="setStatus('submit')">Submit</MpButton>
           <MpButton v-else variant="secondary" @click="setStatus('reopen')">Reopen</MpButton>
           <MpButton :is-loading="saving" :is-disabled="!dirty" @click="save">Save</MpButton>
+          <MpButton variant="secondary" left-icon="delete" data-test="delete-plan" @click="deleteOpen = true">Delete</MpButton>
         </template>
       </PageHeader>
 
@@ -167,6 +184,8 @@ const headerGrid = css({ display: 'grid', gridTemplateColumns: { base: 'minmax(0
         <SuggestionsPanel v-if="plan.canEdit" :plan-id="id" :items="items" :can-add-initiatives="plan.status === 'draft'"
           @link="addLink" @current="useCurrent" @epics="addEpics" />
       </div>
+      <DeletePlanModal :open="deleteOpen" :title="plan.title" :period="plan.period" :submitted="plan.status === 'submitted'" :loading="deleting"
+        @close="deleteOpen = false" @confirm="remove" />
     </template>
   </AsyncState>
 </template>

@@ -438,6 +438,55 @@ await step('templates list and new template page', async () => {
   await shot('10-template-new')
 })
 
+await step('delete a PGP from the list and from its detail page', async () => {
+  const make = async (period: string) => {
+    const t = await api('POST', '/api/pgp/templates', { title: `Delete ${period} ${Date.now()}`, period, items: [{ objective: 'O', keyResult: 'K', weight: 100, initiative: `Delete me ${period}` }] })
+    await api('PATCH', `/api/pgp/templates/${t.id}`, { status: 'published' })
+    return { t, p: await api('POST', '/api/pgp/plans', { templateId: t.id }) }
+  }
+  const status = async (id: string) => (await page.request.fetch(`${APP}/api/pgp/plans/${id}`)).status()
+  const a = await make('2024-Q1')
+  const b = await make('2024-Q2')
+  await api('POST', `/api/pgp/plans/${b.p.id}/submit`)
+
+  // From the list: Cancel keeps the plan, Delete removes it and the row disappears.
+  await page.goto(`${APP}/pgp`)
+  const row = page.locator(`a[href="/pgp/plans/${a.p.id}"]`).locator('xpath=..')
+  await row.locator('[data-test="delete-row"]').click()
+  await text(page, 'Delete this PGP?')
+  if (await page.locator('[data-test="delete-submitted-warning"]').count()) throw new Error('a draft plan must not show the submitted warning')
+  await page.getByRole('button', { name: 'Cancel' }).click()
+  if ((await status(a.p.id)) !== 200) throw new Error('Cancel deleted the plan')
+  await row.locator('[data-test="delete-row"]').click()
+  await page.locator('[data-test="confirm-delete"]').click()
+  await page.waitForFunction((id) => !document.querySelector(`a[href="/pgp/plans/${id}"]`), a.p.id, { timeout: 10_000 })
+  if ((await status(a.p.id)) !== 404) throw new Error('the plan still exists after Delete')
+
+  // From the detail page of a submitted plan: extra warning, then back to the list.
+  await page.goto(`${APP}/pgp/plans/${b.p.id}`)
+  await page.locator('[data-test="delete-plan"]').click()
+  await page.locator('[data-test="delete-submitted-warning"]').waitFor()
+  await shot('11-delete-dialog')
+  await page.locator('[data-test="confirm-delete"]').click()
+  await page.waitForURL(/\/pgp$/)
+  if ((await status(b.p.id)) !== 404) throw new Error('the submitted plan still exists after Delete')
+
+  // The quarter is free again.
+  const again = await api('POST', '/api/pgp/plans', { templateId: a.t.id })
+  if (!again?.id) throw new Error('could not create the plan again after deleting it')
+  for (const width of [1440, 1024, 768]) {
+    await page.setViewportSize({ width, height: 900 })
+    await page.waitForTimeout(250)
+    await page.goto(`${APP}/pgp`)
+    await page.locator('[data-test="delete-row"]').first().waitFor()
+    const m = await page.evaluate(() => ({ page: document.documentElement.scrollWidth - innerWidth, wide: [...document.querySelectorAll('main *')].filter((e) => e.getBoundingClientRect().right > innerWidth + 1).length }))
+    if (m.page > 1 || m.wide > 0) throw new Error(`My PGP list overflows at ${width}px (page +${m.page}px, ${m.wide} elements past the edge)`)
+  }
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.waitForTimeout(200)
+  await shot('11b-pgp-list-delete')
+})
+
 await step('no JS errors collected', async () => {
   if (jsErrors.length) throw new Error(`${jsErrors.length} error(s): ${jsErrors.slice(0, 3).join(' | ')}`)
 })
