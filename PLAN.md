@@ -536,6 +536,16 @@ Cache 5 menit per (user, plan, query); `NOT_CONNECTED` bila Jira belum terhubung
 **Depends:** OD-68, OD-69.
 **Log:** 2026-11-11 — `deliveryRate`: kandidat = berlabel, dibuat sebelum kuartal berakhir, resolved di/ sesudah kuartal atau masih terbuka dan `updated` sejak awal kuartal; Epic dan status `Won't Fix` dikeluarkan (dilaporkan sebagai jumlah di kartu). Tambah `released` (done dengan `fixVersion` released, per tiket dan SP; done tanpa `fixVersion` dilaporkan terpisah) dan `epics` + `epicSummary` (status release per epic dari anak: `parent in (...)` per 40 epic; `epicReleaseStatus` diekspor). UI kartu menampilkan semuanya. Test baru di `suggestions.test.ts` (penyebut, released, status epic, aturan status); mock e2e diperluas. `typecheck`, 134 test, `build`, `e2e` 18/18 hijau. Jira nyata (label `Escape`, 2026-Q3): lama 63,6% (588/924) → baru 84,6% (555/656; 19 epic dan 26 Won't Fix dikeluarkan); Released 62,5% (347/555 tiket), 208 done tanpa `fixVersion`; epic: 16 Partial, 3 No release info, 0 All released.
 
+### OD-81 · Rapikan halaman editor PGP: panel saran tidak berantakan saat "Show all" · `TODO`
+**Description:** Di `/pgp/plans/:id` panel saran (`SuggestionsPanel.vue`, kolom 320 px di kanan `PlanEditorView.vue`) tampil berantakan, lebih parah saat "Show all" dibuka. Akar masalah (dari kode dan screenshot e2e): aside `position: sticky` tanpa batas tinggi, sehingga begitu daftar epic/halaman diperluas panel lebih tinggi dari layar dan bagian bawahnya tidak terjangkau/menimpa area lain; lima kartu bertumpuk tanpa hierarki; kartu Team delivery rate (OD-80) kini panjang. Perubahan:
+1. Aside sticky diberi `max-height: calc(100vh - spasi)` dan satu scroll internal (`overflow-y: auto`), sehingga panjangnya tidak pernah melebihi layar; di bawah breakpoint `xl` panel mengalir normal di bawah editor tanpa sticky.
+2. Setiap kartu menjadi seksi ringkas dengan header seragam (judul, subjudul satu baris, jumlah item) dan **bisa dilipat**; hanya Jira epics yang terbuka secara default; status buka/lipat diingat di browser.
+3. "Show all" memperluas daftar di tempat dengan tinggi maksimum dan scroll internal daftar itu (bukan memanjangkan seluruh panel); baris seragam (tinggi, jarak, pemotongan teks satu baris, aksi sejajar rata kanan).
+4. Kartu Team delivery rate dirapikan: angka utama berdampingan, penjelasan kecil terlipat dalam satu baris "How is this counted", daftar epic memakai baris yang sama dengan kartu lain.
+5. Konsisten dengan sistem UI proyek (`ui.card`, token semantik Pixel, komponen `Mp*`); skill `design-taste-frontend` dipakai hanya untuk prinsip yang relevan di app internal (tepi sejajar, satu sistem kartu, kontras, fokus keyboard), bukan struktur halaman marketing.
+**Acceptance:** Di 1440, 1280, 1024, 768 px: tidak ada scroll horizontal, tidak ada elemen terpotong atau saling menimpa; dengan semua "Show all" terbuka panel tetap seluruhnya terjangkau (scroll internal) dan tidak lebih tinggi dari layar saat sticky; kartu bisa dilipat dan keadaannya diingat; Tab dapat menjangkau semua kontrol dengan fokus terlihat; `typecheck`, `build`, `e2e` hijau; screenshot sebelum/sesudah dicek untuk plan dengan data banyak (mock diperbanyak: 15+ epic dan halaman).
+**Depends:** OD-69, OD-80.
+
 ## Fase 10 — Confluence (read-only)
 
 ### OD-54 · Confluence: My Confluence + evidence PGP · `IN PROGRESS`
