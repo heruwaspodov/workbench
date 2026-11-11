@@ -35,7 +35,7 @@ Status: `TODO` · `IN PROGRESS` · `DONE` · `BLOCKED`
 | 8. Hardening & integrasi nyata | OD-36 … OD-42 | TODO |
 | 9. Rilis MVP internal | OD-43 … OD-44 | TODO |
 | 10. Confluence (read-only) | OD-54 | IN PROGRESS |
-| 11. Create PGP per tahun+kuartal & evidence otomatis | OD-71 … OD-73 (create), OD-68 … OD-70 (saran), OD-74 (accordion), OD-75 … OD-80 (perbaikan: parser, hapus, evidence, keamanan, tombol upload, delivery rate) | semua DONE |
+| 11. Create PGP per tahun+kuartal & evidence otomatis | OD-71 … OD-73 (create), OD-68 … OD-70 (saran), OD-74 (accordion), OD-75 … OD-81 (perbaikan: parser, hapus, evidence, keamanan, tombol upload, delivery rate, panel saran) | semua DONE |
 
 **Urutan kerja berikutnya (disarankan):** OD-32 → OD-33 → OD-34 → OD-35 → OD-31 → OD-45 … OD-50 → OD-36 → sisanya.
 
@@ -536,7 +536,7 @@ Cache 5 menit per (user, plan, query); `NOT_CONNECTED` bila Jira belum terhubung
 **Depends:** OD-68, OD-69.
 **Log:** 2026-11-11 — `deliveryRate`: kandidat = berlabel, dibuat sebelum kuartal berakhir, resolved di/ sesudah kuartal atau masih terbuka dan `updated` sejak awal kuartal; Epic dan status `Won't Fix` dikeluarkan (dilaporkan sebagai jumlah di kartu). Tambah `released` (done dengan `fixVersion` released, per tiket dan SP; done tanpa `fixVersion` dilaporkan terpisah) dan `epics` + `epicSummary` (status release per epic dari anak: `parent in (...)` per 40 epic; `epicReleaseStatus` diekspor). UI kartu menampilkan semuanya. Test baru di `suggestions.test.ts` (penyebut, released, status epic, aturan status); mock e2e diperluas. `typecheck`, 134 test, `build`, `e2e` 18/18 hijau. Jira nyata (label `Escape`, 2026-Q3): lama 63,6% (588/924) → baru 84,6% (555/656; 19 epic dan 26 Won't Fix dikeluarkan); Released 62,5% (347/555 tiket), 208 done tanpa `fixVersion`; epic: 16 Partial, 3 No release info, 0 All released.
 
-### OD-81 · Rapikan halaman editor PGP: panel saran tidak berantakan saat "Show all" · `TODO`
+### OD-81 · Rapikan halaman editor PGP: panel saran tidak berantakan saat "Show all" · `DONE`
 **Description:** Di `/pgp/plans/:id` panel saran (`SuggestionsPanel.vue`, kolom 320 px di kanan `PlanEditorView.vue`) tampil berantakan, lebih parah saat "Show all" dibuka. Akar masalah (dari kode dan screenshot e2e): aside `position: sticky` tanpa batas tinggi, sehingga begitu daftar epic/halaman diperluas panel lebih tinggi dari layar dan bagian bawahnya tidak terjangkau/menimpa area lain; lima kartu bertumpuk tanpa hierarki; kartu Team delivery rate (OD-80) kini panjang. Perubahan:
 1. Aside sticky diberi `max-height: calc(100vh - spasi)` dan satu scroll internal (`overflow-y: auto`), sehingga panjangnya tidak pernah melebihi layar; di bawah breakpoint `xl` panel mengalir normal di bawah editor tanpa sticky.
 2. Setiap kartu menjadi seksi ringkas dengan header seragam (judul, subjudul satu baris, jumlah item) dan **bisa dilipat**; hanya Jira epics yang terbuka secara default; status buka/lipat diingat di browser.
@@ -545,6 +545,7 @@ Cache 5 menit per (user, plan, query); `NOT_CONNECTED` bila Jira belum terhubung
 5. Konsisten dengan sistem UI proyek (`ui.card`, token semantik Pixel, komponen `Mp*`); skill `design-taste-frontend` dipakai hanya untuk prinsip yang relevan di app internal (tepi sejajar, satu sistem kartu, kontras, fokus keyboard), bukan struktur halaman marketing.
 **Acceptance:** Di 1440, 1280, 1024, 768 px: tidak ada scroll horizontal, tidak ada elemen terpotong atau saling menimpa; dengan semua "Show all" terbuka panel tetap seluruhnya terjangkau (scroll internal) dan tidak lebih tinggi dari layar saat sticky; kartu bisa dilipat dan keadaannya diingat; Tab dapat menjangkau semua kontrol dengan fokus terlihat; `typecheck`, `build`, `e2e` hijau; screenshot sebelum/sesudah dicek untuk plan dengan data banyak (mock diperbanyak: 15+ epic dan halaman).
 **Depends:** OD-69, OD-80.
+**Log:** 2026-11-11 — Komponen baru `PanelCard.vue` (header tombol: judul, subjudul satu baris, badge jumlah, chevron; bisa dilipat, keadaan diingat di `localStorage` per kartu; hanya Jira epics terbuka default). `SuggestionsPanel.vue` memakainya untuk semua kartu; aside sticky kini `max-height: calc(100vh - 3rem)` + satu scroll internal hanya di `xl` (di bawahnya mengalir normal), kolom 320 → 360 px; "Show all" memperluas daftar dengan tinggi maks 320 px dan scroll sendiri; baris seragam; kartu Team delivery rate: 4 tile angka (done/released, tiket/SP), penjelasan di `<details>` "How is this counted?", daftar epic berlabel dengan Show all. Perbaikan: kartu tidak lagi menyusut di flex (`flexShrink: 0`). e2e: kartu dibuka lewat header, mock diperbanyak (8 halaman, 10 epic berlabel), cek panel ≤ tinggi layar dan tak melebar saat semua Show all dibuka, screenshot `02f/02g/02h`. `typecheck`, test, `build`, `e2e` 18/18 hijau; screenshot dicek (belum dilihat di one-desk.local karena login SSO).
 
 ## Fase 10 — Confluence (read-only)
 

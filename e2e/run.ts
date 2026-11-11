@@ -319,7 +319,12 @@ await step('evidence is a list of link inputs: add, Enter, paste several, remove
 
 await step('plan suggestions: epics, Confluence, monthly delivery modal, Add toâ€¦, team rate', async () => {
   await page.goto(`${APP}/pgp/plans/${planId}`)
-  await text(page, 'Confluence (last 3 months)')
+  await text(page, 'Pages you created or edited')
+  // Cards are collapsed except the epics; open every other one first.
+  for (const id of ['pages', 'delivery', 'bugs', 'rate']) {
+    const head = page.locator(`section[data-test="${id}"] > button[aria-expanded]`)
+    if ((await head.getAttribute('aria-expanded')) !== 'true') await head.click()
+  }
   await text(page, 'Runbook Signing')
   if (await page.getByText('CONFIDENTIAL BODY TEXT').count()) throw new Error('page body/excerpt leaked into the UI')
   await text(page, 'Mock epic for e2e')
@@ -361,13 +366,29 @@ await step('plan suggestions: epics, Confluence, monthly delivery modal, Add toâ
   // Team delivery rate: label typed by hand.
   await page.getByPlaceholder('Jira label').fill('team-x')
   await page.getByRole('button', { name: 'Show', exact: true }).click()
-  await text(page, 'By tickets:')
+  await text(page, 'Tickets done')
   const rateText = (await page.locator('[data-test="rate"]').innerText()).replace(/\s+/g, ' ')
-  if (!rateText.includes('50% (1/2 tickets)')) throw new Error(`unexpected team rate: ${rateText}`)
-  for (const part of ['Not counted: 1 epic', '100% (1/1 tickets)', 'Mock label epic', 'No release info']) {
+  if (!rateText.includes('50%') || !rateText.includes('1/2 tickets')) throw new Error(`unexpected team rate: ${rateText}`)
+  for (const part of ['Tickets released', '100%', '1/1 done tickets', 'Label epic number 1', 'No release info']) {
     if (!rateText.includes(part)) throw new Error(`team rate card is missing "${part}": ${rateText}`)
   }
   await shot('02f-team-rate')
+  // "Show all" on every list: the panel must stay inside the viewport and its content must stay reachable (internal scroll).
+  const showAll = page.getByRole('button', { name: /^Show all \d+/ })
+  while (await showAll.count()) await showAll.first().click()
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.waitForTimeout(250)
+  const fit = await page.evaluate(() => {
+    const a = document.querySelector('aside[aria-label="Suggestions"]') as HTMLElement
+    const r = a.getBoundingClientRect()
+    const wide = [...a.querySelectorAll('*')].filter((e) => e.getBoundingClientRect().right > r.right + 1 && getComputedStyle(e).position !== 'fixed').length
+    return { height: r.height, view: innerHeight, canScroll: a.scrollHeight > a.clientHeight || a.scrollHeight <= innerHeight, wide }
+  })
+  if (fit.height > fit.view || fit.wide > 0) throw new Error(`suggestions panel is taller than the screen or spills sideways: ${JSON.stringify(fit)}`)
+  await page.evaluate(() => window.scrollTo(0, 0))
+  await page.screenshot({ path: join(OUT, '02g-suggestions-show-all.png') }) // viewport only: a full-page shot distorts a sticky panel
+  await page.locator('aside[aria-label="Suggestions"]').evaluate((a) => a.scrollTo(0, a.scrollHeight))
+  await page.screenshot({ path: join(OUT, '02h-suggestions-bottom.png') })
   for (const width of [1440, 1024, 768]) {
     await page.setViewportSize({ width, height: 900 })
     await page.waitForTimeout(250)
@@ -384,7 +405,7 @@ await step('My Confluence lists, searches and links my pages', async () => {
   await text(page, 'Postmortem SEV1')
   await text(page, 'Roadmap Q4')
   await text(page, 'Rows per page')
-  await text(page, 'Showing 1-4 of 4')
+  await text(page, 'Showing 1-12 of 12')
   const cfReq = await page.evaluate(() => performance.getEntriesByType('resource').map((e) => e.name).filter((n) => n.includes('/api/confluence/pages')).at(-1) ?? '')
   if (!cfReq.includes('pagelen=20') || !cfReq.includes('role=creator')) throw new Error(`Confluence request is not the 20-row creator list: ${cfReq}`)
   for (const width of [1440, 1024, 768]) {

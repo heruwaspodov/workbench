@@ -111,7 +111,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 onBeforeRouteLeave(() => leaving || !dirty.value || window.confirm('You have unsaved changes. Leave this page?'))
 
 // Layout: plan details and items on the left; suggestions beside them on wide screens, below on narrow ones.
-const layout = css({ display: 'grid', gridTemplateColumns: { base: 'minmax(0, 1fr)', xl: 'minmax(0, 1fr) 320px' }, columnGap: '6', rowGap: '5', alignItems: 'start' })
+const layout = css({ display: 'grid', gridTemplateColumns: { base: 'minmax(0, 1fr)', xl: 'minmax(0, 1fr) 360px' }, columnGap: '6', rowGap: '5', alignItems: 'start' })
 const mainCol = css({ display: 'flex', flexDirection: 'column', gap: '5', minWidth: 0 })
 const details = `${ui.card} ${css({ display: 'grid', gridTemplateColumns: { base: 'minmax(0, 1fr)', lg: '200px minmax(0, 1fr)' }, columnGap: '6', rowGap: '5' })}`
 const scoreBlock = css({ display: 'flex', flexDirection: 'column', gap: '2', lg: { borderRightWidth: '1px', borderColor: 'border.default.subtle', pr: '6' } })
