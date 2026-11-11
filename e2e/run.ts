@@ -213,7 +213,7 @@ await step('Create PGP from an uploaded Excel file, then the same quarter is ref
   await page.locator('[data-test="create-plan"]').click()
   await page.waitForURL(/\/pgp\/plans\/[0-9a-f-]{36}$/)
   await text(page, 'PGP 2025-Q1')
-  await page.waitForFunction(() => [...document.querySelectorAll('textarea')].some((t) => t.value.includes('https://jira.example.test/issues?jql=e2e')), undefined, { timeout: 10_000 })
+  await page.waitForFunction(() => [...document.querySelectorAll('[data-test="evidence"] input')].some((t) => (t as HTMLInputElement).value.includes('https://jira.example.test/issues?jql=e2e')), undefined, { timeout: 10_000 })
 
   await page.goto(`${APP}/pgp/new`)
   await page.getByRole('button', { name: 'Upload Excel' }).click()
@@ -274,6 +274,39 @@ await step('template editor imports the same Excel file with the same extractor'
   const got = tpl.items.map((i: { weight: number; initiative: string }) => `${i.weight}:${i.initiative}`).join('|')
   if (tpl.period !== '2025-Q1' || got !== '60:Average 40 story points|40:Zero P0 bugs') throw new Error(`unexpected template ${tpl.period} ${got}`)
   await shot('04c-template-from-upload')
+})
+
+await step('evidence is a list of link inputs: add, Enter, paste several, remove, save', async () => {
+  await page.goto(`${APP}/pgp/plans/${planId}`)
+  const first = page.locator('[data-test="evidence"]').first()
+  await first.waitFor()
+  const inputs = first.locator('input')
+  const start = await inputs.count()
+  await first.locator('[data-test="evidence-add"]').click()
+  if ((await inputs.count()) !== start + 1) throw new Error('Add link did not add an input')
+  if (!(await inputs.last().evaluate((el) => el === document.activeElement))) throw new Error('the new input is not focused')
+  await inputs.last().fill('https://example.test/one')
+  await inputs.last().press('Enter')
+  if ((await inputs.count()) !== start + 2) throw new Error('Enter did not add a row below')
+  // Paste two URLs at once into the empty row: they become two rows.
+  await inputs.last().evaluate((el) => {
+    const data = new DataTransfer()
+    data.setData('text', 'https://example.test/two\nhttps://example.test/three')
+    el.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }))
+  })
+  await page.waitForFunction((n) => document.querySelectorAll('[data-test="evidence"]')[0]!.querySelectorAll('input').length === n, start + 3)
+  await inputs.nth(start + 1).fill('not a url')
+  await first.getByText('Links should start with http').waitFor()
+  await first.getByRole('button', { name: `Remove evidence link ${start + 2}` }).click() // drop "not a url"
+  await shot('02e-evidence-list')
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
+  await page.waitForFunction(async (id) => {
+    const p = await (await fetch(`/api/pgp/plans/${id}`)).json()
+    const all = p.items.flatMap((i: { evidenceLinks: string[] }) => i.evidenceLinks)
+    return all.includes('https://example.test/one') && all.includes('https://example.test/three') && !all.includes('not a url') && !all.includes('')
+  }, planId, { timeout: 10_000 })
+  const m = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)
+  if (m > 1) throw new Error('evidence list overflows')
 })
 
 await step('plan suggestions: epics, Confluence, monthly delivery modal, Add to…, team rate', async () => {

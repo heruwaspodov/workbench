@@ -253,10 +253,10 @@ const empty = css({ display: 'flex', flexDirection: 'column', alignItems: 'flex-
             <MpText v-if="readonly" size="label" :class="pre">{{ r.it[f[0]] || '-' }}</MpText>
             <MpInput v-else size="sm" :model-value="r.it[f[0]] ?? ''" @update:model-value="(v: string) => setField(r.i, f[0], v)" />
           </label>
-          <label :class="[field, full]">
-            <MpText size="label-small" color="text.secondary">Evidence (one link per line)</MpText>
+          <div :class="[field, full]" role="group" aria-label="Evidence links">
+            <MpText size="label-small" color="text.secondary">Evidence</MpText>
             <EvidenceLinks :links="r.it.evidenceLinks ?? []" :readonly="readonly" @update="(links: string[]) => patch(r.i, { evidenceLinks: links })" />
-          </label>
+          </div>
         </div>
       </div>
 
