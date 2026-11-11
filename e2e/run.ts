@@ -83,8 +83,8 @@ const page = await context.newPage()
 
 const jsErrors: string[] = []
 // Pixel icons come from cdn.mekari.design; they may be blocked in sandboxes.
-// The 409 is the expected answer when a quarter is created twice (checked in its own step).
-const ignorable = (s: string) => s.includes('cdn.mekari.design') || s.includes('status of 409')
+// The 409 is the expected answer when a quarter is created twice, and the 400 when an SLA goal gets a target that is not a duration (each checked in its own step).
+const ignorable = (s: string) => s.includes('cdn.mekari.design') || s.includes('status of 409') || s.includes('status of 400')
 page.on('pageerror', (e) => jsErrors.push(`pageerror: ${e.message}`))
 page.on('console', (m) => { if (m.type() === 'error' && !ignorable(m.text() + (m.location().url ?? ''))) jsErrors.push(`console: ${m.text()}`) })
 
@@ -332,7 +332,7 @@ await step('plan suggestions: epics, Confluence, monthly delivery modal, Add toâ
   let rateRequests = 0
   const countRate = (r: { url(): string }) => { if (r.url().includes('/suggestions/delivery-rate')) rateRequests++ }
   page.on('request', countRate)
-  for (const id of ['pages', 'delivery', 'bugs', 'rate']) {
+  for (const id of ['pages', 'delivery', 'bugs', 'sla', 'rate']) {
     if (id === 'rate') {
       await page.waitForTimeout(1500)
       if (rateRequests !== 0) throw new Error('the team delivery rate was requested while its card was closed')
@@ -385,6 +385,15 @@ await step('plan suggestions: epics, Confluence, monthly delivery modal, Add toâ
   await text(page, 'already linked in this plan')
   await page.getByRole('button', { name: 'Cancel' }).click()
 
+  // Fast Track SLA: judged against the seeded goals (P2 5 working days, P1 2 working days; one ticket matches no goal).
+  await text(page, 'Within SLA')
+  const slaText = (await page.locator('[data-test="sla"]').innerText()).replace(/\s+/g, ' ')
+  for (const part of ['2/3 tickets', 'P2 General', 'P1 General', '1 no goal', 'Fast Track ticket 2']) {
+    if (!slaText.includes(part)) throw new Error(`Fast Track SLA card is missing "${part}": ${slaText}`)
+  }
+  await page.waitForTimeout(500)
+  await page.locator('[data-test="sla"]').screenshot({ path: join(OUT, '02i-fast-track-sla.png') })
+
   // Team delivery rate: the default label from Connections is used without typing.
   await text(page, 'Tickets done')
   await text(page, 'Default: team-x')
@@ -426,6 +435,24 @@ await step('plan suggestions: epics, Confluence, monthly delivery modal, Add toâ
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.waitForTimeout(200)
   await shot('02d-plan-suggestions-after')
+})
+
+await step('admin edits the SLA goals', async () => {
+  await page.goto(`${APP}/admin/sla`)
+  await page.locator('[data-test="sla-goal-row"]').first().waitFor()
+  const n = await page.locator('[data-test="sla-goal-row"]').count()
+  if (n !== 8) throw new Error(`expected the 8 seeded goals, got ${n}`)
+  const target = page.locator('[data-test="sla-goal-row"]').first().getByLabel('Target')
+  await target.fill('soon')
+  await page.locator('[data-test="save-sla-goals"]').click()
+  await text(page, 'is not a duration') // rejected with the reason, nothing saved
+  await target.fill('9h')
+  await page.locator('[data-test="save-sla-goals"]').click()
+  await page.waitForFunction(async () => (await (await fetch('/api/sla/goals')).json())[0].target === '9h', undefined, { timeout: 10_000 })
+  await shot('03d-sla-goals')
+  await target.fill('8h')
+  await page.locator('[data-test="save-sla-goals"]').click()
+  await page.waitForFunction(async () => (await (await fetch('/api/sla/goals')).json())[0].target === '8h', undefined, { timeout: 10_000 })
 })
 
 await step('My Confluence lists, searches and links my pages', async () => {

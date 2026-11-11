@@ -99,6 +99,17 @@ const epic = (n: number, summary: string, cat: string, st: string) =>
   ({ id: String(20000 + n), key: `MESIGN-${900 + n}`, fields: { summary, status: { id: '9', name: st, statusCategory: { key: cat } }, resolutiondate: null } })
 function searchJql(jql: string) {
   if (jql.includes('issuetype = Epic')) return [epic(1, 'Mock epic for e2e', 'indeterminate', 'In Progress'), epic(2, 'Mock finished epic', 'done', 'Done')]
+  if (jql.includes('issuetype = "Fast Track"')) {
+    const ft = (n: number, priority: string, labels: string[], daysAgo: number, resolvedHoursLater: number | null) => ({
+      id: `ft${n}`, key: `MESIGN-95${n}`,
+      fields: {
+        summary: `Fast Track ticket ${n}`, priority: { name: priority }, labels, assignee: { accountId: 'acc-dev' }, status: { name: resolvedHoursLater == null ? 'In Progress' : 'Done' },
+        created: new Date(Date.now() - daysAgo * 86_400_000).toISOString(),
+        resolutiondate: resolvedHoursLater == null ? null : new Date(Date.now() - daysAgo * 86_400_000 + resolvedHoursLater * 3_600_000).toISOString(),
+      },
+    })
+    return [ft(1, 'Medium - P2', ['team-x', 'mesign-p2'], 6, 3), ft(2, 'Medium - P2', ['team-x', 'mesign-p2'], 5, 24 * 14), ft(3, 'High - P1', ['team-x', 'mesign-p1'], 4, 2), ft(4, 'Medium - P2', ['team-x', 'other'], 3, 1)]
+  }
   if (jql.startsWith('key in (')) return jql.includes('"MESIGN-899"') ? [{ id: '899', key: 'MESIGN-899', fields: { summary: '26Q4 Unlabelled mock initiative', created: iso(5), resolutiondate: null, issuetype: { name: 'Epic' }, status: { name: 'To Do' } } }] : []
   if (jql.includes('parent is not EMPTY') || jql.startsWith('parent in (')) return []
   if (jql.includes('issuetype = Bug')) return ['1', '2'].map((n) => ({ id: `b${n}`, key: `MESIGN-85${n}`, fields: { priority: { name: 'Medium - P2' } } }))

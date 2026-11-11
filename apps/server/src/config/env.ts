@@ -47,6 +47,8 @@ export const env = {
     deliveryDateField: read('JIRA_DELIVERY_DATE_FIELD', 'customfield_11781') ?? '',
     toggleField: read('JIRA_TOGGLE_FIELD', 'customfield_11708') ?? '',
     /** Epic "Period" (e.g. ["26Q4"]) and "Project Status" custom fields. Empty value disables. */
+    /** Project whose Fast Track tickets the SLA card counts (the project of the Time to SLA configuration). Empty = any. */
+    slaProject: read('JIRA_SLA_PROJECT', 'MESIGN') ?? '',
     periodField: read('JIRA_PERIOD_FIELD', 'customfield_11804') ?? '',
     projectStatusField: read('JIRA_PROJECT_STATUS_FIELD', 'customfield_12356') ?? '',
   },

@@ -15,6 +15,7 @@ import { ApiError, api, notifyError, notifySuccess, unwrap } from '@/lib/api'
 import { copyText, isHttpUrl } from '@/lib/clipboard'
 import { formatDate } from '@/lib/format'
 import type { EditableItem } from '@/lib/pgp'
+import { useAuth } from '@/stores/auth'
 import { ui } from '@/lib/ui'
 import { useAsync } from '@/lib/use-async'
 
@@ -67,7 +68,7 @@ async function applyLabel() {
   const l = label.value.trim()
   if (!l) return
   rateLoadedFor = l
-  await rate.run(l)
+  await Promise.all([rate.run(l), Promise.resolve(loadSla())])
 }
 // The card is heavy (it reads every epic's children), so it loads only once it is open and a label is known.
 const rateOpen = ref(false)
@@ -83,8 +84,32 @@ watch(data, (d, before) => {
   savedLabel.value = d.teamLabel
   label.value = d.teamLabel ?? ''
   loadRate()
+  loadSla()
 })
 const onRateToggle = (open: boolean) => { rateOpen.value = open; loadRate() }
+// ----- Fast Track SLA (loaded when its card is open) -----
+const auth = useAuth()
+const sla = useAsync((l: string) => unwrap(api.pgp.plans({ id: props.planId }).suggestions['fast-track-sla'].get({ query: l ? { label: l } : {} })))
+const slaOpen = ref(false)
+const allMissed = ref(false)
+let slaLoadedFor: string | null = null
+function loadSla(force = false) {
+  const l = label.value.trim()
+  if (!slaOpen.value || (!force && slaLoadedFor === l)) return
+  slaLoadedFor = l
+  sla.run(l)
+}
+const onSlaToggle = (open: boolean) => { slaOpen.value = open; loadSla() }
+const missedList = computed(() => (allMissed.value ? sla.data.value?.missedTickets : sla.data.value?.missedTickets.slice(0, LIMIT)) ?? [])
+const duration = (minutes: number, calendar: 'weekdays' | 'always') => {
+  const day = (calendar === 'weekdays' ? 9 : 24) * 60
+  const d = Math.floor(minutes / day), h = Math.floor((minutes % day) / 60), m = minutes % 60
+  return [d ? `${d}d` : '', h ? `${h}h` : '', !d && m ? `${m}m` : ''].filter(Boolean).join(' ') || '0h'
+}
+const slaValue = computed(() => {
+  const r = sla.data.value
+  return r && r.rate != null ? `${r.rate}% of Fast Track tickets within SLA (${r.met}/${r.met + r.missed}, ${r.label})` : ''
+})
 const canSaveDefault = computed(() => label.value.trim() !== '' && label.value.trim() !== (savedLabel.value ?? ''))
 const savingDefault = ref(false)
 async function saveDefault() {
@@ -217,6 +242,61 @@ const problem = css({ color: 'text.danger' })
           <div :class="meta">
             <a :href="data.bugs.url" target="_blank" rel="noopener noreferrer"><MpButton size="sm" variant="ghost" right-icon="newtab">Open in Jira</MpButton></a>
             <MpButton size="sm" variant="ghost" @click="openPicker('Bugs by priority', data.bugs.url, data.bugs.value)">Add to…</MpButton>
+          </div>
+        </template>
+      </PanelCard>
+
+      <PanelCard id="sla" title="Fast Track SLA" :subtitle="`Created in ${data.period}${label.trim() ? `, ${label.trim()}` : ''}`" :count="sla.data.value?.rate != null ? `${sla.data.value.rate}%` : null" @toggle="onSlaToggle">
+        <MpText v-if="!label.trim()" size="label" color="text.secondary">
+          Set your team label in <RouterLink to="/connections" :class="ui.link">Connections</RouterLink> to see your Fast Track SLA.
+        </MpText>
+        <div v-else-if="sla.loading.value" :class="css({ display: 'grid', placeItems: 'center', py: '4' })"><MpSpinner /></div>
+        <MpText v-else-if="sla.error.value" size="label" :class="problem">{{ (sla.error.value as Error).message }}</MpText>
+        <template v-else-if="sla.data.value">
+          <div :class="stats">
+            <div :class="stat">
+              <MpText size="label-small" color="text.secondary">Within SLA</MpText>
+              <MpText size="h3" weight="semiBold">{{ pct(sla.data.value.rate) }}</MpText>
+              <MpText size="label-small" color="text.secondary">{{ sla.data.value.met }}/{{ sla.data.value.met + sla.data.value.missed }} tickets</MpText>
+            </div>
+            <div :class="stat">
+              <MpText size="label-small" color="text.secondary">Missed</MpText>
+              <MpText size="h3" weight="semiBold">{{ sla.data.value.missed }}</MpText>
+              <MpText size="label-small" color="text.secondary">{{ sla.data.value.running }} running · {{ sla.data.value.noGoal }} no goal</MpText>
+            </div>
+          </div>
+          <div v-if="sla.data.value.goals.length">
+            <div v-for="g in sla.data.value.goals" :key="g.name" :class="row">
+              <div :class="grow">
+                <MpText size="label" :class="css({ truncate: true })" :title="g.name">{{ g.name }}</MpText>
+                <MpText size="label-small" color="text.secondary">{{ g.target }} · {{ g.calendar === 'weekdays' ? 'working days' : '24x7' }}</MpText>
+              </div>
+              <MpText size="label" color="text.secondary">{{ g.met }} met · {{ g.missed }} missed<template v-if="g.running"> · {{ g.running }} running</template></MpText>
+            </div>
+          </div>
+          <MpText v-else size="label" color="text.secondary">No Fast Track ticket matched an SLA goal in this quarter.</MpText>
+          <div v-if="sla.data.value.missedTickets.length" :class="css({ display: 'flex', flexDirection: 'column', gap: '2' })" data-test="sla-missed">
+            <MpText size="label" weight="semiBold">Missed tickets</MpText>
+            <div :class="allMissed ? scroll : undefined">
+              <div v-for="t in missedList" :key="t.key" :class="row">
+                <div :class="grow">
+                  <a :href="t.url" target="_blank" rel="noopener noreferrer" :title="t.summary" :class="trunc">{{ t.key }} {{ t.summary }}</a>
+                  <MpText size="label-small" color="text.secondary">{{ t.goal }} · {{ duration(t.elapsedMinutes, t.calendar) }} of {{ duration(t.targetMinutes, t.calendar) }}<template v-if="t.open"> · still open</template></MpText>
+                </div>
+              </div>
+            </div>
+            <MpButton v-if="sla.data.value.missedTickets.length > LIMIT" size="sm" variant="textLink" :class="css({ alignSelf: 'flex-start' })" @click="allMissed = !allMissed">{{ allMissed ? 'Show fewer' : `Show all ${sla.data.value.missedTickets.length}` }}</MpButton>
+            <MpText v-if="sla.data.value.missedTruncated" size="label-small" color="text.secondary">Only the 50 worst are listed.</MpText>
+          </div>
+          <details :class="explain">
+            <summary>How is this counted?</summary>
+            <p>Fast Track tickets of the team label created this quarter. The first SLA goal matching the ticket's priority and label (with an assignee set) applies; time runs from creation to resolution on the goal's calendar (working days are Mon-Fri 09:00-18:00, no holidays). A ticket still open past its target counts as missed.</p>
+            <p>The goals are a copy of the Time to SLA configuration in Jira<template v-if="auth.me?.role === 'admin'">: <RouterLink to="/admin/sla" :class="ui.link">edit SLA goals</RouterLink></template><template v-else>; an admin keeps them up to date</template>.</p>
+            <p v-if="sla.data.value.truncated">Only the first 1000 tickets were counted.</p>
+          </details>
+          <div :class="meta">
+            <a :href="sla.data.value.url" target="_blank" rel="noopener noreferrer"><MpButton size="sm" variant="ghost" right-icon="newtab">Open in Jira</MpButton></a>
+            <MpButton size="sm" variant="ghost" :is-disabled="!slaValue" @click="openPicker('Fast Track SLA', sla.data.value.url, slaValue)">Add to…</MpButton>
           </div>
         </template>
       </PanelCard>

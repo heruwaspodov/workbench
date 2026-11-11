@@ -18,7 +18,7 @@ const SP = env.jira.storyPointField
 const TTL = 5 * 60_000
 const ISSUE_CAP = 500
 
-const quote = (v: string) => `"${v.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`
+export const quote = (v: string) => `"${v.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`
 
 /** JQL reference for the story point field. "Story Points" is not unique in this site, so use the id form `cf[10005]`. */
 export const spField = (field = SP) => (/^customfield_(\d+)$/.test(field) ? `cf[${field.slice(12)}]` : quote('Story Points'))
@@ -135,7 +135,7 @@ async function epicDeliveries(epics: JiraIssue[], viaChildren: Set<string>, rang
 
 export abstract class SuggestionsService {
   /** Owner only. Returns the plan period; 403 for anyone else (leaders and admins included). */
-  private static async owned(id: string, user: User) {
+  static async owned(id: string, user: User) {
     const plan = await db.query.plans.findFirst({ where: eq(plans.id, id), columns: { id: true, userId: true, year: true, quarter: true } })
     if (!plan) throw new NotFoundError('Plan')
     if (plan.userId !== user.id) throw new ForbiddenError('Suggestions are only available to the plan owner')

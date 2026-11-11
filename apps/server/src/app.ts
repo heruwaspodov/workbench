@@ -6,6 +6,7 @@ import { kanbanModule } from './modules/kanban'
 import { orgModule } from './modules/org'
 import { pgpModule } from './modules/pgp'
 import { pullRequestsModule } from './modules/pull-requests'
+import { slaModule } from './modules/sla'
 import { env } from './config/env'
 import { AppError, PeriodExistsError } from './shared/errors'
 import { originGuard } from './shared/origin-guard'
@@ -33,5 +34,6 @@ export const app = new Elysia()
   .use(kanbanModule)
   .use(orgModule)
   .use(pullRequestsModule)
+  .use(slaModule)
 
 export type App = typeof app

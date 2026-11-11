@@ -36,6 +36,13 @@
       "when": 1794386265974,
       "tag": "0004_connection_team_label",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1794392241611,
+      "tag": "0005_sla_goals",
+      "breakpoints": true
     }
   ]
 }

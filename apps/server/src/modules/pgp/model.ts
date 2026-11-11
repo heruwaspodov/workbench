@@ -66,6 +66,7 @@ export const PgpModel = {
   }),
 
   suggestionMonth: t.Object({ id: t.String({ format: 'uuid' }), month: t.String({ pattern: '^20\\d{2}-(0[1-9]|1[0-2])$' }) }),
+  fastTrackSlaQuery: t.Object({ label: t.Optional(t.String({ maxLength: 100 })) }),
   deliveryRateQuery: t.Object({ label: t.String({ minLength: 1, maxLength: 100 }) }),
 
   planCreate: t.Object({ templateId: t.String({ format: 'uuid' }) }),

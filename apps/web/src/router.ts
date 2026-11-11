@@ -17,6 +17,7 @@ export const router = createRouter({
         { path: 'pgp/templates', name: 'templates', component: () => import('./views/pgp/TemplatesView.vue'), meta: { title: 'PGP Templates', admin: true } },
         { path: 'pgp/templates/new', name: 'template-new', component: () => import('./views/pgp/TemplateEditorView.vue'), meta: { title: 'New Template', admin: true } },
         { path: 'pgp/templates/:id', name: 'template', component: () => import('./views/pgp/TemplateEditorView.vue'), props: true, meta: { title: 'Edit Template', admin: true } },
+        { path: 'admin/sla', name: 'sla-goals', component: () => import('./views/admin/SlaGoalsView.vue'), meta: { title: 'SLA goals', admin: true } },
         { path: 'kanban', name: 'kanban', component: () => import('./views/kanban/KanbanView.vue'), meta: { title: 'My Kanban' } },
         { path: 'pull-requests', name: 'pull-requests', component: () => import('./views/pull-requests/PullRequestsView.vue'), meta: { title: 'My Pull Requests' } },
         { path: 'pull-requests/:repo/:id', name: 'pull-request', component: () => import('./views/pull-requests/PullRequestDetailView.vue'), props: true, meta: { title: 'Pull Request' } },

@@ -157,3 +157,20 @@ export type Template = typeof templates.$inferSelect
 export type TemplateItem = typeof templateItems.$inferSelect
 export type Plan = typeof plans.$inferSelect
 export type PlanItem = typeof planItems.$inferSelect
+
+/** SLA goals for Fast Track tickets, mirroring the Time to SLA configuration in Jira. The first goal that matches a ticket applies. */
+export const slaGoals = pgTable('sla_goals', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  position: integer('position').notNull(),
+  name: text('name').notNull(),
+  /** Jira priority name the goal applies to, e.g. "Medium - P2". */
+  priority: text('priority').notNull(),
+  /** Label that selects the goal, e.g. "mesign-p2". */
+  label: text('label').notNull(),
+  calendar: text('calendar').notNull(),
+  /** Duration as Jira writes it, e.g. "1d12h". A day is a working day on the "weekdays" calendar and 24 h otherwise. */
+  target: text('target').notNull(),
+  ...timestamps,
+}, (t) => [index('sla_goals_position_idx').on(t.position), check('sla_goals_calendar_chk', sql`${t.calendar} in ('weekdays', 'always')`)])
+
+export type SlaGoal = typeof slaGoals.$inferSelect
