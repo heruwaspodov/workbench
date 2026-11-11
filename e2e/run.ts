@@ -329,10 +329,24 @@ await step('plan suggestions: epics, Confluence, monthly delivery modal, Add toâ
   await page.goto(`${APP}/pgp/plans/${planId}`)
   await text(page, 'Pages you created or edited')
   // Cards are collapsed except the epics; open every other one first.
+  let rateRequests = 0
+  const countRate = (r: { url(): string }) => { if (r.url().includes('/suggestions/delivery-rate')) rateRequests++ }
+  page.on('request', countRate)
   for (const id of ['pages', 'delivery', 'bugs', 'rate']) {
+    if (id === 'rate') {
+      await page.waitForTimeout(1500)
+      if (rateRequests !== 0) throw new Error('the team delivery rate was requested while its card was closed')
+    }
     const head = page.locator(`section[data-test="${id}"] > button[aria-expanded]`)
     if ((await head.getAttribute('aria-expanded')) !== 'true') await head.click()
   }
+  await text(page, 'Tickets done')
+  if (rateRequests !== 1) throw new Error(`opening the card should load the rate once, got ${rateRequests}`)
+  await page.locator('section[data-test="rate"] > button[aria-expanded]').click() // close
+  await page.locator('section[data-test="rate"] > button[aria-expanded]').click() // open again
+  await page.waitForTimeout(800)
+  if (rateRequests !== 1) throw new Error(`reopening the card must not reload the same label, got ${rateRequests}`)
+  page.off('request', countRate)
   await text(page, 'Runbook Signing')
   if (await page.getByText('CONFIDENTIAL BODY TEXT').count()) throw new Error('page body/excerpt leaked into the UI')
   await text(page, 'Mock epic for e2e')

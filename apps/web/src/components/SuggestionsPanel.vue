@@ -65,14 +65,26 @@ const savedLabel = ref<string | null>(null)
 const rate = useAsync((l: string) => unwrap(api.pgp.plans({ id: props.planId }).suggestions['delivery-rate'].get({ query: { label: l } })))
 async function applyLabel() {
   const l = label.value.trim()
-  if (l) await rate.run(l)
+  if (!l) return
+  rateLoadedFor = l
+  await rate.run(l)
+}
+// The card is heavy (it reads every epic's children), so it loads only once it is open and a label is known.
+const rateOpen = ref(false)
+let rateLoadedFor = ''
+function loadRate() {
+  const l = label.value.trim()
+  if (!rateOpen.value || !l || rateLoadedFor === l) return
+  rateLoadedFor = l
+  rate.run(l)
 }
 watch(data, (d, before) => {
   if (!d || before) return // first load only: later reloads must not overwrite what is typed
   savedLabel.value = d.teamLabel
   label.value = d.teamLabel ?? ''
-  if (label.value) rate.run(label.value)
+  loadRate()
 })
+const onRateToggle = (open: boolean) => { rateOpen.value = open; loadRate() }
 const canSaveDefault = computed(() => label.value.trim() !== '' && label.value.trim() !== (savedLabel.value ?? ''))
 const savingDefault = ref(false)
 async function saveDefault() {
@@ -209,7 +221,7 @@ const problem = css({ color: 'text.danger' })
         </template>
       </PanelCard>
 
-      <PanelCard id="rate" title="Team delivery rate" :subtitle="`Whole team, by Jira label, ${data.period}`" :count="rate.data.value?.tickets.rate != null ? `${rate.data.value.tickets.rate}%` : null">
+      <PanelCard id="rate" @toggle="onRateToggle" title="Team delivery rate" :subtitle="`Whole team, by Jira label, ${data.period}`" :count="rate.data.value?.tickets.rate != null ? `${rate.data.value.tickets.rate}%` : null">
         <form :class="css({ display: 'flex', gap: '2' })" @submit.prevent="applyLabel">
           <MpInput v-model="label" placeholder="Jira label" aria-label="Jira label" maxlength="100" />
           <MpButton type="submit" variant="secondary" :is-loading="rate.loading.value">Show</MpButton>

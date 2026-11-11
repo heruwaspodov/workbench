@@ -4,10 +4,12 @@
  * over a body. The open/closed choice is remembered in this browser per card id.
  */
 import { MpBadge, MpText, css } from '@mekari/pixel3'
-import { ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { ui } from '@/lib/ui'
 
 const props = defineProps<{ id: string; title: string; subtitle?: string; count?: number | string | null; defaultOpen?: boolean }>()
+
+const emit = defineEmits<{ toggle: [open: boolean] }>()
 
 const KEY = `one-desk:panel:${props.id}`
 const read = () => {
@@ -21,7 +23,9 @@ const open = ref(read())
 function toggle() {
   open.value = !open.value
   try { localStorage.setItem(KEY, open.value ? '1' : '0') } catch { /* ignore */ }
+  emit('toggle', open.value)
 }
+onMounted(() => emit('toggle', open.value))
 
 const card = `${ui.card} ${css({ p: '0', overflow: 'hidden', flexShrink: 0 })}`
 const head = css({
