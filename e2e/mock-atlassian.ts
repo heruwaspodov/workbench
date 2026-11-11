@@ -99,13 +99,14 @@ const epic = (n: number, summary: string, cat: string, st: string) =>
   ({ id: String(20000 + n), key: `MESIGN-${900 + n}`, fields: { summary, status: { id: '9', name: st, statusCategory: { key: cat } }, resolutiondate: null } })
 function searchJql(jql: string) {
   if (jql.includes('issuetype = Epic')) return [epic(1, 'Mock epic for e2e', 'indeterminate', 'In Progress'), epic(2, 'Mock finished epic', 'done', 'Done')]
+  if (jql.startsWith('key in (')) return jql.includes('"MESIGN-899"') ? [{ id: '899', key: 'MESIGN-899', fields: { summary: '26Q4 Unlabelled mock initiative', created: iso(5), resolutiondate: null, issuetype: { name: 'Epic' }, status: { name: 'To Do' } } }] : []
   if (jql.includes('parent is not EMPTY') || jql.startsWith('parent in (')) return []
   if (jql.includes('issuetype = Bug')) return ['1', '2'].map((n) => ({ id: `b${n}`, key: `MESIGN-85${n}`, fields: { priority: { name: 'Medium - P2' } } }))
   const { from, to } = range(jql)
   if (jql.includes('labels =')) {
     const month = (from || iso(0)).slice(0, 7)
     return [
-      { id: '1', key: 'MESIGN-801', fields: { resolutiondate: `${month}-15T10:00:00.000+0000`, customfield_10016: 5, customfield_10005: 5, issuetype: { name: 'Task' }, fixVersions: [{ name: '[BE] Release v1', released: true }] } },
+      { id: '1', key: 'MESIGN-801', fields: { resolutiondate: `${month}-15T10:00:00.000+0000`, customfield_10016: 5, customfield_10005: 5, issuetype: { name: 'Task' }, parent: { key: 'MESIGN-899', fields: { issuetype: { name: 'Epic' } } }, fixVersions: [{ name: '[BE] Release v1', released: true }] } },
       { id: '3', key: 'MESIGN-803', fields: { resolutiondate: null, summary: '26Q4 Mock label epic', created: iso(5), issuetype: { name: 'Epic' }, status: { name: 'To Do' } } },
       ...Array.from({ length: 9 }, (_, n) => ({ id: `${40 + n}`, key: `MESIGN-${810 + n}`, fields: { resolutiondate: null, summary: `26Q4 Label epic number ${n + 1} with a fairly long title to test truncation`, created: iso(5), issuetype: { name: 'Epic' }, status: n === 0 ? { name: 'Done', statusCategory: { key: 'done' } } : { name: 'To Do' } } })),
       { id: '2', key: 'MESIGN-802', fields: { resolutiondate: null, customfield_10016: 3, customfield_10005: 3 } },

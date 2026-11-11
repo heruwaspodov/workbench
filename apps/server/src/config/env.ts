@@ -46,6 +46,9 @@ export const env = {
     /** Site-specific custom fields: an epic's "Actual Delivery Date" and a ticket's "Toggle Name". Empty value disables. */
     deliveryDateField: read('JIRA_DELIVERY_DATE_FIELD', 'customfield_11781') ?? '',
     toggleField: read('JIRA_TOGGLE_FIELD', 'customfield_11708') ?? '',
+    /** Epic "Period" (e.g. ["26Q4"]) and "Project Status" custom fields. Empty value disables. */
+    periodField: read('JIRA_PERIOD_FIELD', 'customfield_11804') ?? '',
+    projectStatusField: read('JIRA_PROJECT_STATUS_FIELD', 'customfield_12356') ?? '',
   },
   bitbucket: {
     apiUrl: read('BITBUCKET_API_URL', 'https://api.bitbucket.org/2.0')!.replace(/\/$/, ''),

@@ -251,7 +251,7 @@ const problem = css({ color: 'text.danger' })
             <summary>How is this counted?</summary>
             <p>Not counted: {{ plural(rate.data.value.excluded.epics, 'epic') }} and {{ rate.data.value.excluded.wontFix }} Won't Fix. Open tickets not touched this quarter are left out.</p>
             <p>Released = a fix version marked released in Jira, so it depends on the team filling it in. {{ plural(rate.data.value.released.tickets.noVersion, 'done ticket') }} without a fix version, not assumed released.</p>
-            <p>Epics follow their own Jira status: Delivered = the epic is Done. "All children done" = still open but nothing left to do (probably not closed yet). An epic is listed when it was created or resolved this quarter, carries the quarter in its name (like 26Q4), or a quarter of its work finished in it{{ rate.data.value.excluded.epicsOutOfQuarter ? `; ${plural(rate.data.value.excluded.epicsOutOfQuarter, 'older epic')} left out` : '' }}.</p>
+            <p>Epics follow their own Jira status: Delivered = the epic is Done. "All children done" = still open but nothing left to do (probably not closed yet). An epic is listed when it or a ticket under it carries the label, and it was created or resolved this quarter, has the quarter as its Period or in its name (like 26Q4), or a quarter of its work finished in it{{ rate.data.value.excluded.epicsOutOfQuarter ? `; ${plural(rate.data.value.excluded.epicsOutOfQuarter, 'older epic')} left out` : '' }}.</p>
             <p>Toggle names come from Jira. Whether a toggle is switched on is not recorded in Jira, so it is not shown.</p>
             <p v-if="rate.data.value.truncated">Only the first 1000 tickets were counted.</p>
           </details>
@@ -265,6 +265,9 @@ const problem = css({ color: 'text.danger' })
                 <div :class="grow">
                   <a :href="e.url" target="_blank" rel="noopener noreferrer" :title="e.summary" :class="trunc">{{ e.summary }}</a>
                   <MpText size="label-small" color="text.secondary">{{ e.key }} · {{ e.children.done }}/{{ e.children.total }} done · {{ e.children.released }} released<template v-if="e.deliveredOn"> · delivered {{ formatDate(e.deliveredOn) }}</template></MpText>
+                  <MpText v-if="e.projectStatus || e.viaChildren" size="label-small" color="text.secondary">
+                    <template v-if="e.projectStatus">Project: {{ e.projectStatus }}</template><template v-if="e.projectStatus && e.viaChildren"> · </template><template v-if="e.viaChildren" >from labelled tickets</template>
+                  </MpText>
                   <MpText v-if="e.toggles.length" size="label-small" color="text.secondary" :title="e.toggles.join(', ')" :class="css({ truncate: true })">Toggle: {{ e.toggles.join(', ') }}</MpText>
                 </div>
                 <MpBadge size="sm" variant="subtle" :variant-color="deliveryColor[e.delivery]">{{ deliveryLabel[e.delivery] }}</MpBadge>

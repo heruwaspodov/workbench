@@ -21,16 +21,24 @@ const DELIVERY = [
   issue('T-3', { summary: 'Three', resolutiondate: '2026-07-31T23:30:00.000+0700', ...sp(2) }),
   issue('T-4', { summary: 'Four', resolutiondate: '2026-08-02T10:00:00.000+0700', ...sp(8) }),
 ]
+const epicRef = (key: string) => ({ key, fields: { issuetype: { name: 'Epic' } } })
+const PERIOD = process.env.JIRA_PERIOD_FIELD || 'customfield_11804'
+const PSTATUS = process.env.JIRA_PROJECT_STATUS_FIELD || 'customfield_12356'
+// Epics that carry no team label themselves: found only through their labelled children.
+const PARENTS = [
+  issue('P-1', { summary: 'Unlabelled initiative', issuetype: { name: 'Epic' }, created: '2025-01-01T00:00:00.000+0700', resolutiondate: '2026-08-30T00:00:00.000+0700', ...({ status: { name: 'Done', statusCategory: { key: 'done' } } }), [PERIOD]: ['26Q3'], [PSTATUS]: { value: 'Done' } }),
+  issue('P-3', { summary: 'Old initiative', issuetype: { name: 'Epic' }, created: '2025-01-01T00:00:00.000+0700', resolutiondate: null, status: { name: 'To Do', statusCategory: { key: 'new' } }, [PERIOD]: ['25Q1'] }),
+]
 const ver = (name: string, released: boolean) => ({ fixVersions: [{ name, released }] })
 const st = (name: string, cat = 'done') => ({ status: { name, statusCategory: { key: cat } } })
 const RATE = [
-  issue('R-1', { resolutiondate: '2026-07-10T10:00:00.000+0700', issuetype: { name: 'Task' }, ...st('Done'), ...sp(5), ...ver('[BE] Release v1', true) }),
-  issue('R-2', { resolutiondate: '2026-08-10T10:00:00.000+0700', issuetype: { name: 'Task' }, ...st('Done'), ...sp(3) }),
-  issue('R-3', { resolutiondate: null, issuetype: { name: 'Task' }, ...st('To Do', 'new'), ...sp(2) }),
+  issue('R-1', { resolutiondate: '2026-07-10T10:00:00.000+0700', parent: epicRef('P-1'), issuetype: { name: 'Task' }, ...st('Done'), ...sp(5), ...ver('[BE] Release v1', true) }),
+  issue('R-2', { resolutiondate: '2026-08-10T10:00:00.000+0700', parent: epicRef('P-1'), issuetype: { name: 'Task' }, ...st('Done'), ...sp(3) }),
+  issue('R-3', { resolutiondate: null, parent: epicRef('P-3'), issuetype: { name: 'Task' }, ...st('To Do', 'new'), ...sp(2) }),
   issue('R-4', { resolutiondate: '2026-10-05T10:00:00.000+0700', issuetype: { name: 'Task' }, ...st('Done'), ...sp(1) }),
   issue('R-5', { resolutiondate: null, issuetype: { name: 'Epic' }, summary: 'Epic with children', created: '2026-05-01T10:00:00.000+0700', ...st('In Progress', 'indeterminate') }),
   issue('R-6', { resolutiondate: '2026-08-12T10:00:00.000+0700', issuetype: { name: 'Task' }, ...st("Won't Fix"), ...sp(4) }),
-  issue('R-7', { resolutiondate: '2026-09-02T10:00:00.000+0700', issuetype: { name: 'Task' }, ...st('Done'), ...sp(2), ...ver('[BE] Release v2', false) }),
+  issue('R-7', { resolutiondate: '2026-09-02T10:00:00.000+0700', parent: epicRef('R-9'), issuetype: { name: 'Task' }, ...st('Done'), ...sp(2), ...ver('[BE] Release v2', false) }),
   issue('R-8', { resolutiondate: null, issuetype: { name: 'Epic' }, summary: '26Q3 Epic without children', created: '2026-01-01T10:00:00.000+0700', ...st('To Do', 'new') }),
   issue('R-9', { resolutiondate: '2026-08-20T10:00:00.000+0700', issuetype: { name: 'Epic' }, summary: '26Q3 Delivered epic', created: '2026-01-01T10:00:00.000+0700', ...st('Done'), [process.env.JIRA_DELIVERY_DATE_FIELD || 'customfield_11781']: '2026-08-20' }),
   issue('R-10', { resolutiondate: null, issuetype: { name: 'Epic' }, summary: '26Q3 Closing epic', created: '2026-01-01T10:00:00.000+0700', ...st('In Progress', 'indeterminate') }),
@@ -42,6 +50,8 @@ const kid = (key: string, parent: string, resolved: boolean | string, v?: Return
 const CHILDREN: Record<string, ReturnType<typeof kid>[]> = {
   'R-5': [kid('K-1', 'R-5', true, ver('[BE] Release v1', true), undefined, ['ft_b', 'ft_a']), kid('K-2', 'R-5', false), kid('K-3', 'R-5', false, undefined, "Won't Fix")],
   'R-9': [kid('K-4', 'R-9', true)],
+  'P-1': [kid('K-20', 'P-1', true)],
+  'P-3': [],
   'R-10': [kid('K-5', 'R-10', true), kid('K-6', 'R-10', true, undefined, undefined, ['ft_a'])],
   'R-11': [kid('K-7', 'R-11', true), ...Array.from({ length: 7 }, (_, n) => kid(`K-${8 + n}`, 'R-11', '2023-11-01T10:00:00.000+0700'))],
 }
@@ -76,6 +86,7 @@ describe('SuggestionsService', () => {
       ]
     }
     if (jql.includes('issuetype = Bug')) return [issue('B-1', { priority: { name: 'Medium - P2' } }), issue('B-2', { priority: { name: 'Medium - P2' } }), issue('B-3', { priority: { name: 'High - P1' } }), issue('B-4', { priority: { name: 'Lowest' } })]
+    if (jql.startsWith('key in (')) return PARENTS.filter((e) => jql.includes(`"${e.key}"`))
     if (jql.startsWith('parent in (')) return Object.entries(CHILDREN).filter(([k]) => jql.includes(`"${k}"`)).flatMap(([, v]) => v)
     if (jql.includes('labels =')) return RATE
     const [from, to] = [...jql.matchAll(/resolutiondate (?:>=|<) "([^"]+)"/g)].map((m) => m[1]!)
@@ -211,7 +222,7 @@ describe('SuggestionsService', () => {
 
   test('team delivery rate: epics and Won\'t Fix are set aside, untouched backlog is not a commitment', async () => {
     const res = await Svc.deliveryRate(planQ3, owner, ' team-x ')
-    expect(res).toMatchObject({ label: 'team-x', from: '2026-07-01', to: '2026-10-01', truncated: false, excluded: { epics: 5, wontFix: 1, epicsOutOfQuarter: 1 } })
+    expect(res).toMatchObject({ label: 'team-x', from: '2026-07-01', to: '2026-10-01', truncated: false, excluded: { epics: 5, wontFix: 1, epicsOutOfQuarter: 2 } })
     expect(res.tickets).toEqual({ done: 3, total: 5, rate: 60 })
     expect(res.storyPoints).toEqual({ done: 10, total: 13, rate: 76.9 })
     expect(res.jql).toBe('labels = "team-x" AND created < "2026-10-01" AND (resolutiondate >= "2026-07-01" OR (resolution is EMPTY AND updated >= "2026-07-01"))')
@@ -232,9 +243,15 @@ describe('SuggestionsService', () => {
       ['R-9', 'delivered', { total: 1, done: 1, released: 0 }],
       ['R-8', 'no_children', { total: 0, done: 0, released: 0 }],
       ['R-5', 'in_progress', { total: 2, done: 1, released: 1 }],
+      ['P-1', 'delivered', { total: 1, done: 1, released: 0 }],
     ])
-    expect(res.epicSummary).toEqual({ delivered: 1, children_done: 1, in_progress: 1, no_children: 1 })
-    expect(res.epicsDelivered).toEqual({ delivered: 1, total: 4 })
+    expect(res.epicSummary).toEqual({ delivered: 2, children_done: 1, in_progress: 1, no_children: 1 })
+    expect(res.epicsDelivered).toEqual({ delivered: 2, total: 5 })
+    // P-1 has no team label itself: it is reached through its labelled children, and the quarter comes from its Period.
+    expect(res.epics.find((e) => e.key === 'P-1')).toMatchObject({ viaChildren: true, projectStatus: 'Done' })
+    expect(res.epics.find((e) => e.key === 'R-9')!.viaChildren).toBe(false) // already labelled: not listed twice
+    expect(res.epics.filter((e) => e.key === 'R-9')).toHaveLength(1)
+    expect(res.epics.map((e) => e.key)).not.toContain('P-3') // Period of another quarter
     expect(res.epics.find((e) => e.key === 'R-9')!.deliveredOn).toBe('2026-08-20')
     expect(res.epics.find((e) => e.key === 'R-5')!.deliveredOn).toBeNull()
     expect(res.epics.find((e) => e.key === 'R-5')!.toggles).toEqual(['ft_a', 'ft_b'])
@@ -261,6 +278,9 @@ describe('SuggestionsService', () => {
     expect(epicInQuarter(e('plain', { resolutiondate: '2026-08-01T00:00:00.000+0000' }), [], range, '26Q3')).toBe(true)
     expect(epicInQuarter(e('plain', { created: '2026-08-01T00:00:00.000+0000' }), [], range, '26Q3')).toBe(true)
     expect(epicInQuarter(e('[26Q3] Tagged'), [], range, '26Q3')).toBe(true)
+    expect(epicInQuarter(e('plain', { [PERIOD]: ['26Q3'] }), [], range, '26Q3')).toBe(true)
+    expect(epicInQuarter(e('plain', { [PERIOD]: ['26Q2', '26q3'] }), [], range, '26Q3')).toBe(true)
+    expect(epicInQuarter(e('plain', { [PERIOD]: ['26Q2'] }), [], range, '26Q3')).toBe(false)
     expect(epicInQuarter(e('126Q31 not a tag'), [], range, '26Q3')).toBe(false)
     expect(epicInQuarter(e('23Q3 Old'), [k('2026-08-01'), k('2023-01-01'), k('2023-01-01'), k('2023-01-01'), k('2023-01-01')], range, '26Q3')).toBe(false) // 1 of 5
     expect(epicInQuarter(e('23Q3 Old'), [k('2026-08-01'), k('2026-09-01'), k('2023-01-01'), k('2023-01-01')], range, '26Q3')).toBe(true) // half of it
