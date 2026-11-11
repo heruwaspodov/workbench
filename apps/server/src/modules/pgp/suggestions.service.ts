@@ -50,6 +50,50 @@ const toEpic = (i: JiraIssue, source: 'assigned' | 'child') => ({
   source,
 })
 
+type ReleaseStatus = 'all_released' | 'partial' | 'not_released' | 'no_info'
+const isEpic = (i: JiraIssue) => i.fields.issuetype?.name === 'Epic'
+const isWontFix = (i: JiraIssue) => /won['’]?t\s+(fix|do)/i.test(String(i.fields.status?.name ?? ''))
+const versionsOf = (i: JiraIssue): { name: string; released: boolean }[] => (Array.isArray(i.fields.fixVersions) ? i.fields.fixVersions : [])
+const hasReleased = (i: JiraIssue) => versionsOf(i).some((v) => v.released)
+const isResolved = (i: JiraIssue) => Boolean(i.fields.resolutiondate)
+
+/** Release status of one epic from its child issues ("Won't Fix" children ignored). */
+export const epicReleaseStatus = (children: JiraIssue[]): ReleaseStatus => {
+  const live = children.filter((c) => !isWontFix(c))
+  if (!live.length) return 'no_info'
+  if (live.every((c) => isResolved(c) && hasReleased(c))) return 'all_released'
+  if (live.some(hasReleased)) return 'partial'
+  if (live.some((c) => versionsOf(c).length)) return 'not_released'
+  return 'no_info'
+}
+
+const CHILD_CAP = 2000
+/** Labelled epics with the release status of their children (one `parent in (...)` search per 40 epics). */
+async function epicRelease(epics: JiraIssue[]) {
+  const childrenOf = new Map<string, JiraIssue[]>()
+  let truncated = false
+  for (let n = 0; n < epics.length && !truncated; n += 40) {
+    const keys = epics.slice(n, n + 40).map((e) => e.key)
+    const r = await jira.search(`parent in (${keys.map(quote).join(', ')})`, ['resolutiondate', 'status', 'fixVersions', 'parent'], CHILD_CAP)
+    truncated = r.truncated
+    for (const c of r.issues) {
+      const k = String(c.fields.parent?.key ?? '')
+      if (k) childrenOf.set(k, [...(childrenOf.get(k) ?? []), c])
+    }
+  }
+  const summary: Record<ReleaseStatus, number> = { all_released: 0, partial: 0, not_released: 0, no_info: 0 }
+  const items = epics.map((e) => {
+    const kids = (childrenOf.get(e.key) ?? []).filter((c) => !isWontFix(c))
+    const release = epicReleaseStatus(kids)
+    summary[release]++
+    return {
+      key: e.key, summary: String(e.fields.summary ?? ''), status: String(e.fields.status?.name ?? ''), url: jira.browseUrl(e.key), release,
+      children: { total: kids.length, done: kids.filter(isResolved).length, released: kids.filter(hasReleased).length },
+    }
+  }).sort((x, y) => x.summary.localeCompare(y.summary))
+  return { items, summary, truncated }
+}
+
 export abstract class SuggestionsService {
   /** Owner only. Returns the plan period; 403 for anyone else (leaders and admins included). */
   private static async owned(id: string, user: User) {
@@ -159,27 +203,47 @@ export abstract class SuggestionsService {
 
   /**
    * Team delivery rate for a label over the plan's quarter (whole team, not only the owner's tickets).
-   * total = labelled tickets active in the quarter (created before its end, and unresolved or resolved on/after its start);
-   * done = those resolved inside the quarter. Reported by ticket count and by story points.
+   * Candidates = labelled issues created before the quarter ends that were resolved in or after it, or are still open
+   * and were touched since it started (old untouched backlog is not a commitment of this quarter).
+   * Epics and "Won't Fix" issues are set aside (reported as counts); the rest is `total`, and `done` = resolved inside the quarter.
+   * `released` = done issues carrying at least one released fixVersion; done issues with no fixVersion are reported separately.
+   * Each labelled epic gets a release status from its child issues.
    */
   static async deliveryRate(id: string, user: User, rawLabel: string) {
     const { plan, accountId, range } = await this.owned(id, user)
     const label = rawLabel.trim()
     if (!label) throw new BadRequestError('Label is required')
-    const jql = `labels = ${quote(label)} AND created < ${quote(range.to)} AND (resolution is EMPTY OR resolutiondate >= ${quote(range.from)})`
+    const jql = `labels = ${quote(label)} AND created < ${quote(range.to)} AND (resolutiondate >= ${quote(range.from)} OR (resolution is EMPTY AND updated >= ${quote(range.from)}))`
     const cap = 1000
-    const { issues, truncated } = await cached(`sg:${plan.id}:${accountId}:rate:${label}`, TTL, () => jira.search(jql, ['resolutiondate', SP], cap))
+    const fields = ['resolutiondate', SP, 'issuetype', 'status', 'fixVersions', 'summary']
+    const { issues: found, truncated, epics } = await cached(`sg:${plan.id}:${accountId}:rate2:${label}`, TTL, async () => {
+      const r = await jira.search(jql, fields, cap)
+      const epicIssues = r.issues.filter(isEpic)
+      return { ...r, epics: await epicRelease(epicIssues) }
+    })
+    const wontFix = found.filter((i) => !isEpic(i) && isWontFix(i))
+    const counted = found.filter((i) => !isEpic(i) && !isWontFix(i))
     const isDone = (i: JiraIssue) => {
       const d = dayOf(i.fields.resolutiondate)
       return d >= range.from && d < range.to
     }
-    const done = issues.filter(isDone)
+    const done = counted.filter(isDone)
+    const released = done.filter(hasReleased)
+    const noVersion = done.filter((i) => !versionsOf(i).length)
     const rate = (a: number, b: number) => (b === 0 ? null : Math.round((a / b) * 1000) / 10)
     const spSum = (list: JiraIssue[]) => list.reduce((s, i) => s + sp(i), 0)
     return {
       label, from: range.from, to: range.to, jql, url: jqlUrl(jql), truncated,
-      tickets: { done: done.length, total: issues.length, rate: rate(done.length, issues.length) },
-      storyPoints: { done: spSum(done), total: spSum(issues), rate: rate(spSum(done), spSum(issues)) },
+      excluded: { epics: found.filter(isEpic).length, wontFix: wontFix.length },
+      tickets: { done: done.length, total: counted.length, rate: rate(done.length, counted.length) },
+      storyPoints: { done: spSum(done), total: spSum(counted), rate: rate(spSum(done), spSum(counted)) },
+      released: {
+        tickets: { released: released.length, noVersion: noVersion.length, done: done.length, rate: rate(released.length, done.length) },
+        storyPoints: { released: spSum(released), noVersion: spSum(noVersion), done: spSum(done), rate: rate(spSum(released), spSum(done)) },
+      },
+      epics: epics.items,
+      epicSummary: epics.summary,
+      epicsTruncated: epics.truncated,
     }
   }
 }

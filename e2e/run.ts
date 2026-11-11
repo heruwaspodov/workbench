@@ -364,6 +364,10 @@ await step('plan suggestions: epics, Confluence, monthly delivery modal, Add toâ
   await text(page, 'By tickets:')
   const rateText = (await page.locator('[data-test="rate"]').innerText()).replace(/\s+/g, ' ')
   if (!rateText.includes('50% (1/2 tickets)')) throw new Error(`unexpected team rate: ${rateText}`)
+  for (const part of ['Not counted: 1 epic', '100% (1/1 tickets)', 'Mock label epic', 'No release info']) {
+    if (!rateText.includes(part)) throw new Error(`team rate card is missing "${part}": ${rateText}`)
+  }
+  await shot('02f-team-rate')
   for (const width of [1440, 1024, 768]) {
     await page.setViewportSize({ width, height: 900 })
     await page.waitForTimeout(250)

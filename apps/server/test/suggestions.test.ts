@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { like } from 'drizzle-orm'
 import { AppError, BadRequestError, ForbiddenError, NotConnectedError } from '../src/shared/errors'
-import { pageKind } from '../src/modules/pgp/suggestions.service'
+import { epicReleaseStatus, pageKind } from '../src/modules/pgp/suggestions.service'
 import { invalidate } from '../src/shared/cache'
 import { monthRange, quarterRange } from '../src/shared/period'
 import { setupTestDb } from './db'
@@ -21,12 +21,20 @@ const DELIVERY = [
   issue('T-3', { summary: 'Three', resolutiondate: '2026-07-31T23:30:00.000+0700', ...sp(2) }),
   issue('T-4', { summary: 'Four', resolutiondate: '2026-08-02T10:00:00.000+0700', ...sp(8) }),
 ]
+const ver = (name: string, released: boolean) => ({ fixVersions: [{ name, released }] })
+const st = (name: string, cat = 'done') => ({ status: { name, statusCategory: { key: cat } } })
 const RATE = [
-  issue('R-1', { resolutiondate: '2026-07-10T10:00:00.000+0700', ...sp(5) }),
-  issue('R-2', { resolutiondate: '2026-08-10T10:00:00.000+0700', ...sp(3) }),
-  issue('R-3', { resolutiondate: null, ...sp(2) }),
-  issue('R-4', { resolutiondate: '2026-10-05T10:00:00.000+0700', ...sp(1) }),
+  issue('R-1', { resolutiondate: '2026-07-10T10:00:00.000+0700', issuetype: { name: 'Task' }, ...st('Done'), ...sp(5), ...ver('[BE] Release v1', true) }),
+  issue('R-2', { resolutiondate: '2026-08-10T10:00:00.000+0700', issuetype: { name: 'Task' }, ...st('Done'), ...sp(3) }),
+  issue('R-3', { resolutiondate: null, issuetype: { name: 'Task' }, ...st('To Do', 'new'), ...sp(2) }),
+  issue('R-4', { resolutiondate: '2026-10-05T10:00:00.000+0700', issuetype: { name: 'Task' }, ...st('Done'), ...sp(1) }),
+  issue('R-5', { resolutiondate: null, issuetype: { name: 'Epic' }, summary: 'Epic with children', ...st('In Progress', 'indeterminate') }),
+  issue('R-6', { resolutiondate: '2026-08-12T10:00:00.000+0700', issuetype: { name: 'Task' }, ...st("Won't Fix"), ...sp(4) }),
+  issue('R-7', { resolutiondate: '2026-09-02T10:00:00.000+0700', issuetype: { name: 'Task' }, ...st('Done'), ...sp(2), ...ver('[BE] Release v2', false) }),
+  issue('R-8', { resolutiondate: null, issuetype: { name: 'Epic' }, summary: 'Epic without children', ...st('To Do', 'new') }),
 ]
+const kid = (key: string, parent: string, resolved: boolean, v?: ReturnType<typeof ver>, status = resolved ? 'Done' : 'To Do') =>
+  issue(key, { parent: { key: parent }, resolutiondate: resolved ? '2026-08-01T10:00:00.000+0700' : null, ...st(status, resolved ? 'done' : 'new'), ...(v ?? {}) })
 const epic = (key: string, summary: string, cat = 'indeterminate') => issue(key, { summary, status: { name: 'In Progress', statusCategory: { key: cat } }, resolutiondate: null })
 
 describe('SuggestionsService', () => {
@@ -58,6 +66,7 @@ describe('SuggestionsService', () => {
       ]
     }
     if (jql.includes('issuetype = Bug')) return [issue('B-1', { priority: { name: 'Medium - P2' } }), issue('B-2', { priority: { name: 'Medium - P2' } }), issue('B-3', { priority: { name: 'High - P1' } }), issue('B-4', { priority: { name: 'Lowest' } })]
+    if (jql.startsWith('parent in (')) return jql.includes('"R-5"') ? [kid('K-1', 'R-5', true, ver('[BE] Release v1', true)), kid('K-2', 'R-5', false), kid('K-3', 'R-5', false, undefined, "Won't Fix")] : []
     if (jql.includes('labels =')) return RATE
     const [from, to] = [...jql.matchAll(/resolutiondate (?:>=|<) "([^"]+)"/g)].map((m) => m[1]!)
     return DELIVERY.filter((i) => String(i.fields.resolutiondate).slice(0, 10) >= from! && String(i.fields.resolutiondate).slice(0, 10) < to!)
@@ -183,14 +192,42 @@ describe('SuggestionsService', () => {
     await expect(Svc.deliveryMonth(planQ3, owner, '2026-10')).rejects.toBeInstanceOf(BadRequestError)
   })
 
-  test('team delivery rate by label: done over total, by tickets and by story points', async () => {
+  test('team delivery rate: epics and Won\'t Fix are set aside, untouched backlog is not a commitment', async () => {
     const res = await Svc.deliveryRate(planQ3, owner, ' team-x ')
-    expect(res).toMatchObject({ label: 'team-x', from: '2026-07-01', to: '2026-10-01', truncated: false })
-    expect(res.tickets).toEqual({ done: 2, total: 4, rate: 50 })
-    expect(res.storyPoints).toEqual({ done: 8, total: 11, rate: 72.7 })
-    expect(res.jql).toBe('labels = "team-x" AND created < "2026-10-01" AND (resolution is EMPTY OR resolutiondate >= "2026-07-01")')
+    expect(res).toMatchObject({ label: 'team-x', from: '2026-07-01', to: '2026-10-01', truncated: false, excluded: { epics: 2, wontFix: 1 } })
+    expect(res.tickets).toEqual({ done: 3, total: 5, rate: 60 })
+    expect(res.storyPoints).toEqual({ done: 10, total: 13, rate: 76.9 })
+    expect(res.jql).toBe('labels = "team-x" AND created < "2026-10-01" AND (resolutiondate >= "2026-07-01" OR (resolution is EMPTY AND updated >= "2026-07-01"))')
     expect(res.jql).not.toContain(ACCOUNT) // whole team, not only the owner
     await expect(Svc.deliveryRate(planQ3, owner, '   ')).rejects.toBeInstanceOf(BadRequestError)
+  })
+
+  test('team delivery rate: released share of done, done without a fixVersion reported apart', async () => {
+    const res = await Svc.deliveryRate(planQ3, owner, 'team-x')
+    expect(res.released.tickets).toEqual({ released: 1, noVersion: 1, done: 3, rate: 33.3 })
+    expect(res.released.storyPoints).toEqual({ released: 5, noVersion: 3, done: 10, rate: 50 })
+  })
+
+  test('team delivery rate: release status per labelled epic from its children', async () => {
+    const res = await Svc.deliveryRate(planQ3, owner, 'team-x')
+    expect(res.epics.map((e) => [e.key, e.release, e.children])).toEqual([
+      ['R-5', 'partial', { total: 2, done: 1, released: 1 }],
+      ['R-8', 'no_info', { total: 0, done: 0, released: 0 }],
+    ])
+    expect(res.epicSummary).toEqual({ all_released: 0, partial: 1, not_released: 0, no_info: 1 })
+    expect(res.epics[0]!.url).toBe(`http://localhost:${server.port}/browse/R-5`)
+    expect(res.epicsTruncated).toBe(false)
+  })
+
+  test('epic release status rules', () => {
+    const k = (resolved: boolean, v?: boolean) => issue('x', { resolutiondate: resolved ? '2026-08-01' : null, ...st(resolved ? 'Done' : 'To Do'), ...(v === undefined ? {} : ver('v', v)) })
+    expect(epicReleaseStatus([])).toBe('no_info')
+    expect(epicReleaseStatus([k(true, true), k(true, true)])).toBe('all_released')
+    expect(epicReleaseStatus([k(true, true), k(false)])).toBe('partial') // an open child blocks "all"
+    expect(epicReleaseStatus([k(true, true), k(true)])).toBe('partial') // done without fixVersion is not released
+    expect(epicReleaseStatus([k(true, false), k(true)])).toBe('not_released')
+    expect(epicReleaseStatus([k(true), k(false)])).toBe('no_info')
+    expect(epicReleaseStatus([k(true, true), issue('w', { resolutiondate: '2026-08-01', ...st("Won't Fix") })])).toBe('all_released')
   })
 
   test('only the plan owner may read suggestions', async () => {

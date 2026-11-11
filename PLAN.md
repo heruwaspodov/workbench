@@ -35,7 +35,7 @@ Status: `TODO` · `IN PROGRESS` · `DONE` · `BLOCKED`
 | 8. Hardening & integrasi nyata | OD-36 … OD-42 | TODO |
 | 9. Rilis MVP internal | OD-43 … OD-44 | TODO |
 | 10. Confluence (read-only) | OD-54 | IN PROGRESS |
-| 11. Create PGP per tahun+kuartal & evidence otomatis | OD-71 … OD-73 (create), OD-68 … OD-70 (saran), OD-74 (accordion), OD-75 … OD-79 (perbaikan: parser, hapus, evidence, keamanan, tombol upload) | semua DONE |
+| 11. Create PGP per tahun+kuartal & evidence otomatis | OD-71 … OD-73 (create), OD-68 … OD-70 (saran), OD-74 (accordion), OD-75 … OD-80 (perbaikan: parser, hapus, evidence, keamanan, tombol upload, delivery rate) | semua DONE |
 
 **Urutan kerja berikutnya (disarankan):** OD-32 → OD-33 → OD-34 → OD-35 → OD-31 → OD-45 … OD-50 → OD-36 → sisanya.
 
@@ -526,7 +526,7 @@ Cache 5 menit per (user, plan, query); `NOT_CONNECTED` bila Jira belum terhubung
 **Depends:** OD-72, OD-73.
 **Log:** 2026-11-11 — `XlsxImport.vue`: input file asli disembunyikan (tetap `data-test="xlsx-file"`), diganti `MpButton` "Choose file" (`data-test="xlsx-choose"`) + teks nama file / "No file chosen". e2e: cek tombol terlihat + nama file muncul + screenshot `04a-upload-choose-button`. `typecheck`, `build`, `e2e` 18/18 hijau; screenshot dicek.
 
-### OD-80 · Team delivery rate lebih akurat: penyebut bersih, angka Released, status release per epic · `TODO`
+### OD-80 · Team delivery rate lebih akurat: penyebut bersih, angka Released, status release per epic · `DONE`
 **Description:** Kartu "Team delivery rate" (`suggestions.service.ts#deliveryRate`) kurang mendekati aktual. Cek Jira nyata (label `Escape`, 2026-Q3, baca saja): dari 924 tiket, 87 adalah Epic, 259 belum resolved (227 `To Do`, kemungkinan backlog lama), 77 resolved setelah kuartal, 26 berstatus `Won't Fix` yang ikut terhitung done, dan 514 tidak punya `fixVersion`. Perubahan:
 1. **Penyebut bersih:** keluarkan issuetype Epic dan status `Won't Fix` dari total dan done; hanya hitung tiket yang aktif di kuartal (resolved di dalamnya, atau belum resolved tetapi `updated` di dalam kuartal), bukan seluruh backlog. Aturan dan angka yang dikeluarkan ditampilkan di kartu agar transparan.
 2. **Angka Released:** dari tiket done, hitung yang `fixVersion`-nya minimal satu berstatus `released`; tampilkan juga jumlah done tanpa `fixVersion` secara terpisah (tidak diasumsikan sudah rilis). Per tiket dan per SP.
@@ -534,6 +534,7 @@ Cache 5 menit per (user, plan, query); `NOT_CONNECTED` bila Jira belum terhubung
 **ASSUMPTION (belum dikonfirmasi):** query final (JQL / aturan "aktif di kuartal") masih dicari user; implementasi memakai aturan di atas dan mudah diganti. Tim mengisi `fixVersion` secara konsisten hanya untuk sebagian tiket, sehingga "No release info" dipertahankan sebagai kategori sendiri.
 **Acceptance:** Test (Jira palsu): Epic dan `Won't Fix` tidak masuk hitungan; tiket backlog lama tak tersentuh keluar dari penyebut; done dengan `fixVersion` released dihitung Released, tanpa `fixVersion` dihitung terpisah; epic berstatus All/Partial/Not/No info sesuai anaknya; paginasi tetap jalan. `typecheck`, `test`, `build`, `e2e` hijau; angka label `Escape` 2026-Q3 pada Jira nyata dibandingkan dengan angka lama dan dicatat di Log.
 **Depends:** OD-68, OD-69.
+**Log:** 2026-11-11 — `deliveryRate`: kandidat = berlabel, dibuat sebelum kuartal berakhir, resolved di/ sesudah kuartal atau masih terbuka dan `updated` sejak awal kuartal; Epic dan status `Won't Fix` dikeluarkan (dilaporkan sebagai jumlah di kartu). Tambah `released` (done dengan `fixVersion` released, per tiket dan SP; done tanpa `fixVersion` dilaporkan terpisah) dan `epics` + `epicSummary` (status release per epic dari anak: `parent in (...)` per 40 epic; `epicReleaseStatus` diekspor). UI kartu menampilkan semuanya. Test baru di `suggestions.test.ts` (penyebut, released, status epic, aturan status); mock e2e diperluas. `typecheck`, 134 test, `build`, `e2e` 18/18 hijau. Jira nyata (label `Escape`, 2026-Q3): lama 63,6% (588/924) → baru 84,6% (555/656; 19 epic dan 26 Won't Fix dikeluarkan); Released 62,5% (347/555 tiket), 208 done tanpa `fixVersion`; epic: 16 Partial, 3 No release info, 0 All released.
 
 ## Fase 10 — Confluence (read-only)
 

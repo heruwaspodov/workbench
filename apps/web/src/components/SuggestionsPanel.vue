@@ -68,6 +68,11 @@ async function applyLabel() {
 }
 onMounted(() => { if (label.value.trim()) rate.run(label.value.trim()) })
 const rateText = (r: { done: number; total: number; rate: number | null }, unit: string) => (r.rate == null ? `No ${unit}` : `${r.rate}% (${r.done}/${r.total} ${unit})`)
+const releasedText = (r: { released: number; done: number; rate: number | null }, unit: string) => (r.rate == null ? `No done ${unit}` : `${r.rate}% (${r.released}/${r.done} ${unit})`)
+type Release = 'all_released' | 'partial' | 'not_released' | 'no_info'
+const releaseOrder: Release[] = ['all_released', 'partial', 'not_released', 'no_info']
+const releaseLabel: Record<Release, string> = { all_released: 'All released', partial: 'Partial', not_released: 'Not released', no_info: 'No release info' }
+const releaseColor: Record<Release, 'green' | 'blue' | 'orange' | 'gray'> = { all_released: 'green', partial: 'blue', not_released: 'orange', no_info: 'gray' }
 const rateValue = computed(() => {
   const r = rate.data.value
   return r && r.tickets.rate != null ? `${r.label}: ${r.tickets.rate}% tickets (${r.tickets.done}/${r.tickets.total}), ${r.storyPoints.rate ?? 0}% SP` : ''
@@ -193,7 +198,31 @@ const problem = css({ color: 'text.danger' })
           <div :class="css({ display: 'flex', flexDirection: 'column', gap: '1' })">
             <MpText size="label">By tickets: <b>{{ rateText(rate.data.value.tickets, 'tickets') }}</b></MpText>
             <MpText size="label">By story points: <b>{{ rateText(rate.data.value.storyPoints, 'SP') }}</b></MpText>
+            <MpText size="label-small" color="text.secondary" data-test="rate-excluded">
+              Not counted: {{ plural(rate.data.value.excluded.epics, 'epic') }}, {{ rate.data.value.excluded.wontFix }} Won't Fix. Open tickets not touched this quarter are left out.
+            </MpText>
             <MpText v-if="rate.data.value.truncated" size="label-small" color="text.secondary">Only the first 1000 tickets were counted.</MpText>
+          </div>
+          <div :class="css({ display: 'flex', flexDirection: 'column', gap: '1' })" data-test="rate-released">
+            <MpText size="label">Released (of done): <b>{{ releasedText(rate.data.value.released.tickets, 'tickets') }}</b></MpText>
+            <MpText size="label">Released by story points: <b>{{ releasedText(rate.data.value.released.storyPoints, 'SP') }}</b></MpText>
+            <MpText size="label-small" color="text.secondary">
+              Released = fix version marked released in Jira. {{ plural(rate.data.value.released.tickets.noVersion, 'done ticket') }} without a fix version, not assumed released.
+            </MpText>
+          </div>
+          <div v-if="rate.data.value.epics.length" :class="css({ display: 'flex', flexDirection: 'column' })" data-test="rate-epics">
+            <MpText size="label" weight="semiBold">Epics with this label</MpText>
+            <div :class="meta">
+              <MpBadge v-for="r in releaseOrder" :key="r" size="sm" variant="subtle" :variant-color="releaseColor[r]">{{ rate.data.value.epicSummary[r] }} {{ releaseLabel[r] }}</MpBadge>
+            </div>
+            <div v-for="e in rate.data.value.epics" :key="e.key" :class="row">
+              <div :class="grow">
+                <a :href="e.url" target="_blank" rel="noopener noreferrer" :title="e.summary" :class="trunc">{{ e.summary }}</a>
+                <MpText size="label-small" color="text.secondary">{{ e.key }} · {{ e.children.done }}/{{ e.children.total }} done · {{ e.children.released }} released</MpText>
+              </div>
+              <MpBadge size="sm" variant="subtle" :variant-color="releaseColor[e.release]">{{ releaseLabel[e.release] }}</MpBadge>
+            </div>
+            <MpText v-if="rate.data.value.epicsTruncated" size="label-small" color="text.secondary">Some epic children were not loaded, so statuses may be incomplete.</MpText>
           </div>
           <div :class="meta">
             <a :href="rate.data.value.url" target="_blank" rel="noopener noreferrer"><MpButton size="sm" variant="ghost" right-icon="newtab">Open in Jira</MpButton></a>
