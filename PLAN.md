@@ -35,7 +35,7 @@ Status: `TODO` · `IN PROGRESS` · `DONE` · `BLOCKED`
 | 8. Hardening & integrasi nyata | OD-36 … OD-42 | TODO |
 | 9. Rilis MVP internal | OD-43 … OD-44 | TODO |
 | 10. Confluence (read-only) | OD-54 | IN PROGRESS |
-| 11. Create PGP per tahun+kuartal & evidence otomatis | OD-71 … OD-73 (create), OD-68 … OD-70 (saran) | OD-71 … OD-73 dan OD-68 DONE, OD-69 … OD-70 TODO |
+| 11. Create PGP per tahun+kuartal & evidence otomatis | OD-71 … OD-73 (create), OD-68 … OD-70 (saran) | OD-71 … OD-73 dan OD-68 DONE, OD-69 … OD-70 dan OD-74 TODO |
 
 **Urutan kerja berikutnya (disarankan):** OD-32 → OD-33 → OD-34 → OD-35 → OD-31 → OD-45 … OD-50 → OD-36 → sisanya.
 
@@ -484,6 +484,12 @@ Cache 5 menit per (user, plan, query); `NOT_CONNECTED` bila Jira belum terhubung
 **Description:** Banyak Current Value di sheet adalah angka hasil hitung Jira: rata-rata story point per sprint ("AVG 44"), jumlah bug per prioritas ("P2: 7"), jumlah tiket resolved/bulan, lead time median ("3d 7h"), jumlah RCA. Riset kecil + implementasi metrik yang bisa dihitung dengan JQL yang pasti (SP & tiket per bulan dan delivery rate sudah ada di OD-68; tambahkan jumlah bug per prioritas bila label/field-nya jelas, rata-rata SP per sprint) dan tampilkan sebagai **Use as current value** di panel OD-69. Metrik yang bergantung pada definisi internal (carry-over, DORA, SLA) hanya didokumentasikan, tidak ditebak.
 **Acceptance:** Daftar metrik yang didukung beserta JQL/rumusnya tercatat; tiap metrik diverifikasi terhadap angka di sheet Q3 user (selisih dicatat); yang tidak bisa dihitung pasti ditandai sebagai keputusan; test dan e2e hijau.
 **Depends:** OD-69.
+
+### OD-74 · Item PGP dikelompokkan per objective dalam accordion · `TODO`
+**Description:** Di `ItemsEditor` (dipakai `/pgp/new`, editor plan, dan editor template) item dikelompokkan **per objective**: tiap objective jadi satu panel accordion, di dalamnya key result (KR) sebagai sub-kelompok dengan initiative-nya seperti sekarang. Header panel (satu baris, bisa diklik, tombol dengan `aria-expanded`) menampilkan chevron, nama objective, jumlah KR dan initiative, Weight total, dan Score (mode plan); header menyatukan objective yang sama walau barisnya tidak berurutan hanya bila urutan data memang berurutan (urutan baris tidak diubah diam-diam). Tombol **Expand all / Collapse all**. Default: semua terbuka bila ≤ 3 objective, selain itu hanya yang pertama terbuka; objective yang berisi input tidak valid (achievement > weight, objective kosong) otomatis terbuka. Keadaan buka/tutup hanya di memori halaman (tidak disimpan ke server). Aksi yang sudah ada (edit objective/KR, Add initiative, Add objective, pindah, hapus, total weight) tetap berfungsi; Add objective membuka panel barunya dan memberi fokus ke inputnya. Perilaku mobile: tidak ada scroll horizontal.
+**ASSUMPTION (belum dikonfirmasi):** "per objective" berarti accordion tingkat objective dengan KR di dalamnya (bukan accordion per pasangan objective+KR seperti kartu sekarang).
+**Acceptance:** Daftar item di `/pgp/new` (hasil upload), `/pgp/plans/:id` (draft dan submitted/readonly), dan editor template tampil sebagai accordion per objective dengan header ringkasan yang benar (jumlah, weight, score); expand/collapse tunggal dan semua berfungsi lewat mouse dan keyboard (Enter/Space); objective tidak valid terbuka otomatis; mengedit, menambah, memindah, dan menghapus tetap menyimpan data yang sama (tidak ada perubahan payload API); tanpa scroll horizontal di 1440/1024/768; e2e mencakup collapse/expand dan menambah objective; typecheck, build, test, e2e hijau.
+**Depends:** OD-72.
 
 ## Fase 10 — Confluence (read-only)
 
