@@ -72,10 +72,10 @@ async function applyLabel() {
 onMounted(() => { if (label.value.trim()) rate.run(label.value.trim()) })
 const rateText = (r: { done: number; total: number; rate: number | null }, unit: string) => (r.rate == null ? `No ${unit}` : `${r.rate}% (${r.done}/${r.total} ${unit})`)
 const releasedText = (r: { released: number; done: number; rate: number | null }, unit: string) => (r.rate == null ? `No done ${unit}` : `${r.rate}% (${r.released}/${r.done} ${unit})`)
-type Release = 'all_released' | 'partial' | 'not_released' | 'no_info'
-const releaseOrder: Release[] = ['all_released', 'partial', 'not_released', 'no_info']
-const releaseLabel: Record<Release, string> = { all_released: 'All released', partial: 'Partial', not_released: 'Not released', no_info: 'No release info' }
-const releaseColor: Record<Release, 'green' | 'blue' | 'orange' | 'gray'> = { all_released: 'green', partial: 'blue', not_released: 'orange', no_info: 'gray' }
+type Delivery = 'delivered' | 'children_done' | 'in_progress' | 'no_children'
+const deliveryOrder: Delivery[] = ['delivered', 'children_done', 'in_progress', 'no_children']
+const deliveryLabel: Record<Delivery, string> = { delivered: 'Delivered', children_done: 'All children done', in_progress: 'In progress', no_children: 'No children' }
+const deliveryColor: Record<Delivery, 'green' | 'blue' | 'orange' | 'gray'> = { delivered: 'green', children_done: 'orange', in_progress: 'blue', no_children: 'gray' }
 const rateValue = computed(() => {
   const r = rate.data.value
   return r && r.tickets.rate != null ? `${r.label}: ${r.tickets.rate}% tickets (${r.tickets.done}/${r.tickets.total}), ${r.storyPoints.rate ?? 0}% SP` : ''
@@ -230,21 +230,24 @@ const problem = css({ color: 'text.danger' })
           <details :class="explain" data-test="rate-excluded">
             <summary>How is this counted?</summary>
             <p>Not counted: {{ plural(rate.data.value.excluded.epics, 'epic') }} and {{ rate.data.value.excluded.wontFix }} Won't Fix. Open tickets not touched this quarter are left out.</p>
-            <p>Released = a fix version marked released in Jira. {{ plural(rate.data.value.released.tickets.noVersion, 'done ticket') }} without a fix version, not assumed released.</p>
+            <p>Released = a fix version marked released in Jira, so it depends on the team filling it in. {{ plural(rate.data.value.released.tickets.noVersion, 'done ticket') }} without a fix version, not assumed released.</p>
+            <p>Epics follow their own Jira status: Delivered = the epic is Done. "All children done" = still open but nothing left to do (probably not closed yet). An epic is listed when it was created or resolved this quarter, carries the quarter in its name (like 26Q4), or a quarter of its work finished in it{{ rate.data.value.excluded.epicsOutOfQuarter ? `; ${plural(rate.data.value.excluded.epicsOutOfQuarter, 'older epic')} left out` : '' }}.</p>
+            <p>Toggle names come from Jira. Whether a toggle is switched on is not recorded in Jira, so it is not shown.</p>
             <p v-if="rate.data.value.truncated">Only the first 1000 tickets were counted.</p>
           </details>
           <div v-if="rate.data.value.epics.length" :class="css({ display: 'flex', flexDirection: 'column', gap: '2' })" data-test="rate-epics">
-            <MpText size="label" weight="semiBold">Epics with this label</MpText>
+            <MpText size="label" weight="semiBold">Epics delivered: {{ rate.data.value.epicsDelivered.delivered }}/{{ rate.data.value.epicsDelivered.total }}</MpText>
             <div :class="meta">
-              <MpBadge v-for="r in releaseOrder" :key="r" size="sm" variant="subtle" :variant-color="releaseColor[r]">{{ rate.data.value.epicSummary[r] }} {{ releaseLabel[r] }}</MpBadge>
+              <MpBadge v-for="r in deliveryOrder" :key="r" size="sm" variant="subtle" :variant-color="deliveryColor[r]">{{ rate.data.value.epicSummary[r] }} {{ deliveryLabel[r] }}</MpBadge>
             </div>
             <div :class="allRateEpics ? scroll : undefined">
               <div v-for="e in rateEpicList" :key="e.key" :class="row">
                 <div :class="grow">
                   <a :href="e.url" target="_blank" rel="noopener noreferrer" :title="e.summary" :class="trunc">{{ e.summary }}</a>
-                  <MpText size="label-small" color="text.secondary">{{ e.key }} · {{ e.children.done }}/{{ e.children.total }} done · {{ e.children.released }} released</MpText>
+                  <MpText size="label-small" color="text.secondary">{{ e.key }} · {{ e.children.done }}/{{ e.children.total }} done · {{ e.children.released }} released<template v-if="e.deliveredOn"> · delivered {{ formatDate(e.deliveredOn) }}</template></MpText>
+                  <MpText v-if="e.toggles.length" size="label-small" color="text.secondary" :title="e.toggles.join(', ')" :class="css({ truncate: true })">Toggle: {{ e.toggles.join(', ') }}</MpText>
                 </div>
-                <MpBadge size="sm" variant="subtle" :variant-color="releaseColor[e.release]">{{ releaseLabel[e.release] }}</MpBadge>
+                <MpBadge size="sm" variant="subtle" :variant-color="deliveryColor[e.delivery]">{{ deliveryLabel[e.delivery] }}</MpBadge>
               </div>
             </div>
             <MpButton v-if="rate.data.value.epics.length > LIMIT" size="sm" variant="textLink" :class="css({ alignSelf: 'flex-start' })" @click="allRateEpics = !allRateEpics">{{ allRateEpics ? 'Show fewer' : `Show all ${rate.data.value.epics.length}` }}</MpButton>

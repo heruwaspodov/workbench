@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { like } from 'drizzle-orm'
 import { AppError, BadRequestError, ForbiddenError, NotConnectedError } from '../src/shared/errors'
-import { epicReleaseStatus, pageKind } from '../src/modules/pgp/suggestions.service'
+import { epicDelivery, epicInQuarter, pageKind } from '../src/modules/pgp/suggestions.service'
 import { invalidate } from '../src/shared/cache'
 import { monthRange, quarterRange } from '../src/shared/period'
 import { setupTestDb } from './db'
@@ -28,13 +28,23 @@ const RATE = [
   issue('R-2', { resolutiondate: '2026-08-10T10:00:00.000+0700', issuetype: { name: 'Task' }, ...st('Done'), ...sp(3) }),
   issue('R-3', { resolutiondate: null, issuetype: { name: 'Task' }, ...st('To Do', 'new'), ...sp(2) }),
   issue('R-4', { resolutiondate: '2026-10-05T10:00:00.000+0700', issuetype: { name: 'Task' }, ...st('Done'), ...sp(1) }),
-  issue('R-5', { resolutiondate: null, issuetype: { name: 'Epic' }, summary: 'Epic with children', ...st('In Progress', 'indeterminate') }),
+  issue('R-5', { resolutiondate: null, issuetype: { name: 'Epic' }, summary: 'Epic with children', created: '2026-05-01T10:00:00.000+0700', ...st('In Progress', 'indeterminate') }),
   issue('R-6', { resolutiondate: '2026-08-12T10:00:00.000+0700', issuetype: { name: 'Task' }, ...st("Won't Fix"), ...sp(4) }),
   issue('R-7', { resolutiondate: '2026-09-02T10:00:00.000+0700', issuetype: { name: 'Task' }, ...st('Done'), ...sp(2), ...ver('[BE] Release v2', false) }),
-  issue('R-8', { resolutiondate: null, issuetype: { name: 'Epic' }, summary: 'Epic without children', ...st('To Do', 'new') }),
+  issue('R-8', { resolutiondate: null, issuetype: { name: 'Epic' }, summary: '26Q3 Epic without children', created: '2026-01-01T10:00:00.000+0700', ...st('To Do', 'new') }),
+  issue('R-9', { resolutiondate: '2026-08-20T10:00:00.000+0700', issuetype: { name: 'Epic' }, summary: '26Q3 Delivered epic', created: '2026-01-01T10:00:00.000+0700', ...st('Done'), [process.env.JIRA_DELIVERY_DATE_FIELD || 'customfield_11781']: '2026-08-20' }),
+  issue('R-10', { resolutiondate: null, issuetype: { name: 'Epic' }, summary: '26Q3 Closing epic', created: '2026-01-01T10:00:00.000+0700', ...st('In Progress', 'indeterminate') }),
+  issue('R-11', { resolutiondate: null, issuetype: { name: 'Epic' }, summary: '23Q3 Old bucket epic', created: '2023-07-01T10:00:00.000+0700', ...st('To Do', 'new') }),
 ]
-const kid = (key: string, parent: string, resolved: boolean, v?: ReturnType<typeof ver>, status = resolved ? 'Done' : 'To Do') =>
-  issue(key, { parent: { key: parent }, resolutiondate: resolved ? '2026-08-01T10:00:00.000+0700' : null, ...st(status, resolved ? 'done' : 'new'), ...(v ?? {}) })
+const TOGGLE = process.env.JIRA_TOGGLE_FIELD || 'customfield_11708'
+const kid = (key: string, parent: string, resolved: boolean | string, v?: ReturnType<typeof ver>, status = resolved ? 'Done' : 'To Do', toggles?: string[]) =>
+  issue(key, { parent: { key: parent }, resolutiondate: resolved ? (typeof resolved === 'string' ? resolved : '2026-08-01T10:00:00.000+0700') : null, ...st(status, resolved ? 'done' : 'new'), ...(v ?? {}), ...(toggles ? { [TOGGLE]: toggles } : {}) })
+const CHILDREN: Record<string, ReturnType<typeof kid>[]> = {
+  'R-5': [kid('K-1', 'R-5', true, ver('[BE] Release v1', true), undefined, ['ft_b', 'ft_a']), kid('K-2', 'R-5', false), kid('K-3', 'R-5', false, undefined, "Won't Fix")],
+  'R-9': [kid('K-4', 'R-9', true)],
+  'R-10': [kid('K-5', 'R-10', true), kid('K-6', 'R-10', true, undefined, undefined, ['ft_a'])],
+  'R-11': [kid('K-7', 'R-11', true), ...Array.from({ length: 7 }, (_, n) => kid(`K-${8 + n}`, 'R-11', '2023-11-01T10:00:00.000+0700'))],
+}
 const epic = (key: string, summary: string, cat = 'indeterminate') => issue(key, { summary, status: { name: 'In Progress', statusCategory: { key: cat } }, resolutiondate: null })
 
 describe('SuggestionsService', () => {
@@ -66,7 +76,7 @@ describe('SuggestionsService', () => {
       ]
     }
     if (jql.includes('issuetype = Bug')) return [issue('B-1', { priority: { name: 'Medium - P2' } }), issue('B-2', { priority: { name: 'Medium - P2' } }), issue('B-3', { priority: { name: 'High - P1' } }), issue('B-4', { priority: { name: 'Lowest' } })]
-    if (jql.startsWith('parent in (')) return jql.includes('"R-5"') ? [kid('K-1', 'R-5', true, ver('[BE] Release v1', true)), kid('K-2', 'R-5', false), kid('K-3', 'R-5', false, undefined, "Won't Fix")] : []
+    if (jql.startsWith('parent in (')) return Object.entries(CHILDREN).filter(([k]) => jql.includes(`"${k}"`)).flatMap(([, v]) => v)
     if (jql.includes('labels =')) return RATE
     const [from, to] = [...jql.matchAll(/resolutiondate (?:>=|<) "([^"]+)"/g)].map((m) => m[1]!)
     return DELIVERY.filter((i) => String(i.fields.resolutiondate).slice(0, 10) >= from! && String(i.fields.resolutiondate).slice(0, 10) < to!)
@@ -194,7 +204,7 @@ describe('SuggestionsService', () => {
 
   test('team delivery rate: epics and Won\'t Fix are set aside, untouched backlog is not a commitment', async () => {
     const res = await Svc.deliveryRate(planQ3, owner, ' team-x ')
-    expect(res).toMatchObject({ label: 'team-x', from: '2026-07-01', to: '2026-10-01', truncated: false, excluded: { epics: 2, wontFix: 1 } })
+    expect(res).toMatchObject({ label: 'team-x', from: '2026-07-01', to: '2026-10-01', truncated: false, excluded: { epics: 5, wontFix: 1, epicsOutOfQuarter: 1 } })
     expect(res.tickets).toEqual({ done: 3, total: 5, rate: 60 })
     expect(res.storyPoints).toEqual({ done: 10, total: 13, rate: 76.9 })
     expect(res.jql).toBe('labels = "team-x" AND created < "2026-10-01" AND (resolutiondate >= "2026-07-01" OR (resolution is EMPTY AND updated >= "2026-07-01"))')
@@ -208,26 +218,45 @@ describe('SuggestionsService', () => {
     expect(res.released.storyPoints).toEqual({ released: 5, noVersion: 3, done: 10, rate: 50 })
   })
 
-  test('team delivery rate: release status per labelled epic from its children', async () => {
+  test('team delivery rate: delivery status per labelled epic follows the epic status, quarter-bound', async () => {
     const res = await Svc.deliveryRate(planQ3, owner, 'team-x')
-    expect(res.epics.map((e) => [e.key, e.release, e.children])).toEqual([
-      ['R-5', 'partial', { total: 2, done: 1, released: 1 }],
-      ['R-8', 'no_info', { total: 0, done: 0, released: 0 }],
+    expect(res.epics.map((e) => [e.key, e.delivery, e.children])).toEqual([
+      ['R-10', 'children_done', { total: 2, done: 2, released: 0 }],
+      ['R-9', 'delivered', { total: 1, done: 1, released: 0 }],
+      ['R-8', 'no_children', { total: 0, done: 0, released: 0 }],
+      ['R-5', 'in_progress', { total: 2, done: 1, released: 1 }],
     ])
-    expect(res.epicSummary).toEqual({ all_released: 0, partial: 1, not_released: 0, no_info: 1 })
-    expect(res.epics[0]!.url).toBe(`http://localhost:${server.port}/browse/R-5`)
+    expect(res.epicSummary).toEqual({ delivered: 1, children_done: 1, in_progress: 1, no_children: 1 })
+    expect(res.epicsDelivered).toEqual({ delivered: 1, total: 4 })
+    expect(res.epics.find((e) => e.key === 'R-9')!.deliveredOn).toBe('2026-08-20')
+    expect(res.epics.find((e) => e.key === 'R-5')!.deliveredOn).toBeNull()
+    expect(res.epics.find((e) => e.key === 'R-5')!.toggles).toEqual(['ft_a', 'ft_b'])
+    expect(res.epics.find((e) => e.key === 'R-10')!.toggles).toEqual(['ft_a'])
+    expect(res.epics.map((e) => e.key)).not.toContain('R-11') // old epic with one stray ticket this quarter
+    expect(res.epics[0]!.url).toBe(`http://localhost:${server.port}/browse/R-10`)
     expect(res.epicsTruncated).toBe(false)
   })
 
-  test('epic release status rules', () => {
-    const k = (resolved: boolean, v?: boolean) => issue('x', { resolutiondate: resolved ? '2026-08-01' : null, ...st(resolved ? 'Done' : 'To Do'), ...(v === undefined ? {} : ver('v', v)) })
-    expect(epicReleaseStatus([])).toBe('no_info')
-    expect(epicReleaseStatus([k(true, true), k(true, true)])).toBe('all_released')
-    expect(epicReleaseStatus([k(true, true), k(false)])).toBe('partial') // an open child blocks "all"
-    expect(epicReleaseStatus([k(true, true), k(true)])).toBe('partial') // done without fixVersion is not released
-    expect(epicReleaseStatus([k(true, false), k(true)])).toBe('not_released')
-    expect(epicReleaseStatus([k(true), k(false)])).toBe('no_info')
-    expect(epicReleaseStatus([k(true, true), issue('w', { resolutiondate: '2026-08-01', ...st("Won't Fix") })])).toBe('all_released')
+  test('epic delivery status rules', () => {
+    const epic = (cat: string) => issue('E', { summary: 'x', ...st(cat === 'done' ? 'Done' : 'In Progress', cat) })
+    const k = (resolved: boolean) => issue('x', { resolutiondate: resolved ? '2026-08-01' : null, ...st(resolved ? 'Done' : 'To Do') })
+    expect(epicDelivery(epic('done'), [k(false)])).toBe('delivered') // the epic status is trusted
+    expect(epicDelivery(epic('indeterminate'), [])).toBe('no_children')
+    expect(epicDelivery(epic('indeterminate'), [k(true), k(true)])).toBe('children_done')
+    expect(epicDelivery(epic('indeterminate'), [k(true), k(false)])).toBe('in_progress')
+    expect(epicDelivery(epic('indeterminate'), [k(true), issue('w', { resolutiondate: null, ...st("Won't Fix") })])).toBe('children_done')
+  })
+
+  test('epic quarter rules: resolved, created, tagged, or a quarter of its work', () => {
+    const range = { from: '2026-07-01', to: '2026-10-01' }
+    const e = (summary: string, extra: Record<string, unknown> = {}) => issue('E', { summary, created: '2025-01-01T00:00:00.000+0000', resolutiondate: null, ...extra })
+    const k = (date: string | null) => issue('k', { resolutiondate: date, ...st('Done') })
+    expect(epicInQuarter(e('plain', { resolutiondate: '2026-08-01T00:00:00.000+0000' }), [], range, '26Q3')).toBe(true)
+    expect(epicInQuarter(e('plain', { created: '2026-08-01T00:00:00.000+0000' }), [], range, '26Q3')).toBe(true)
+    expect(epicInQuarter(e('[26Q3] Tagged'), [], range, '26Q3')).toBe(true)
+    expect(epicInQuarter(e('126Q31 not a tag'), [], range, '26Q3')).toBe(false)
+    expect(epicInQuarter(e('23Q3 Old'), [k('2026-08-01'), k('2023-01-01'), k('2023-01-01'), k('2023-01-01'), k('2023-01-01')], range, '26Q3')).toBe(false) // 1 of 5
+    expect(epicInQuarter(e('23Q3 Old'), [k('2026-08-01'), k('2026-09-01'), k('2023-01-01'), k('2023-01-01')], range, '26Q3')).toBe(true) // half of it
   })
 
   test('only the plan owner may read suggestions', async () => {

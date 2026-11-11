@@ -50,48 +50,67 @@ const toEpic = (i: JiraIssue, source: 'assigned' | 'child') => ({
   source,
 })
 
-type ReleaseStatus = 'all_released' | 'partial' | 'not_released' | 'no_info'
+type EpicDelivery = 'delivered' | 'children_done' | 'in_progress' | 'no_children'
 const isEpic = (i: JiraIssue) => i.fields.issuetype?.name === 'Epic'
 const isWontFix = (i: JiraIssue) => /won['’]?t\s+(fix|do)/i.test(String(i.fields.status?.name ?? ''))
 const versionsOf = (i: JiraIssue): { name: string; released: boolean }[] => (Array.isArray(i.fields.fixVersions) ? i.fields.fixVersions : [])
 const hasReleased = (i: JiraIssue) => versionsOf(i).some((v) => v.released)
 const isResolved = (i: JiraIssue) => Boolean(i.fields.resolutiondate)
+const isDoneCategory = (i: JiraIssue) => i.fields.status?.statusCategory?.key === 'done'
 
-/** Release status of one epic from its child issues ("Won't Fix" children ignored). */
-export const epicReleaseStatus = (children: JiraIssue[]): ReleaseStatus => {
+/**
+ * Delivery status of one epic. The epic's own status is what the team trusts: Done = delivered.
+ * An open epic whose children are all done is flagged (probably just not closed yet). "Won't Fix" children are ignored.
+ */
+export const epicDelivery = (epic: JiraIssue, children: JiraIssue[]): EpicDelivery => {
+  if (isDoneCategory(epic)) return 'delivered'
   const live = children.filter((c) => !isWontFix(c))
-  if (!live.length) return 'no_info'
-  if (live.every((c) => isResolved(c) && hasReleased(c))) return 'all_released'
-  if (live.some(hasReleased)) return 'partial'
-  if (live.some((c) => versionsOf(c).length)) return 'not_released'
-  return 'no_info'
+  if (!live.length) return 'no_children'
+  return live.every(isResolved) ? 'children_done' : 'in_progress'
+}
+
+/** Whether an epic belongs to the plan's quarter: resolved or created in it, tagged with it ("26Q4 ..."), or a quarter of its work happened in it. */
+export const epicInQuarter = (epic: JiraIssue, children: JiraIssue[], range: { from: string; to: string }, tag: string) => {
+  const within = (iso: unknown) => { const d = dayOf(iso); return d >= range.from && d < range.to }
+  if (within(epic.fields.resolutiondate) || within(epic.fields.created)) return true
+  if (new RegExp(`(?<![0-9])${tag}(?![0-9])`, 'i').test(String(epic.fields.summary ?? ''))) return true
+  const live = children.filter((c) => !isWontFix(c))
+  return live.length > 0 && live.filter((c) => within(c.fields.resolutiondate)).length / live.length >= 0.25
 }
 
 const CHILD_CAP = 2000
-/** Labelled epics with the release status of their children (one `parent in (...)` search per 40 epics). */
-async function epicRelease(epics: JiraIssue[]) {
+/** Labelled epics with the delivery status of their children (one `parent in (...)` search per 40 epics). */
+async function epicDeliveries(epics: JiraIssue[], range: { from: string; to: string }, tag: string) {
   const childrenOf = new Map<string, JiraIssue[]>()
   let truncated = false
+  const kidFields = ['resolutiondate', 'status', 'fixVersions', 'parent', ...(env.jira.toggleField ? [env.jira.toggleField] : [])]
   for (let n = 0; n < epics.length && !truncated; n += 40) {
     const keys = epics.slice(n, n + 40).map((e) => e.key)
-    const r = await jira.search(`parent in (${keys.map(quote).join(', ')})`, ['resolutiondate', 'status', 'fixVersions', 'parent'], CHILD_CAP)
+    const r = await jira.search(`parent in (${keys.map(quote).join(', ')})`, kidFields, CHILD_CAP)
     truncated = r.truncated
     for (const c of r.issues) {
       const k = String(c.fields.parent?.key ?? '')
       if (k) childrenOf.set(k, [...(childrenOf.get(k) ?? []), c])
     }
   }
-  const summary: Record<ReleaseStatus, number> = { all_released: 0, partial: 0, not_released: 0, no_info: 0 }
-  const items = epics.map((e) => {
-    const kids = (childrenOf.get(e.key) ?? []).filter((c) => !isWontFix(c))
-    const release = epicReleaseStatus(kids)
-    summary[release]++
-    return {
-      key: e.key, summary: String(e.fields.summary ?? ''), status: String(e.fields.status?.name ?? ''), url: jira.browseUrl(e.key), release,
+  const summary: Record<EpicDelivery, number> = { delivered: 0, children_done: 0, in_progress: 0, no_children: 0 }
+  let outOfQuarter = 0
+  const items = []
+  for (const e of epics) {
+    const all = childrenOf.get(e.key) ?? []
+    if (!epicInQuarter(e, all, range, tag)) { outOfQuarter++; continue }
+    const kids = all.filter((c) => !isWontFix(c))
+    const delivery = epicDelivery(e, kids)
+    summary[delivery]++
+    const toggles = [...new Set(kids.flatMap((c) => (Array.isArray(c.fields[env.jira.toggleField]) ? (c.fields[env.jira.toggleField] as unknown[]).map(String) : [])))].sort()
+    const deliveredOn = delivery === 'delivered' && env.jira.deliveryDateField ? dayOf(e.fields[env.jira.deliveryDateField]) || null : null
+    items.push({
+      key: e.key, summary: String(e.fields.summary ?? ''), status: String(e.fields.status?.name ?? ''), url: jira.browseUrl(e.key), delivery, deliveredOn, toggles,
       children: { total: kids.length, done: kids.filter(isResolved).length, released: kids.filter(hasReleased).length },
-    }
-  }).sort((x, y) => x.summary.localeCompare(y.summary))
-  return { items, summary, truncated }
+    })
+  }
+  items.sort((x, y) => x.summary.localeCompare(y.summary))
+  return { items, summary, outOfQuarter, truncated }
 }
 
 export abstract class SuggestionsService {
@@ -215,11 +234,11 @@ export abstract class SuggestionsService {
     if (!label) throw new BadRequestError('Label is required')
     const jql = `labels = ${quote(label)} AND created < ${quote(range.to)} AND (resolutiondate >= ${quote(range.from)} OR (resolution is EMPTY AND updated >= ${quote(range.from)}))`
     const cap = 1000
-    const fields = ['resolutiondate', SP, 'issuetype', 'status', 'fixVersions', 'summary']
+    const fields = ['resolutiondate', SP, 'issuetype', 'status', 'fixVersions', 'summary', 'created', ...(env.jira.deliveryDateField ? [env.jira.deliveryDateField] : [])]
     const { issues: found, truncated, epics } = await cached(`sg:${plan.id}:${accountId}:rate2:${label}`, TTL, async () => {
       const r = await jira.search(jql, fields, cap)
       const epicIssues = r.issues.filter(isEpic)
-      return { ...r, epics: await epicRelease(epicIssues) }
+      return { ...r, epics: await epicDeliveries(epicIssues, range, `${String(plan.year).slice(2)}Q${plan.quarter}`) }
     })
     const wontFix = found.filter((i) => !isEpic(i) && isWontFix(i))
     const counted = found.filter((i) => !isEpic(i) && !isWontFix(i))
@@ -234,7 +253,7 @@ export abstract class SuggestionsService {
     const spSum = (list: JiraIssue[]) => list.reduce((s, i) => s + sp(i), 0)
     return {
       label, from: range.from, to: range.to, jql, url: jqlUrl(jql), truncated,
-      excluded: { epics: found.filter(isEpic).length, wontFix: wontFix.length },
+      excluded: { epics: found.filter(isEpic).length, wontFix: wontFix.length, epicsOutOfQuarter: epics.outOfQuarter },
       tickets: { done: done.length, total: counted.length, rate: rate(done.length, counted.length) },
       storyPoints: { done: spSum(done), total: spSum(counted), rate: rate(spSum(done), spSum(counted)) },
       released: {
@@ -243,6 +262,7 @@ export abstract class SuggestionsService {
       },
       epics: epics.items,
       epicSummary: epics.summary,
+      epicsDelivered: { delivered: epics.summary.delivered, total: epics.items.length },
       epicsTruncated: epics.truncated,
     }
   }

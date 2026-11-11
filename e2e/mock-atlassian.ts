@@ -106,8 +106,8 @@ function searchJql(jql: string) {
     const month = (from || iso(0)).slice(0, 7)
     return [
       { id: '1', key: 'MESIGN-801', fields: { resolutiondate: `${month}-15T10:00:00.000+0000`, customfield_10016: 5, customfield_10005: 5, issuetype: { name: 'Task' }, fixVersions: [{ name: '[BE] Release v1', released: true }] } },
-      { id: '3', key: 'MESIGN-803', fields: { resolutiondate: null, summary: 'Mock label epic', issuetype: { name: 'Epic' }, status: { name: 'To Do' } } },
-      ...Array.from({ length: 9 }, (_, n) => ({ id: `${40 + n}`, key: `MESIGN-${810 + n}`, fields: { resolutiondate: null, summary: `Label epic number ${n + 1} with a fairly long title to test truncation`, issuetype: { name: 'Epic' }, status: { name: 'To Do' } } })),
+      { id: '3', key: 'MESIGN-803', fields: { resolutiondate: null, summary: '26Q4 Mock label epic', created: iso(5), issuetype: { name: 'Epic' }, status: { name: 'To Do' } } },
+      ...Array.from({ length: 9 }, (_, n) => ({ id: `${40 + n}`, key: `MESIGN-${810 + n}`, fields: { resolutiondate: null, summary: `26Q4 Label epic number ${n + 1} with a fairly long title to test truncation`, created: iso(5), issuetype: { name: 'Epic' }, status: n === 0 ? { name: 'Done', statusCategory: { key: 'done' } } : { name: 'To Do' } } })),
       { id: '2', key: 'MESIGN-802', fields: { resolutiondate: null, customfield_10016: 3, customfield_10005: 3 } },
     ]
   }

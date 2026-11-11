@@ -43,6 +43,9 @@ export const env = {
     apiToken: read('JIRA_API_TOKEN') ?? read('ATLASSIAN_API_TOKEN'),
     defaultBoardId: read('JIRA_BOARD_ID') ? Number(read('JIRA_BOARD_ID')) : undefined,
     storyPointField: read('JIRA_STORY_POINT_FIELD', 'customfield_10016')!,
+    /** Site-specific custom fields: an epic's "Actual Delivery Date" and a ticket's "Toggle Name". Empty value disables. */
+    deliveryDateField: read('JIRA_DELIVERY_DATE_FIELD', 'customfield_11781') ?? '',
+    toggleField: read('JIRA_TOGGLE_FIELD', 'customfield_11708') ?? '',
   },
   bitbucket: {
     apiUrl: read('BITBUCKET_API_URL', 'https://api.bitbucket.org/2.0')!.replace(/\/$/, ''),
