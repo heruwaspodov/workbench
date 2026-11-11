@@ -276,12 +276,60 @@ await step('template editor imports the same Excel file with the same extractor'
   await shot('04c-template-from-upload')
 })
 
-await step('plan editor shows Confluence evidence card (no page body)', async () => {
+await step('plan suggestions: epics, Confluence, monthly delivery modal, Add to…, team rate', async () => {
   await page.goto(`${APP}/pgp/plans/${planId}`)
-  await text(page, 'Created or edited in the last 90 days')
+  await text(page, 'Confluence (last 3 months)')
   await text(page, 'Runbook Signing')
   if (await page.getByText('CONFIDENTIAL BODY TEXT').count()) throw new Error('page body/excerpt leaked into the UI')
-  await shot('02b-plan-confluence')
+  await text(page, 'Mock epic for e2e')
+  await shot('02b-plan-suggestions')
+
+  // Month row -> modal with the tickets, a Jira JQL link, and "Use as current value".
+  const row = page.locator('[data-month]').first()
+  await row.waitFor()
+  await row.click()
+  await text(page, 'Delivered story')
+  const total = (await page.locator('[data-test="month-total"]').innerText()).replace(/\s+/g, ' ')
+  if (!/^8 SP · 2 tickets/.test(total)) throw new Error(`unexpected month total: ${total}`)
+  const jira = await page.getByRole('link', { name: 'Open in Jira' }).first().getAttribute('href')
+  if (!jira?.includes('/issues?jql=') || !jira.includes('resolutiondate')) throw new Error(`unexpected Jira link: ${jira}`)
+  await shot('02c-month-modal')
+  await page.getByRole('button', { name: 'Add to…' }).last().click()
+  await page.locator('input[name="target-initiative"]').first().check()
+  await page.locator('[data-test="use-current"]').click()
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
+  await page.waitForFunction(async (id) => {
+    const p = await (await fetch(`/api/pgp/plans/${id}`)).json()
+    return p.items.some((i: { currentValue: string | null }) => /^8 SP · 2 tickets/.test(i.currentValue ?? ''))
+  }, planId, { timeout: 10_000 })
+
+  // Epics -> initiatives, confirmed in a modal, deduplicated on a second run.
+  await page.locator('[data-test="add-epics"]').click()
+  await page.locator('[data-test="confirm-epics"]').click()
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
+  await page.waitForFunction(async (id) => {
+    const p = await (await fetch(`/api/pgp/plans/${id}`)).json()
+    return p.items.some((i: { initiative: string; evidenceLinks: string[]; weight: number }) => i.initiative === 'Mock epic for e2e' && i.weight === 0 && i.evidenceLinks.some((l) => l.endsWith('/browse/MESIGN-901')))
+  }, planId, { timeout: 10_000 })
+  await page.locator('[data-test="add-epics"]').click()
+  await text(page, 'already linked in this plan')
+  await page.getByRole('button', { name: 'Cancel' }).click()
+
+  // Team delivery rate: label typed by hand.
+  await page.getByPlaceholder('Jira label').fill('team-x')
+  await page.getByRole('button', { name: 'Show', exact: true }).click()
+  await text(page, 'By tickets:')
+  const rateText = (await page.locator('[data-test="rate"]').innerText()).replace(/\s+/g, ' ')
+  if (!rateText.includes('50% (1/2 tickets)')) throw new Error(`unexpected team rate: ${rateText}`)
+  for (const width of [1440, 1024, 768]) {
+    await page.setViewportSize({ width, height: 900 })
+    await page.waitForTimeout(250)
+    const m = await page.evaluate(() => ({ page: document.documentElement.scrollWidth - innerWidth, wide: [...document.querySelectorAll('main *')].filter((e) => e.getBoundingClientRect().right > innerWidth + 1).length }))
+    if (m.page > 1 || m.wide > 0) throw new Error(`Plan with suggestions overflows at ${width}px (page +${m.page}px, ${m.wide} elements past the edge)`)
+  }
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.waitForTimeout(200)
+  await shot('02d-plan-suggestions-after')
 })
 
 await step('My Confluence lists, searches and links my pages', async () => {

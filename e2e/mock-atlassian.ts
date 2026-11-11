@@ -83,7 +83,40 @@ function wikiSearch(url: URL): Response {
   })
 }
 
-function jiraRoute(path: string, url: URL, method: string): Response | null {
+// JQL search used by the PGP suggestions (story points under both common field ids: the app reads whichever the environment names).
+// Dates in the JQL drive the answer, so the data stays inside whatever quarter the plan has.
+const range = (jql: string) => ({
+  from: jql.match(/resolutiondate >= "([^"]+)"/)?.[1] ?? '',
+  to: jql.match(/(?:resolutiondate|created) < "([^"]+)"/)?.[1] ?? '',
+})
+const monthsIn = (from: string, to: string) => {
+  const out: string[] = []
+  for (let d = new Date(`${from}T00:00:00Z`); d < new Date(`${to}T00:00:00Z`); d = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1))) out.push(d.toISOString().slice(0, 7))
+  return out
+}
+const epic = (n: number, summary: string, cat: string, st: string) =>
+  ({ id: String(20000 + n), key: `MESIGN-${900 + n}`, fields: { summary, status: { id: '9', name: st, statusCategory: { key: cat } }, resolutiondate: null } })
+function searchJql(jql: string) {
+  if (jql.includes('issuetype = Epic')) return [epic(1, 'Mock epic for e2e', 'indeterminate', 'In Progress'), epic(2, 'Mock finished epic', 'done', 'Done')]
+  if (jql.includes('parent is not EMPTY')) return []
+  const { from, to } = range(jql)
+  if (jql.includes('labels =')) {
+    const month = (from || iso(0)).slice(0, 7)
+    return [
+      { id: '1', key: 'MESIGN-801', fields: { resolutiondate: `${month}-15T10:00:00.000+0000`, customfield_10016: 5, customfield_10005: 5 } },
+      { id: '2', key: 'MESIGN-802', fields: { resolutiondate: null, customfield_10016: 3, customfield_10005: 3 } },
+    ]
+  }
+  if (jql.includes('cf[') && from && to) {
+    return monthsIn(from, to).flatMap((m, i) => [
+      { id: `m${i}a`, key: `MESIGN-${700 + i * 2}`, fields: { summary: `Delivered story ${m} A`, resolutiondate: `${m}-15T10:00:00.000+0000`, customfield_10016: 3, customfield_10005: 3 } },
+      { id: `m${i}b`, key: `MESIGN-${701 + i * 2}`, fields: { summary: `Delivered story ${m} B`, resolutiondate: `${m}-16T10:00:00.000+0000`, customfield_10016: 5, customfield_10005: 5 } },
+    ])
+  }
+  return issues.filter((i) => i.fields.resolutiondate)
+}
+
+function jiraRoute(path: string, url: URL, method: string, body = ''): Response | null {
   if (path === '/wiki/rest/api/search') return wikiSearch(url)
   if (path === '/rest/api/3/user/search') {
     const q = (url.searchParams.get('query') ?? '').toLowerCase()
@@ -95,7 +128,7 @@ function jiraRoute(path: string, url: URL, method: string): Response | null {
   if (path === '/rest/agile/1.0/board/7') return json(board)
   if (path === '/rest/agile/1.0/board/7/configuration') return json(boardConfig)
   if (path === '/rest/agile/1.0/board/7/issue') return json({ issues, total: issues.length })
-  if (path === '/rest/api/3/search/jql' && method === 'POST') return json({ issues: issues.filter((i) => i.fields.resolutiondate) })
+  if (path === '/rest/api/3/search/jql' && method === 'POST') return json({ issues: searchJql((JSON.parse(body || '{}') as { jql?: string }).jql ?? '') })
   const m = path.match(/^\/rest\/api\/3\/issue\/([A-Z]+-\d+)(\/comment)?$/)
   if (m) {
     const found = issues.find((i) => i.key === m[1])
@@ -194,10 +227,10 @@ function bbRoute(path: string, url: URL): Response | null {
 
 Bun.serve({
   port: PORT,
-  fetch(req) {
+  async fetch(req) {
     const url = new URL(req.url)
     const path = url.pathname
-    const res = path.startsWith('/2.0/') ? bbRoute(path.slice(4), url) : jiraRoute(path, url, req.method)
+    const res = path.startsWith('/2.0/') ? bbRoute(path.slice(4), url) : jiraRoute(path, url, req.method, req.method === 'POST' ? await req.text() : '')
     if (res) return res
     console.warn(`[mock] unhandled ${req.method} ${path}`)
     return json({ error: 'not mocked', path }, 404)

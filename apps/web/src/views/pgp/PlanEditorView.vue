@@ -5,12 +5,13 @@ import {
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { onBeforeRouteLeave, RouterLink } from 'vue-router'
 import AsyncState from '@/components/AsyncState.vue'
+import type { EpicSuggestion } from '@/components/EpicsModal.vue'
 import ItemsEditor from '@/components/ItemsEditor.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import SuggestionsPanel from '@/components/SuggestionsPanel.vue'
 import { api, notifyError, notifySuccess, unwrap } from '@/lib/api'
-import { copyText, isHttpUrl } from '@/lib/clipboard'
 import { formatDate } from '@/lib/format'
-import { type EditableItem, stripKeys, toEditable, totals } from '@/lib/pgp'
+import { type EditableItem, newKey, stripKeys, toEditable, totals } from '@/lib/pgp'
 import { ui } from '@/lib/ui'
 import { useAsync } from '@/lib/use-async'
 
@@ -62,34 +63,43 @@ async function setStatus(action: 'submit' | 'reopen') {
 
 const exportUrl = computed(() => `/api/pgp/plans/${props.id}/export`)
 
-// Jira delivery stats as evidence helper (silently hidden when Jira isn't connected)
-const stats = ref<{ month: string; tickets: number; storyPoints: number }[]>([])
-watch(plan, async (p) => { if (p?.canEdit && !stats.value.length) stats.value = await unwrap(api.kanban.stats.get()).catch(() => []) }, { once: true })
-// Confluence pages the user touched recently, as ready-to-copy evidence links (owner only, hidden when unavailable)
-type Doc = { id: string; title: string; space: string | null; url: string; lastModified: string | null }
-const docs = ref<Doc[] | null>(null)
-watch(plan, async (p) => {
-  if (!p?.canEdit) return
-  docs.value = (await unwrap(api.confluence.pages.get({ query: { role: 'contributor', days: 90, pagelen: 8 } })).catch(() => null))?.items ?? null
-}, { once: true })
-const monthLabel = (m: string) => new Date(`${m}-01`).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
+// ----- suggestions: edit the form only; the plan still needs Save -----
+const dedupe = (links: string[]) => [...new Set(links)]
+function addLink(rowKey: string, url: string) {
+  items.value = items.value.map((i) => (i._key === rowKey ? { ...i, evidenceLinks: dedupe([...(i.evidenceLinks ?? []), url]) } : i))
+  notifySuccess('Link added to Evidence. Save to keep it.')
+}
+function useCurrent(rowKey: string, value: string) {
+  items.value = items.value.map((i) => (i._key === rowKey && !i.currentValue?.trim() ? { ...i, currentValue: value } : i))
+  notifySuccess('Current value filled. Save to keep it.')
+}
+const statusFromJira = (category: string): EditableItem['status'] => (category === 'done' ? 'done' : category === 'indeterminate' ? 'on_track' : 'not_started')
+function addEpics(groupKey: string | null, epics: EpicSuggestion[]) {
+  const anchor = items.value.find((i) => i._key === groupKey)
+  const objective = anchor?.objective ?? 'Delivery'
+  const keyResult = anchor?.keyResult ?? ''
+  const rows: EditableItem[] = epics.map((e) => ({
+    _key: newKey(), companyOkr: anchor?.companyOkr ?? null, objective, keyResult, weight: 0, initiative: e.summary,
+    status: statusFromJira(e.statusCategory), evidenceLinks: [e.url],
+  }))
+  const at = anchor ? items.value.reduce((last, i, idx) => (i.objective === objective && i.keyResult === keyResult ? idx : last), -1) : items.value.length - 1
+  const next = [...items.value]
+  next.splice(at + 1, 0, ...rows)
+  items.value = next
+  notifySuccess(`${rows.length} ${rows.length === 1 ? 'initiative' : 'initiatives'} added. Set the weights, then Save.`)
+}
 
 const beforeUnload = (e: BeforeUnloadEvent) => { if (dirty.value) e.preventDefault() }
 onMounted(() => window.addEventListener('beforeunload', beforeUnload))
 onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 onBeforeRouteLeave(() => !dirty.value || window.confirm('You have unsaved changes. Leave this page?'))
 
-// Layout: plan details and items on the left; evidence sources (Jira, Confluence) beside them on wide screens, below on narrow ones.
+// Layout: plan details and items on the left; suggestions beside them on wide screens, below on narrow ones.
 const layout = css({ display: 'grid', gridTemplateColumns: { base: 'minmax(0, 1fr)', xl: 'minmax(0, 1fr) 320px' }, columnGap: '6', rowGap: '5', alignItems: 'start' })
 const mainCol = css({ display: 'flex', flexDirection: 'column', gap: '5', minWidth: 0 })
 const details = `${ui.card} ${css({ display: 'grid', gridTemplateColumns: { base: 'minmax(0, 1fr)', lg: '200px minmax(0, 1fr)' }, columnGap: '6', rowGap: '5' })}`
 const scoreBlock = css({ display: 'flex', flexDirection: 'column', gap: '2', lg: { borderRightWidth: '1px', borderColor: 'border.default.subtle', pr: '6' } })
 const headerGrid = css({ display: 'grid', gridTemplateColumns: { base: 'minmax(0, 1fr)', md: 'repeat(2, minmax(0, 1fr))' }, gap: '4' })
-const aside = css({ display: 'flex', flexDirection: 'column', gap: '4', minWidth: 0, xl: { position: 'sticky', top: '6' } })
-const asideCard = `${ui.card} ${css({ display: 'flex', flexDirection: 'column', gap: '3', p: '4' })}`
-const listRow = css({ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '3', py: '2', borderTopWidth: '1px', borderColor: 'border.default.subtle' })
-const docLink = `${ui.link} ${css({ display: 'block', truncate: true })}`
-const grow = css({ minWidth: 0, flex: 1 })
 </script>
 
 <template>
@@ -154,40 +164,8 @@ const grow = css({ minWidth: 0, flex: 1 })
           <ItemsEditor v-model="items" mode="plan" :lock-planning="plan.status === 'submitted'" :readonly="!plan.canEdit" />
         </div>
 
-        <aside v-if="plan.canEdit" :class="aside" aria-label="Evidence sources">
-          <section :class="asideCard">
-            <div>
-              <MpText weight="semiBold">Jira delivery</MpText>
-              <MpText size="label-small" color="text.secondary">Resolved issues, last 3 months</MpText>
-            </div>
-            <template v-if="stats.length">
-              <div v-for="s in stats" :key="s.month" :class="listRow">
-                <MpText size="label">{{ monthLabel(s.month) }}</MpText>
-                <MpText size="label" color="text.secondary">{{ s.storyPoints }} SP · {{ s.tickets }} {{ s.tickets === 1 ? 'ticket' : 'tickets' }}</MpText>
-              </div>
-            </template>
-            <MpText v-else size="label" color="text.secondary">
-              Nothing to show yet. Connect Jira in <RouterLink to="/connections" :class="ui.link">Connections</RouterLink> to see your story points.
-            </MpText>
-          </section>
-
-          <section v-if="docs" :class="asideCard">
-            <div>
-              <MpText weight="semiBold">Confluence pages</MpText>
-              <MpText size="label-small" color="text.secondary">Created or edited in the last 90 days. Copy a link into Evidence.</MpText>
-            </div>
-            <MpText v-if="!docs.length" size="label" color="text.secondary">No pages in the last 90 days.</MpText>
-            <div v-for="d in docs" :key="d.id" :class="listRow">
-              <div :class="grow">
-                <a v-if="isHttpUrl(d.url)" :href="d.url" target="_blank" rel="noopener noreferrer" :title="d.title" :class="docLink">{{ d.title }}</a>
-                <MpText v-else size="label" weight="semiBold">{{ d.title }}</MpText>
-                <MpText size="label-small" color="text.secondary">{{ d.space ?? '-' }} · {{ formatDate(d.lastModified) }}</MpText>
-              </div>
-              <MpButton size="sm" variant="ghost" left-icon="copy" aria-label="Copy link" title="Copy link" @click="copyText(d.url)" />
-            </div>
-            <RouterLink to="/confluence" :class="ui.link">View all pages</RouterLink>
-          </section>
-        </aside>
+        <SuggestionsPanel v-if="plan.canEdit" :plan-id="id" :items="items" :can-add-initiatives="plan.status === 'draft'"
+          @link="addLink" @current="useCurrent" @epics="addEpics" />
       </div>
     </template>
   </AsyncState>
