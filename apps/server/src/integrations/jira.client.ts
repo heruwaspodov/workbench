@@ -36,7 +36,8 @@ export interface JiraIssue {
 }
 
 export const jira = {
-  baseUrl: env.jira.baseUrl,
+  /** Read per call so it follows the current config. */
+  get baseUrl() { return env.jira.baseUrl },
   browseUrl: (key: string) => `${env.jira.baseUrl}/browse/${key}`,
 
   searchUsers: (query: string) =>

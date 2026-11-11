@@ -65,6 +65,9 @@ export const PgpModel = {
     items: t.Array(PlanItemInput, { minItems: 1, maxItems: 300 }),
   }),
 
+  suggestionMonth: t.Object({ id: t.String({ format: 'uuid' }), month: t.String({ pattern: '^20\\d{2}-(0[1-9]|1[0-2])$' }) }),
+  deliveryRateQuery: t.Object({ label: t.String({ minLength: 1, maxLength: 100 }) }),
+
   planCreate: t.Object({ templateId: t.String({ format: 'uuid' }) }),
   planUpdate: t.Object({
     division: nullableText,
