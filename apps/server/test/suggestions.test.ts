@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
-import { like } from 'drizzle-orm'
+import { eq, like } from 'drizzle-orm'
 import { AppError, BadRequestError, ForbiddenError, NotConnectedError } from '../src/shared/errors'
 import { epicDelivery, epicInQuarter, pageKind } from '../src/modules/pgp/suggestions.service'
 import { invalidate } from '../src/shared/cache'
@@ -173,6 +173,13 @@ describe('SuggestionsService', () => {
     expect(res.bugs!.jql).toBe(`assignee = "${ACCOUNT}" AND issuetype = Bug AND created >= "2026-07-01" AND created < "2026-10-01" ORDER BY created ASC`)
     expect(res.bugs!.url).toContain(encodeURIComponent('issuetype = Bug'))
     expect(res.errors.bugs).toBeNull()
+  })
+
+  test('the owner\'s default team label comes with the suggestions', async () => {
+    expect((await Svc.get(planQ3, owner)).teamLabel).toBeNull()
+    await ctx.db.update(S.connections).set({ teamLabel: 'team-x' }).where(eq(S.connections.userId, owner.id))
+    expect((await Svc.get(planQ3, owner)).teamLabel).toBe('team-x')
+    await ctx.db.update(S.connections).set({ teamLabel: null }).where(eq(S.connections.userId, owner.id))
   })
 
   test('identical requests are served from the cache', async () => {

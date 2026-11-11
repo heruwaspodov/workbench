@@ -6,12 +6,12 @@
 import {
   MpBadge, MpButton, MpInput, MpModal, MpModalBody, MpModalCloseButton, MpModalContent, MpModalFooter, MpModalHeader, MpModalOverlay, MpSpinner, MpText, css,
 } from '@mekari/pixel3'
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import EpicsModal, { type EpicSuggestion } from './EpicsModal.vue'
 import PanelCard from './PanelCard.vue'
 import PickTargetModal from './PickTargetModal.vue'
-import { ApiError, api, notifyError, unwrap } from '@/lib/api'
+import { ApiError, api, notifyError, notifySuccess, unwrap } from '@/lib/api'
 import { copyText, isHttpUrl } from '@/lib/clipboard'
 import { formatDate } from '@/lib/format'
 import type { EditableItem } from '@/lib/pgp'
@@ -59,17 +59,30 @@ const month = useAsync((m: string) => unwrap(api.pgp.plans({ id: props.planId })
 function openMonth(m: string) { monthOpen.value = m; month.run(m) }
 const monthValue = computed(() => (month.data.value ? `${month.data.value.storyPoints} SP · ${plural(month.data.value.tickets, 'ticket')} (${monthLabel(month.data.value.month)})` : ''))
 
-// ----- team delivery rate by label (the label is typed by hand and remembered in this browser) -----
-const LABEL_KEY = 'one-desk:delivery-label'
-const readLabel = () => { try { return localStorage.getItem(LABEL_KEY) ?? '' } catch { return '' } }
-const label = ref(readLabel())
+// ----- team delivery rate by label (the default label lives in Connections; typing another one is a one-off look) -----
+const label = ref('')
+const savedLabel = ref<string | null>(null)
 const rate = useAsync((l: string) => unwrap(api.pgp.plans({ id: props.planId }).suggestions['delivery-rate'].get({ query: { label: l } })))
 async function applyLabel() {
   const l = label.value.trim()
-  try { localStorage.setItem(LABEL_KEY, l) } catch { /* remembering is a convenience only */ }
   if (l) await rate.run(l)
 }
-onMounted(() => { if (label.value.trim()) rate.run(label.value.trim()) })
+watch(data, (d, before) => {
+  if (!d || before) return // first load only: later reloads must not overwrite what is typed
+  savedLabel.value = d.teamLabel
+  label.value = d.teamLabel ?? ''
+  if (label.value) rate.run(label.value)
+})
+const canSaveDefault = computed(() => label.value.trim() !== '' && label.value.trim() !== (savedLabel.value ?? ''))
+const savingDefault = ref(false)
+async function saveDefault() {
+  savingDefault.value = true
+  try {
+    const o = await unwrap(api.connections.jira['team-label'].put({ label: label.value.trim() }))
+    savedLabel.value = o.jira.teamLabel
+    notifySuccess('Default team label saved')
+  } catch (e) { notifyError(e) } finally { savingDefault.value = false }
+}
 const rateText = (r: { done: number; total: number; rate: number | null }, unit: string) => (r.rate == null ? `No ${unit}` : `${r.rate}% (${r.done}/${r.total} ${unit})`)
 const releasedText = (r: { released: number; done: number; rate: number | null }, unit: string) => (r.rate == null ? `No done ${unit}` : `${r.rate}% (${r.released}/${r.done} ${unit})`)
 type Delivery = 'delivered' | 'children_done' | 'in_progress' | 'no_children'
@@ -201,6 +214,13 @@ const problem = css({ color: 'text.danger' })
           <MpInput v-model="label" placeholder="Jira label" aria-label="Jira label" maxlength="100" />
           <MpButton type="submit" variant="secondary" :is-loading="rate.loading.value">Show</MpButton>
         </form>
+        <div :class="meta">
+          <MpButton v-if="canSaveDefault" size="sm" variant="ghost" data-test="save-default-label" :is-loading="savingDefault" @click="saveDefault">Use as default</MpButton>
+          <MpText size="label-small" color="text.secondary">
+            <template v-if="savedLabel">Default: {{ savedLabel }}. Change it in <RouterLink to="/connections" :class="ui.link">Connections</RouterLink>.</template>
+            <template v-else>No default yet. Set one in <RouterLink to="/connections" :class="ui.link">Connections</RouterLink>.</template>
+          </MpText>
+        </div>
         <MpText v-if="rate.error.value" size="label" :class="problem">{{ (rate.error.value as Error).message }}</MpText>
         <template v-else-if="rate.data.value">
           <div :class="stats">

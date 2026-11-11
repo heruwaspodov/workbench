@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { MpBadge, MpBanner, MpBannerDescription, MpButton, MpIcon, MpInput, MpSelect, MpText, css } from '@mekari/pixel3'
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import AsyncState from '@/components/AsyncState.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import { api, notifyError, notifySuccess, unwrap } from '@/lib/api'
@@ -31,6 +31,13 @@ const searchBoards = async () => {
 }
 const onBoardChange = (value: string | number) =>
   act('board', () => unwrap(api.connections.jira.board.put({ boardId: value ? Number(value) : null })), 'Board saved')
+
+// Team label (default for Team delivery rate)
+const teamLabel = ref('')
+watch(() => overview.value?.jira.teamLabel, (v) => { teamLabel.value = v ?? '' }, { immediate: true })
+const teamLabelDirty = computed(() => teamLabel.value.trim() !== (overview.value?.jira.teamLabel ?? ''))
+const saveTeamLabel = () =>
+  act('team-label', () => unwrap(api.connections.jira['team-label'].put({ label: teamLabel.value.trim() })), teamLabel.value.trim() ? 'Team label saved' : 'Team label cleared')
 
 onMounted(run)
 
@@ -101,6 +108,17 @@ const grid = ui.twoCol
               <option v-for="b in boards" :key="b.id" :value="b.id">{{ b.name }} ({{ b.type }}{{ b.project ? ` · ${b.project}` : '' }})</option>
             </MpSelect>
           </div>
+
+          <form v-if="overview.jira.accountId" :class="css({ display: 'flex', flexDirection: 'column', gap: '2' })" data-test="team-label-form" @submit.prevent="saveTeamLabel">
+            <MpText weight="semiBold">Team label</MpText>
+            <MpText size="label-small" color="text.secondary">
+              The Jira label of your team (for example Escape). It is the default for Team delivery rate in your PGP. Leave it empty to clear.
+            </MpText>
+            <div :class="row">
+              <MpInput v-model="teamLabel" placeholder="Jira label" aria-label="Team label" maxlength="100" />
+              <MpButton type="submit" variant="secondary" :is-disabled="!teamLabelDirty" :is-loading="busy === 'team-label'">Save</MpButton>
+            </div>
+          </form>
         </template>
         <MpText v-else size="label" color="text.secondary">An admin needs to set JIRA_BASE_URL, JIRA_EMAIL and JIRA_API_TOKEN.</MpText>
       </section>

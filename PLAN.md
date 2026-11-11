@@ -35,7 +35,7 @@ Status: `TODO` · `IN PROGRESS` · `DONE` · `BLOCKED`
 | 8. Hardening & integrasi nyata | OD-36 … OD-42 | TODO |
 | 9. Rilis MVP internal | OD-43 … OD-44 | TODO |
 | 10. Confluence (read-only) | OD-54 | IN PROGRESS |
-| 11. Create PGP per tahun+kuartal & evidence otomatis | OD-71 … OD-73 (create), OD-68 … OD-70 (saran), OD-74 (accordion), OD-75 … OD-82 (perbaikan: parser, hapus, evidence, keamanan, tombol upload, delivery rate, panel saran, status epic) | semua DONE |
+| 11. Create PGP per tahun+kuartal & evidence otomatis | OD-71 … OD-73 (create), OD-68 … OD-70 (saran), OD-74 (accordion), OD-75 … OD-83 (perbaikan: parser, hapus, evidence, keamanan, tombol upload, delivery rate, panel saran, status epic, label tim) | semua DONE |
 
 **Urutan kerja berikutnya (disarankan):** OD-32 → OD-33 → OD-34 → OD-35 → OD-31 → OD-45 … OD-50 → OD-36 → sisanya.
 
@@ -563,7 +563,7 @@ Perubahan:
 **Depends:** OD-80, OD-81.
 **Log:** 2026-11-11 — `epicRelease`/`epicReleaseStatus` diganti `epicDeliveries`/`epicDelivery` (`suggestions.service.ts`): Delivered (status epic kategori Done, + `Actual Delivery Date` bila ada), All children done, In progress, No children; "Epics delivered X/Y"; `fixVersion` tinggal info sekunder; nama toggle unik dari `Toggle Name` anak. Field Jira khusus site masuk env `JIRA_DELIVERY_DATE_FIELD` (default `customfield_11781`) dan `JIRA_TOGGLE_FIELD` (`customfield_11708`), kosong = nonaktif; `.env.example` diperbarui. **Perbaikan tambahan (laporan: epic "23Q3 …Handover…" muncul di plan 2026-Q4):** epic yang cuma lolos karena `updated` kini disaring `epicInQuarter`: masuk bila dibuat/resolved di kuartal, bernama dengan tag kuartal (mis. 26Q4), atau ≥ 25% anak (non-Won't Fix) selesai di kuartal itu; selebihnya dihitung di `excluded.epicsOutOfQuarter` dan disebut di "How is this counted?" (ASSUMPTION: ambang 25% dan tag nama; mudah diganti). UI: kartu menampilkan status baru, tanggal delivered, Toggle, dan catatan bahwa status nyala toggle tidak ada di Jira. Test baru (status epic, aturan kuartal, toggle, tanggal); `typecheck`, 135 test, `build`, `e2e` 18/18 hijau. Jira nyata, plan 2026-Q4 (label `Escape`): 7 epic (sebelumnya 10 termasuk 3 yang lama/payung): 2 Delivered, 2 All children done, 3 In progress; epic "23Q3 …" tidak lagi muncul.
 
-### OD-83 · Label tim Jira default disimpan di Connections (database) · `TODO`
+### OD-83 · Label tim Jira default disimpan di Connections (database) · `DONE`
 **Description:** Saat ini label tim di kartu "Team delivery rate" (mis. `Escape`) hanya diingat di `localStorage` browser (`one-desk:delivery-label` di `SuggestionsPanel.vue`): tidak ada di database, hilang bila ganti browser/perangkat, dan tidak bisa diatur dari Connections. Perubahan:
 1. Kolom baru `connections.team_label` (text, nullable) lewat migrasi baru (`bunx drizzle-kit generate --name connection_team_label`); `ConnectionsService.overview` mengembalikannya; endpoint `PUT /api/connections/jira/team-label` `{ label: string | null }` (dipangkas, maks 100 karakter, kosong = hapus), hanya untuk user itu sendiri dan hanya bila Jira tertaut.
 2. Halaman Connections (kartu Jira, di bawah board): kolom "Team label" dengan tombol Save, teks bantu ("Jira label of your team, used as the default in Team delivery rate"), bisa diubah atau dikosongkan; notifikasi berhasil/gagal seperti pengaturan board.
@@ -571,6 +571,7 @@ Perubahan:
 **ASSUMPTION (belum dikonfirmasi):** satu label per user (bukan per tim di tabel terpisah); label tidak divalidasi ke Jira.
 **Acceptance:** Test: simpan, ubah, kosongkan label; 409 NOT_CONNECTED bila Jira belum tertaut; label tidak bisa diatur untuk user lain; `overview` mengembalikan label. e2e: set label di Connections lalu kartu di editor plan langsung menampilkan hasil tanpa mengetik; "Use as default" tersimpan. Migrasi jalan di DB yang berisi data; `typecheck`, test, `build`, `e2e` hijau.
 **Depends:** OD-80, OD-78.
+**Log:** 2026-11-11 — Kolom `connections.team_label` (migrasi `0004_connection_team_label.sql`, hanya ADD COLUMN; sudah dijalankan di DB dev). `ConnectionsService.setTeamLabel` (butuh tautan Jira terverifikasi via `requireJira`; dipangkas; kosong = hapus; >100 karakter = 400), `PUT /api/connections/jira/team-label`, `overview.jira.teamLabel`, `requireJira` mengembalikan `teamLabel`, dan `GET …/suggestions` menyertakan `teamLabel`. Connections: bagian "Team label" (input + Save, nonaktif bila tak berubah). Kartu Team delivery rate: label default dari database terisi dan hasil langsung tampil; mengetik label lain hanya melihat sesaat; tombol "Use as default" menyimpan ke Connections; keterangan "Default: X" + tautan ke Connections; `localStorage` tidak dipakai lagi. Test: `connections-team-label.test.ts` (simpan/ubah/kosongkan, milik user sendiri, tanpa tautan Jira, terlalu panjang, route butuh sesi) + default ikut suggestions. `typecheck`, 141 test, `build`, `e2e` 19/19 hijau; screenshot `03c-connections-team-label` dicek.
 
 ## Fase 10 — Confluence (read-only)
 

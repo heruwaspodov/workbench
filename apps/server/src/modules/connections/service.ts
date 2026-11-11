@@ -5,7 +5,7 @@ import { connections, type Connection, type User } from '../../db/schema'
 import { bitbucket, bitbucketConfigured } from '../../integrations/bitbucket.client'
 import { jira, jiraConfigured, type JiraBoard } from '../../integrations/jira.client'
 import { cached } from '../../shared/cache'
-import { NotConnectedError, NotFoundError } from '../../shared/errors'
+import { BadRequestError, NotConnectedError, NotFoundError } from '../../shared/errors'
 
 const normalize = (email: string) => email.trim().toLowerCase()
 const sameEmail = (a: string | null | undefined, b: string) => Boolean(a) && normalize(a!) === normalize(b)
@@ -47,6 +47,7 @@ export abstract class ConnectionsService {
         accountId: c.jiraAccountId,
         displayName: c.jiraDisplayName,
         boardId,
+        teamLabel: c.teamLabel,
         boardName,
         boardIsDefault: c.jiraBoardId == null && env.jira.defaultBoardId != null,
       },
@@ -107,6 +108,14 @@ export abstract class ConnectionsService {
 
   static setBoard = (user: User, boardId: number | null) => this.update(user.id, { jiraBoardId: boardId })
 
+  /** Team label for the delivery rate card. Needs a verified Jira link; blank clears it. */
+  static async setTeamLabel(user: User, raw: string | null) {
+    await this.requireJira(user)
+    const label = (raw ?? '').trim()
+    if (label.length > 100) throw new BadRequestError('Label is too long (100 characters at most)')
+    return this.update(user.id, { teamLabel: label || null })
+  }
+
   /**
    * The user's own Jira account id. A link is trusted only with proof that the account's email is the user's SSO email:
    * stored when the link is made, or checked once here for links made before proof was kept. A link that fails is removed.
@@ -122,7 +131,7 @@ export abstract class ConnectionsService {
       }
       await this.update(user.id, { jiraVerifiedEmail: normalize(user.email) })
     }
-    return { accountId: c.jiraAccountId, boardId: c.jiraBoardId ?? env.jira.defaultBoardId ?? null }
+    return { accountId: c.jiraAccountId, boardId: c.jiraBoardId ?? env.jira.defaultBoardId ?? null, teamLabel: c.teamLabel }
   }
 
   // ---------- Bitbucket ----------

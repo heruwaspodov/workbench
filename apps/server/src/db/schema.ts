@@ -60,6 +60,8 @@ export const connections = pgTable('connections', {
   /** Email of the Jira account at the time it was matched to this user's SSO email: proof the link is the user's own. */
   jiraVerifiedEmail: text('jira_verified_email'),
   jiraBoardId: integer('jira_board_id'),
+  /** The user's team as a Jira label (e.g. "Escape"): the default for the Team delivery rate card. */
+  teamLabel: text('team_label'),
   bitbucketUuid: text('bitbucket_uuid'),
   bitbucketDisplayName: text('bitbucket_display_name'),
   bitbucketNickname: text('bitbucket_nickname'),

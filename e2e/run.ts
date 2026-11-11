@@ -317,6 +317,14 @@ await step('evidence is a list of link inputs: add, Enter, paste several, remove
   if (m > 1) throw new Error('evidence list overflows')
 })
 
+await step('team label is saved in Connections', async () => {
+  await page.goto(`${APP}/connections`)
+  await page.getByLabel('Team label').fill('team-x')
+  await page.locator('[data-test="team-label-form"]').getByRole('button', { name: 'Save' }).click()
+  await page.waitForFunction(async () => (await (await fetch('/api/connections')).json()).jira.teamLabel === 'team-x', undefined, { timeout: 10_000 })
+  await shot('03c-connections-team-label')
+})
+
 await step('plan suggestions: epics, Confluence, monthly delivery modal, Add toâ€¦, team rate', async () => {
   await page.goto(`${APP}/pgp/plans/${planId}`)
   await text(page, 'Pages you created or edited')
@@ -363,7 +371,13 @@ await step('plan suggestions: epics, Confluence, monthly delivery modal, Add toâ
   await text(page, 'already linked in this plan')
   await page.getByRole('button', { name: 'Cancel' }).click()
 
-  // Team delivery rate: label typed by hand.
+  // Team delivery rate: the default label from Connections is used without typing.
+  await text(page, 'Tickets done')
+  await text(page, 'Default: team-x')
+  await page.getByPlaceholder('Jira label').fill('team-y')
+  await page.locator('[data-test="save-default-label"]').click()
+  await page.waitForFunction(async () => (await (await fetch('/api/connections')).json()).jira.teamLabel === 'team-y', undefined, { timeout: 10_000 })
+  await text(page, 'Default: team-y')
   await page.getByPlaceholder('Jira label').fill('team-x')
   await page.getByRole('button', { name: 'Show', exact: true }).click()
   await text(page, 'Tickets done')

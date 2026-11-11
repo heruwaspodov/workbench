@@ -120,12 +120,12 @@ export abstract class SuggestionsService {
     if (!plan) throw new NotFoundError('Plan')
     if (plan.userId !== user.id) throw new ForbiddenError('Suggestions are only available to the plan owner')
     if (!jiraConfigured()) throw new AppError(503, 'Atlassian service account is not configured', 'JIRA_NOT_CONFIGURED')
-    const { accountId } = await ConnectionsService.requireJira(user)
-    return { plan, accountId, range: quarterRange(plan.year, plan.quarter) }
+    const { accountId, teamLabel } = await ConnectionsService.requireJira(user)
+    return { plan, accountId, teamLabel, range: quarterRange(plan.year, plan.quarter) }
   }
 
   static async get(id: string, user: User) {
-    const { plan, accountId, range } = await this.owned(id, user)
+    const { plan, accountId, teamLabel, range } = await this.owned(id, user)
     const key = `sg:${plan.id}:${accountId}`
     const guard = async <T>(run: () => Promise<T>, empty: T): Promise<{ value: T; error: string | null }> => {
       try { return { value: await run(), error: null } } catch (e) { return { value: empty, error: e instanceof Error ? e.message : 'Request failed' } }
@@ -138,6 +138,7 @@ export abstract class SuggestionsService {
     ])
     return {
       period: `${plan.year}-Q${plan.quarter}`,
+      teamLabel,
       epics: epics.value,
       pages: pages.value,
       delivery: delivery.value,
