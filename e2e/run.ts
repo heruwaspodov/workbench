@@ -225,6 +225,43 @@ await step('Create PGP from an uploaded Excel file, then the same quarter is ref
   await shot('04b-create-quarter-taken')
 })
 
+await step('items are grouped per objective in accordions (collapse, expand all, add objective)', async () => {
+  await page.goto(`${APP}/pgp/new`)
+  await page.getByRole('button', { name: 'Upload Excel' }).click()
+  await page.locator('[data-test="xlsx-file"]').setInputFiles(join(OUT, 'e2e-plan.xlsx'))
+  await page.locator('[data-test="create-plan"]').waitFor()
+  const panels = page.locator('[data-test="objective"]')
+  if ((await panels.count()) !== 2) throw new Error(`expected 2 objective panels, got ${await panels.count()}`)
+  const first = panels.first()
+  const chevron = first.getByRole('button', { name: /^Collapse Delivery/ })
+  if ((await chevron.getAttribute('aria-expanded')) !== 'true') throw new Error('first objective should start open')
+  const initiative = first.locator('textarea').nth(1)
+  await chevron.click()
+  if (await initiative.isVisible()) throw new Error('collapsed objective still shows its initiatives')
+  if ((await first.getByRole('button', { name: /^Expand Delivery/ }).getAttribute('aria-expanded')) !== 'false') throw new Error('aria-expanded did not flip')
+  await first.getByText('1 KR · 1 initiative').first().waitFor()
+  await page.locator('[data-test="toggle-all"]').click() // some are closed, so this expands all
+  await page.getByRole('button', { name: 'Collapse all' }).waitFor()
+  await initiative.waitFor({ state: 'visible' })
+  await page.getByRole('button', { name: 'Add objective' }).click()
+  if ((await panels.count()) !== 3) throw new Error('Add objective did not add a panel')
+  const added = panels.last().locator('input').first()
+  if (!(await added.evaluate((el) => el === document.activeElement))) throw new Error('new objective input is not focused')
+  await panels.last().getByText('Needs attention').waitFor()
+  await page.locator('[data-test="toggle-all"]').click() // collapse all; the unnamed objective must stay open
+  if (!(await panels.last().locator('textarea').first().isVisible())) throw new Error('an objective that needs attention was collapsed')
+  for (const width of [1440, 1024, 768]) {
+    await page.setViewportSize({ width, height: 900 })
+    await page.waitForTimeout(200)
+    const m = await page.evaluate(() => ({ page: document.documentElement.scrollWidth - innerWidth, wide: [...document.querySelectorAll('main *')].filter((e) => e.getBoundingClientRect().right > innerWidth + 1).length }))
+    if (m.page > 1 || m.wide > 0) throw new Error(`Objective accordions overflow at ${width}px (page +${m.page}px, ${m.wide} elements past the edge)`)
+    if (width === 768) await shot('04d-accordion-768')
+  }
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.waitForTimeout(200)
+  await shot('04e-accordion')
+})
+
 await step('template editor imports the same Excel file with the same extractor', async () => {
   await page.goto(`${APP}/pgp/templates/new`)
   await page.getByRole('tab', { name: 'Upload Excel (.xlsx)' }).click()

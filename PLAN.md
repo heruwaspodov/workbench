@@ -35,7 +35,7 @@ Status: `TODO` · `IN PROGRESS` · `DONE` · `BLOCKED`
 | 8. Hardening & integrasi nyata | OD-36 … OD-42 | TODO |
 | 9. Rilis MVP internal | OD-43 … OD-44 | TODO |
 | 10. Confluence (read-only) | OD-54 | IN PROGRESS |
-| 11. Create PGP per tahun+kuartal & evidence otomatis | OD-71 … OD-73 (create), OD-68 … OD-70 (saran) | OD-71 … OD-73 dan OD-68 DONE, OD-69 … OD-70 dan OD-74 TODO |
+| 11. Create PGP per tahun+kuartal & evidence otomatis | OD-71 … OD-73 (create), OD-68 … OD-70 (saran) | OD-71 … OD-73 dan OD-68 DONE, OD-74 DONE, OD-69 … OD-70 TODO |
 
 **Urutan kerja berikutnya (disarankan):** OD-32 → OD-33 → OD-34 → OD-35 → OD-31 → OD-45 … OD-50 → OD-36 → sisanya.
 
@@ -485,11 +485,12 @@ Cache 5 menit per (user, plan, query); `NOT_CONNECTED` bila Jira belum terhubung
 **Acceptance:** Daftar metrik yang didukung beserta JQL/rumusnya tercatat; tiap metrik diverifikasi terhadap angka di sheet Q3 user (selisih dicatat); yang tidak bisa dihitung pasti ditandai sebagai keputusan; test dan e2e hijau.
 **Depends:** OD-69.
 
-### OD-74 · Item PGP dikelompokkan per objective dalam accordion · `TODO`
+### OD-74 · Item PGP dikelompokkan per objective dalam accordion · `DONE`
 **Description:** Di `ItemsEditor` (dipakai `/pgp/new`, editor plan, dan editor template) item dikelompokkan **per objective**: tiap objective jadi satu panel accordion, di dalamnya key result (KR) sebagai sub-kelompok dengan initiative-nya seperti sekarang. Header panel (satu baris, bisa diklik, tombol dengan `aria-expanded`) menampilkan chevron, nama objective, jumlah KR dan initiative, Weight total, dan Score (mode plan); header menyatukan objective yang sama walau barisnya tidak berurutan hanya bila urutan data memang berurutan (urutan baris tidak diubah diam-diam). Tombol **Expand all / Collapse all**. Default: semua terbuka bila ≤ 3 objective, selain itu hanya yang pertama terbuka; objective yang berisi input tidak valid (achievement > weight, objective kosong) otomatis terbuka. Keadaan buka/tutup hanya di memori halaman (tidak disimpan ke server). Aksi yang sudah ada (edit objective/KR, Add initiative, Add objective, pindah, hapus, total weight) tetap berfungsi; Add objective membuka panel barunya dan memberi fokus ke inputnya. Perilaku mobile: tidak ada scroll horizontal.
 **ASSUMPTION (belum dikonfirmasi):** "per objective" berarti accordion tingkat objective dengan KR di dalamnya (bukan accordion per pasangan objective+KR seperti kartu sekarang).
 **Acceptance:** Daftar item di `/pgp/new` (hasil upload), `/pgp/plans/:id` (draft dan submitted/readonly), dan editor template tampil sebagai accordion per objective dengan header ringkasan yang benar (jumlah, weight, score); expand/collapse tunggal dan semua berfungsi lewat mouse dan keyboard (Enter/Space); objective tidak valid terbuka otomatis; mengedit, menambah, memindah, dan menghapus tetap menyimpan data yang sama (tidak ada perubahan payload API); tanpa scroll horizontal di 1440/1024/768; e2e mencakup collapse/expand dan menambah objective; typecheck, build, test, e2e hijau.
 **Depends:** OD-72.
+**Log:** 2026-11-11 — `ItemsEditor` kini membuat satu panel accordion per objective (objective berurutan yang namanya sama digabung; urutan baris dan payload API tidak berubah), KR dan initiative di dalamnya. Header: chevron (tombol `aria-expanded`/`aria-controls`), nama objective (input atau teks saat terkunci), jumlah KR dan initiative, Weight, Score (plan); tombol Expand all / Collapse all; default semua terbuka bila ≤ 3 objective, selain itu hanya yang pertama; objective tanpa nama atau dengan achievement > weight diberi badge "Needs attention" dan tetap terbuka; Add objective membuka panel baru dan memberi fokus ke inputnya. Keadaan hanya di memori halaman. Panel memakai `v-show` agar isian tidak hilang saat ditutup. Berlaku di `/pgp/new`, editor plan (termasuk submitted/readonly), dan editor template. Verifikasi: `bun run typecheck`, `bun run test` (112 lulus), `bun run build`, `bun run e2e` 16/16 (langkah baru: 2 panel dari upload, collapse flip `aria-expanded`, Expand/Collapse all, Add objective + fokus + Needs attention tetap terbuka, tanpa overflow 1440/1024/768) dan cek screenshot. Catatan: kontrol keyboard memakai tombol native (Enter/Space), tidak dicoba dengan pembaca layar. Commit: lihat git log.
 
 ## Fase 10 — Confluence (read-only)
 
