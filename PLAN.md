@@ -547,6 +547,21 @@ Cache 5 menit per (user, plan, query); `NOT_CONNECTED` bila Jira belum terhubung
 **Depends:** OD-69, OD-80.
 **Log:** 2026-11-11 — Komponen baru `PanelCard.vue` (header tombol: judul, subjudul satu baris, badge jumlah, chevron; bisa dilipat, keadaan diingat di `localStorage` per kartu; hanya Jira epics terbuka default). `SuggestionsPanel.vue` memakainya untuk semua kartu; aside sticky kini `max-height: calc(100vh - 3rem)` + satu scroll internal hanya di `xl` (di bawahnya mengalir normal), kolom 320 → 360 px; "Show all" memperluas daftar dengan tinggi maks 320 px dan scroll sendiri; baris seragam; kartu Team delivery rate: 4 tile angka (done/released, tiket/SP), penjelasan di `<details>` "How is this counted?", daftar epic berlabel dengan Show all. Perbaikan: kartu tidak lagi menyusut di flex (`flexShrink: 0`). e2e: kartu dibuka lewat header, mock diperbanyak (8 halaman, 10 epic berlabel), cek panel ≤ tinggi layar dan tak melebar saat semua Show all dibuka, screenshot `02f/02g/02h`. `typecheck`, test, `build`, `e2e` 18/18 hijau; screenshot dicek (belum dilihat di one-desk.local karena login SSO).
 
+### OD-82 · Status delivery initiative berdasarkan status epic (bukan fixVersion) + info toggle · `TODO`
+**Description:** Masukan tim (Jira, "dihitung dari epicnya sudah done semua atau belum, plus togglenya sudah nyala atau belum") dan pengecekan Jira nyata (label `Escape`, 2026-Q3, 19 epic, baca saja) menunjukkan status release per epic di OD-80 terlalu keras: `fixVersion` tidak konsisten diisi (mis. epic "Asynchronous KYC" semua 21 anak done tetapi hanya 13 berfix version released; epic Done rata-rata hanya sekitar 50-60% anak berfix version). Temuan Jira:
+- Status epic sendiri bisa dipercaya: 10 dari 19 Done; 8 di antaranya punya `Actual Delivery Date` (`customfield_11781`).
+- Ada epic payung yang tidak pernah ditutup (Production Support, Adhoc Request, Releases, Additional Task, mis. 250-440 anak).
+- Beberapa epic To Do sebenarnya anak-anaknya sudah semua done (mis. 21/21), kemungkinan lupa ditutup.
+- Toggle: field `Toggle Name` (`customfield_11708`) hanya terisi di 9 dari 682 tiket anak dan `Toggle Deployment` (`customfield_11709`) tidak terisi sama sekali. Apakah toggle sudah **menyala** tidak tercatat di Jira (ada di Flipper), jadi tidak bisa dihitung otomatis.
+Perubahan:
+1. Status epic di kartu Team delivery rate (`epicReleaseStatus`) diganti menjadi: **Delivered** (status epic kategori Done; tampilkan `Actual Delivery Date` bila ada), **All children done** (epic masih terbuka tetapi semua anak done: kandidat untuk ditutup), **In progress** (ada anak belum done), **No children**.
+2. Ringkasan di kartu: "Epics delivered X/Y" (X = Delivered), badge per status; hitungan `fixVersion` released per epic tetap tampil sebagai info sekunder ("n/m released"), bukan penentu.
+3. Toggle: kumpulkan nama toggle dari `Toggle Name` anak epic dan tampilkan sebagai info per epic ("Toggle: ft_xxx"); label kartu menyebut bahwa status nyala/mati tidak tersedia di Jira.
+4. Angka "Tickets released" dari OD-80 tetap, tetapi diberi catatan bahwa bergantung pada kelengkapan `fixVersion`.
+**ASSUMPTION (belum dikonfirmasi):** epic payung yang tidak pernah ditutup tetap ditampilkan sebagai In progress (tidak ada cara andal mengenalinya otomatis); id field Jira di atas khusus site ini dan dibaca dari env/konstanta yang bisa diganti.
+**Acceptance:** Test (Jira palsu): epic Done dihitung Delivered dengan tanggal bila ada; epic terbuka dengan semua anak done jadi All children done; ada anak belum done jadi In progress; tanpa anak jadi No children; `Won't Fix` diabaikan; nama toggle dari anak tampil unik per epic. `typecheck`, test, `build`, `e2e` hijau; angka label `Escape` 2026-Q3 pada Jira nyata dibandingkan (harapan: 10 Delivered, beberapa All children done) dan dicatat di Log.
+**Depends:** OD-80, OD-81.
+
 ## Fase 10 — Confluence (read-only)
 
 ### OD-54 · Confluence: My Confluence + evidence PGP · `IN PROGRESS`
