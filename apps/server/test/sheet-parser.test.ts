@@ -54,6 +54,30 @@ describe('parsePgpSheet', () => {
   })
 })
 
+describe('parsePgpSheet rows that mention header words', () => {
+  const head = ['Company OKR', 'Objective', 'Key Results', 'Weightage', 'Initiatives', 'Start Value', 'Target Value', 'Current Value', '% Achievement', 'Status']
+  const rows = [
+    head,
+    head, // the sheet repeats its header line; this one must still be skipped
+    ['', 'Delivery', '<10% carry over (each instance deducts 20% of KR achievement)', '2%', 'Keep carry-over under 10%'],
+    ['', 'Quality', 'Bugs per sprint. Weight each by status and keep evidence of every achievement', '3%', 'Limit bugs leaking to staging'],
+    ['', 'Reliability', 'Current value of the SLO stays above target value', '95%', 'Hold the SLO'],
+  ]
+  const parsed = parsePgpSheet(rows)
+
+  test('keeps key results whose text contains achievement, weight, status or value', () => {
+    expect(parsed.items.map((i) => [i.initiative, i.weight])).toEqual([
+      ['Keep carry-over under 10%', 2], ['Limit bugs leaking to staging', 3], ['Hold the SLO', 95],
+    ])
+    expect(parsed.totalWeight).toBe(100)
+    expect(parsed.warnings).toEqual([])
+  })
+
+  test('still skips the repeated header line', () => {
+    expect(parsed.items.some((i) => i.objective === 'Objective' || i.keyResult === 'Key Results')).toBe(false)
+  })
+})
+
 describe('parsePercent', () => {
   test.each([
     ['2%', 2], ['12.5%', 12.5], ['0.3', 30], ['30', 30], ['', null], ['abc', null],

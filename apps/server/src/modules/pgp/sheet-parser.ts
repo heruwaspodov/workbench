@@ -113,8 +113,9 @@ export function parsePgpSheet(rows: string[][], links?: string[][]): ParsedSheet
     if (row.every((c) => !c)) continue
     if (row.some((c) => /^example\s*:?/i.test(c))) continue
     if (row.some((c) => /^(total|team members)$/i.test(c))) break
-    // Skip the second header line if present
-    if (HEADER_MATCHERS.some(([, re]) => re.test(get(row, 'keyResult')) || re.test(get(row, 'objective')))) continue
+    // Skip a repeated header line. Only the exact labels count: a key result that merely mentions
+    // "achievement" or "weight" in its text is a real row.
+    if (/^objectives?$/i.test(get(row, 'objective')) || /^key\s*results?$/i.test(get(row, 'keyResult'))) continue
 
     const objective = get(row, 'objective') || carry.objective
     const keyResult = get(row, 'keyResult') || carry.keyResult
