@@ -594,6 +594,11 @@ Aplikasi menghitung sendiri dari konfigurasi ini, mengikuti perubahan di Jira le
 **Acceptance:** Test (Jira palsu): pemilihan goal menurut priority+label+assignee, goal pertama yang cocok menang; Weekdays melewati akhir pekan, tanpa kalender tidak; memenuhi/terlewat/berjalan/no goal; Won't Fix dihitung selesai; owner saja; tabel goal dapat diubah admin dan memengaruhi hasil. `typecheck`, test, `build`, `e2e` hijau; angka Jira nyata (label `Escape`, 2026-Q3) dibandingkan dengan panel pada beberapa tiket (mis. MESIGN-24252: memenuhi) dan dicatat di Log.
 **Depends:** OD-80, OD-83.
 
+### OD-85 · Epic inisiatif tim ikut terhitung bila anak-anaknya berlabel tim (epic sendiri tak berlabel) · `TODO`
+**Description:** Kartu Team delivery rate hanya mencantumkan epic yang **dirinya** berlabel tim (mis. `Escape`). Epic inisiatif engineering seperti MESIGN-23018 ("26Q4 ENG - Single Sign PSrE with Async Method", Done, tanpa label dan tanpa assignee) tidak muncul padahal 10 anaknya berlabel `Escape` dan semuanya milik user. Perubahan: himpunan epic di kartu = (epic berlabel tim) ∪ (epic yang menjadi parent tiket berlabel tim yang aktif di kuartal); anak diambil dari seluruh isi epic seperti sekarang. Tanda "dari label anak" di baris epic (info kecil) agar jelas mengapa epic itu ada. Aturan kuartal (`epicInQuarter`) tetap berlaku.
+**Acceptance:** Test (Jira palsu): epic tanpa label dengan anak berlabel masuk; epic tanpa label tanpa anak berlabel tidak; tidak duplikat dengan epic berlabel; aturan kuartal tetap. `typecheck`, test, `build`, `e2e` hijau; plan 2026-Q4 label `Escape` di Jira nyata memuat MESIGN-23018 (Delivered) dan hasilnya dicatat di Log.
+**Depends:** OD-82.
+
 ## Fase 10 — Confluence (read-only)
 
 ### OD-54 · Confluence: My Confluence + evidence PGP · `IN PROGRESS`
