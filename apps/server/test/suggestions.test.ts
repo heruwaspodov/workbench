@@ -57,6 +57,7 @@ describe('SuggestionsService', () => {
         issue('C-3', { parent: parent('S-1', 'Story', 'A story, not an epic') }),
       ]
     }
+    if (jql.includes('issuetype = Bug')) return [issue('B-1', { priority: { name: 'Medium - P2' } }), issue('B-2', { priority: { name: 'Medium - P2' } }), issue('B-3', { priority: { name: 'High - P1' } }), issue('B-4', { priority: { name: 'Lowest' } })]
     if (jql.includes('labels =')) return RATE
     const [from, to] = [...jql.matchAll(/resolutiondate (?:>=|<) "([^"]+)"/g)].map((m) => m[1]!)
     return DELIVERY.filter((i) => String(i.fields.resolutiondate).slice(0, 10) >= from! && String(i.fields.resolutiondate).slice(0, 10) < to!)
@@ -144,6 +145,15 @@ describe('SuggestionsService', () => {
     expect(res.pages.map((p) => [p.title, p.kind])).toEqual([['RFC: new signing flow', 'rfc'], ['RCA 2026-09 outage', 'rca'], ['Runbook for webhooks', 'tech-doc'], ['Meeting notes', 'other']])
     expect(wikiHits.at(-1)).toBe(`type = page AND contributor = "${ACCOUNT}" AND lastmodified >= now("-92d") ORDER BY lastmodified DESC`)
     expect(JSON.stringify(res)).not.toContain('SECRET BODY')
+  })
+
+  test('bugs: assigned to the owner and created in the quarter, counted per priority level', async () => {
+    const res = await Svc.get(planQ3, owner)
+    expect(res.bugs).toMatchObject({ total: 4, value: 'Lowest: 1, P1: 1, P2: 2' })
+    expect(res.bugs!.items.map((i) => [i.label, i.count])).toEqual([['Lowest', 1], ['P1', 1], ['P2', 2]])
+    expect(res.bugs!.jql).toBe(`assignee = "${ACCOUNT}" AND issuetype = Bug AND created >= "2026-07-01" AND created < "2026-10-01" ORDER BY created ASC`)
+    expect(res.bugs!.url).toContain(encodeURIComponent('issuetype = Bug'))
+    expect(res.errors.bugs).toBeNull()
   })
 
   test('identical requests are served from the cache', async () => {

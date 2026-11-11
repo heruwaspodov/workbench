@@ -67,17 +67,19 @@ export abstract class SuggestionsService {
     const guard = async <T>(run: () => Promise<T>, empty: T): Promise<{ value: T; error: string | null }> => {
       try { return { value: await run(), error: null } } catch (e) { return { value: empty, error: e instanceof Error ? e.message : 'Request failed' } }
     }
-    const [epics, pages, delivery] = await Promise.all([
+    const [epics, pages, delivery, bugs] = await Promise.all([
       guard(() => cached(`${key}:epics`, TTL, () => this.epics(accountId, plan.year, plan.quarter, range)), []),
       guard(() => cached(`${key}:pages`, TTL, () => this.pages(user)), []),
       guard(() => cached(`${key}:delivery`, TTL, () => this.delivery(accountId, range)), []),
+      guard(() => cached(`${key}:bugs`, TTL, () => this.bugs(accountId, range)), null),
     ])
     return {
       period: `${plan.year}-Q${plan.quarter}`,
       epics: epics.value,
       pages: pages.value,
       delivery: delivery.value,
-      errors: { epics: epics.error, pages: pages.error, delivery: delivery.error },
+      bugs: bugs.value,
+      errors: { epics: epics.error, pages: pages.error, delivery: delivery.error, bugs: bugs.error },
     }
   }
 
@@ -118,6 +120,25 @@ export abstract class SuggestionsService {
     })
   }
 
+  /**
+   * Bugs assigned to the user and created in the quarter, counted per priority.
+   * Checked against the Q3 2026 sheet: "P2: 7" matches. Other bug counts in the sheet (leaked to staging,
+   * production bugs from PIC initiatives) follow internal definitions that Jira alone does not carry, so they are not offered.
+   */
+  private static async bugs(accountId: string, range: ReturnType<typeof quarterRange>) {
+    const jql = `assignee = ${quote(accountId)} AND issuetype = Bug AND created >= ${quote(range.from)} AND created < ${quote(range.to)} ORDER BY created ASC`
+    const { issues } = await jira.search(jql, ['priority'], ISSUE_CAP)
+    const byPriority = new Map<string, number>()
+    for (const i of issues) {
+      const name = String(i.fields.priority?.name ?? 'No priority')
+      byPriority.set(name, (byPriority.get(name) ?? 0) + 1)
+    }
+    // "Medium - P2" is shown as "P2": the sheet counts by the P-level.
+    const short = (name: string) => name.match(/\bP\d\b/i)?.[0].toUpperCase() ?? name
+    const items = [...byPriority].map(([priority, count]) => ({ priority, label: short(priority), count })).sort((a, b) => a.label.localeCompare(b.label))
+    return { total: issues.length, items, value: items.map((i) => `${i.label}: ${i.count}`).join(', '), jql, url: jqlUrl(jql) }
+  }
+
   /** Tickets behind one month's numbers, for the detail modal. */
   static async deliveryMonth(id: string, user: User, month: string) {
     const { plan, accountId, range } = await this.owned(id, user)
@@ -147,7 +168,7 @@ export abstract class SuggestionsService {
     if (!label) throw new BadRequestError('Label is required')
     const jql = `labels = ${quote(label)} AND created < ${quote(range.to)} AND (resolution is EMPTY OR resolutiondate >= ${quote(range.from)})`
     const cap = 1000
-    const issues = await cached(`sg:${plan.id}:${accountId}:rate:${label}`, TTL, async () => (await jira.search(jql, ['resolutiondate', SP], cap)).issues)
+    const { issues, truncated } = await cached(`sg:${plan.id}:${accountId}:rate:${label}`, TTL, () => jira.search(jql, ['resolutiondate', SP], cap))
     const isDone = (i: JiraIssue) => {
       const d = dayOf(i.fields.resolutiondate)
       return d >= range.from && d < range.to
@@ -156,7 +177,7 @@ export abstract class SuggestionsService {
     const rate = (a: number, b: number) => (b === 0 ? null : Math.round((a / b) * 1000) / 10)
     const spSum = (list: JiraIssue[]) => list.reduce((s, i) => s + sp(i), 0)
     return {
-      label, from: range.from, to: range.to, jql, url: jqlUrl(jql), truncated: issues.length >= cap,
+      label, from: range.from, to: range.to, jql, url: jqlUrl(jql), truncated,
       tickets: { done: done.length, total: issues.length, rate: rate(done.length, issues.length) },
       storyPoints: { done: spSum(done), total: spSum(issues), rate: rate(spSum(done), spSum(issues)) },
     }

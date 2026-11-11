@@ -114,6 +114,23 @@ Aturan bisnis PGP:
 | Confluence Cloud | `/wiki/rest/api/search` (CQL) | Service account yang sama dengan Jira; hanya metadata halaman (judul, space, tanggal, link), difilter `accountId` user; isi halaman tidak pernah dibaca/ditampilkan |
 | Google Sheets | Sheets API v4 (service account, readonly) | Sheet harus di-share ke email service account. Alternatif tanpa setup: upload .xlsx |
 
+## 7a. Saran evidence & Current Value dari Jira (OD-68, OD-69, OD-70)
+
+Panel di halaman detail plan (hanya owner) menghitung saran dari akun Atlassian si owner, dalam kuartal plan. Hanya metadata (key, judul, status, tanggal, URL); tidak ada isi issue atau halaman. Tidak ada yang terisi otomatis: setiap aksi (Add to…, Use as current value, Add initiatives) butuh konfirmasi dan baru tersimpan setelah Save. Pencarian Jira diikuti `nextPageToken` karena Jira membatasi 100 issue per halaman.
+
+| Metrik | Rumus / JQL | Diverifikasi terhadap sheet Q3-2026 |
+|--------|-------------|-------------------------------------|
+| Story points & tiket per bulan | `assignee = <accountId> AND resolutiondate >= <awal bulan> AND resolutiondate < <awal bulan berikut> AND cf[<id field SP>] > 0`; SP = jumlah field SP, tiket = jumlah issue | Juli: 162 SP / 62 tiket, sama dengan sheet. Agustus 51/20, September 62/32 (tidak ada di sheet) |
+| Bug per prioritas | `assignee = <accountId> AND issuetype = Bug AND created >= <awal kuartal> AND created < <awal kuartal berikut>`, dihitung per level P (`Medium - P2` → `P2`) | "P2: 7" sama dengan sheet (baris bug staging) |
+| Team delivery rate per label | label diisi manual; total = `labels = "L" AND created < <akhir> AND (resolution is EMPTY OR resolutiondate >= <awal>)`; selesai = yang resolved di kuartal; dilaporkan per tiket dan per SP; seluruh tim | Belum diverifikasi (label di sheet tidak diketahui) |
+| Epic kuartal ini | epic assigned ke user, `created < akhir`, `updated >= awal`, terbuka atau resolved sejak awal; ditambah epic induk dari issue yang user resolve di kuartal | 7 dari 7 epic yang di-link di sheet |
+| Halaman Confluence | halaman yang user buat/kontribusikan 92 hari terakhir; jenis ditebak dari judul | 3 dari 5 halaman yang di-link di sheet berada dalam jendela uji |
+
+**Tidak ditawarkan (butuh keputusan definisi, tidak ditebak):**
+- *Rata-rata story point per sprint* ("AVG 44"): board 2508 adalah Kanban, issue tidak punya sprint, jadi tidak bisa dihitung dari Jira.
+- *Median lead time* ("3d 7h"): median `created → resolved` dari issue yang user resolve di Q3 = 4d 8h (semua) / 4d 2h (bertanda SP), tidak cocok dengan sheet; kemungkinan memakai definisi lain (mulai dari In Progress, jam kerja). Tentukan definisinya dulu.
+- *Carry-over %*, *bug bocor ke staging per sprint*, *bug produksi dari inisiatif PIC* ("P2: 5"), *CFR*, *Deployment Frequency / DORA*, *SLA tiket FT* ("Met 24 Breached 0"), *jumlah RCA* (4 / 8 / 6 berbeda per baris), *ack rate PagerDuty*, *code coverage*: bergantung pada definisi internal, sprint, atau sistem di luar Jira.
+
 ## 8. Prinsip keamanan & data (UU PDP / ISO 27001 / 27701)
 
 - Tidak ada secret di repo; semua via `.env` (`.env.example` hanya placeholder). Token integrasi hanya di server.

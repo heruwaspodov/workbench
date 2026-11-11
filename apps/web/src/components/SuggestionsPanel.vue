@@ -160,6 +160,25 @@ const problem = css({ color: 'text.danger' })
         </button>
       </section>
 
+      <section :class="card" data-test="bugs">
+        <div>
+          <MpText weight="semiBold">Bugs by priority</MpText>
+          <MpText size="label-small" color="text.secondary">Assigned to you and created in {{ data.period }}</MpText>
+        </div>
+        <MpText v-if="data.errors.bugs" size="label" :class="problem">Bugs could not be loaded: {{ data.errors.bugs }}</MpText>
+        <MpText v-else-if="!data.bugs || !data.bugs.total" size="label" color="text.secondary">No bugs assigned to you were created this quarter.</MpText>
+        <template v-else>
+          <div v-for="b in data.bugs.items" :key="b.priority" :class="row">
+            <MpText size="label" :title="b.priority">{{ b.label }}</MpText>
+            <MpText size="label" weight="semiBold">{{ b.count }}</MpText>
+          </div>
+          <div :class="meta">
+            <a :href="data.bugs.url" target="_blank" rel="noopener noreferrer"><MpButton size="sm" variant="ghost" right-icon="newtab">Open in Jira</MpButton></a>
+            <MpButton size="sm" variant="ghost" @click="openPicker('Bugs by priority', data.bugs.url, data.bugs.value)">Add to…</MpButton>
+          </div>
+        </template>
+      </section>
+
       <section :class="card" data-test="rate">
         <div>
           <MpText weight="semiBold">Team delivery rate</MpText>

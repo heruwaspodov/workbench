@@ -57,12 +57,23 @@ export const jira = {
       query: { jql, fields: fields.join(','), maxResults: 200 },
     }),
 
-  /** Enhanced JQL search (the legacy /search endpoint is deprecated). */
-  search: (jql: string, fields: string[], maxResults = 100) =>
-    http<{ issues: JiraIssue[]; nextPageToken?: string }>('/rest/api/3/search/jql', {
-      method: 'POST',
-      body: JSON.stringify({ jql, fields, maxResults }),
-    }),
+  /**
+   * Enhanced JQL search. Jira returns at most 100 issues per page whatever `maxResults` says, so this follows
+   * `nextPageToken` until `maxResults` issues are collected or the results run out.
+   */
+  search: async (jql: string, fields: string[], maxResults = 100) => {
+    const issues: JiraIssue[] = []
+    let nextPageToken: string | undefined
+    do {
+      const page = await http<{ issues: JiraIssue[]; nextPageToken?: string }>('/rest/api/3/search/jql', {
+        method: 'POST',
+        body: JSON.stringify({ jql, fields, maxResults: Math.min(maxResults - issues.length, 100), nextPageToken }),
+      })
+      issues.push(...page.issues)
+      nextPageToken = page.issues.length ? page.nextPageToken : undefined
+    } while (nextPageToken && issues.length < maxResults)
+    return { issues: issues.slice(0, maxResults), truncated: Boolean(nextPageToken) }
+  },
 
   getIssue: (key: string, fields: string[]) =>
     http<JiraIssue>(`/rest/api/3/issue/${encodeURIComponent(key)}`, { query: { fields: fields.join(',') } }),

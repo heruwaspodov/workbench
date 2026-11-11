@@ -99,6 +99,7 @@ const epic = (n: number, summary: string, cat: string, st: string) =>
 function searchJql(jql: string) {
   if (jql.includes('issuetype = Epic')) return [epic(1, 'Mock epic for e2e', 'indeterminate', 'In Progress'), epic(2, 'Mock finished epic', 'done', 'Done')]
   if (jql.includes('parent is not EMPTY')) return []
+  if (jql.includes('issuetype = Bug')) return ['1', '2'].map((n) => ({ id: `b${n}`, key: `MESIGN-85${n}`, fields: { priority: { name: 'Medium - P2' } } }))
   const { from, to } = range(jql)
   if (jql.includes('labels =')) {
     const month = (from || iso(0)).slice(0, 7)

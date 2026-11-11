@@ -282,6 +282,8 @@ await step('plan suggestions: epics, Confluence, monthly delivery modal, Add toâ
   await text(page, 'Runbook Signing')
   if (await page.getByText('CONFIDENTIAL BODY TEXT').count()) throw new Error('page body/excerpt leaked into the UI')
   await text(page, 'Mock epic for e2e')
+  await page.locator('[data-test="bugs"]').getByText('P2', { exact: true }).waitFor()
+  if (!(await page.locator('[data-test="bugs"]').innerText()).replace(/\s+/g, ' ').includes('P2 2')) throw new Error('bugs by priority should show P2 2')
   await shot('02b-plan-suggestions')
 
   // Month row -> modal with the tickets, a Jira JQL link, and "Use as current value".
@@ -291,7 +293,7 @@ await step('plan suggestions: epics, Confluence, monthly delivery modal, Add toâ
   await text(page, 'Delivered story')
   const total = (await page.locator('[data-test="month-total"]').innerText()).replace(/\s+/g, ' ')
   if (!/^8 SP Â· 2 tickets/.test(total)) throw new Error(`unexpected month total: ${total}`)
-  const jira = await page.getByRole('link', { name: 'Open in Jira' }).first().getAttribute('href')
+  const jira = await page.getByRole('link', { name: 'Open in Jira' }).last().getAttribute('href') // the modal renders last
   if (!jira?.includes('/issues?jql=') || !jira.includes('resolutiondate')) throw new Error(`unexpected Jira link: ${jira}`)
   await shot('02c-month-modal')
   await page.getByRole('button', { name: 'Add toâ€¦' }).last().click()
