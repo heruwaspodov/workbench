@@ -1,6 +1,7 @@
 import type { User } from '../../db/schema'
 import { bitbucket, type BbPullRequest } from '../../integrations/bitbucket.client'
 import { cached } from '../../shared/cache'
+import { NotFoundError } from '../../shared/errors'
 import { ConnectionsService } from '../connections/service'
 import { PR_STATES, type PullRequestSummary } from './model'
 
@@ -67,10 +68,18 @@ export abstract class PullRequestsService {
     return { items: items.slice((page - 1) * pagelen, page * pagelen), page, pagelen, total: items.length, hasNext: items.length > page * pagelen }
   }
 
+  /** The pull request, only if the user is its author, a reviewer or a participant; anything else reads as not found. */
+  private static async involved(user: User, repo: string, id: number) {
+    const { uuid } = await ConnectionsService.requireBitbucket(user)
+    const pr = await bitbucket.pullRequest(repo, id)
+    const mine = pr.author?.uuid === uuid || pr.reviewers?.some((r) => r.uuid === uuid) || pr.participants?.some((p) => p.user?.uuid === uuid)
+    if (!mine) throw new NotFoundError('Pull request')
+    return pr
+  }
+
   static async detail(user: User, repo: string, id: number) {
-    await ConnectionsService.requireBitbucket(user)
-    const [pr, diffstat, commits, comments, statuses] = await Promise.all([
-      bitbucket.pullRequest(repo, id),
+    const pr = await this.involved(user, repo, id)
+    const [diffstat, commits, comments, statuses] = await Promise.all([
       bitbucket.diffstat(repo, id).catch(() => ({ values: [] })),
       bitbucket.commits(repo, id).catch(() => ({ values: [] })),
       bitbucket.comments(repo, id).catch(() => ({ values: [] })),
@@ -114,7 +123,7 @@ export abstract class PullRequestsService {
 
   /** Raw unified diff, capped to protect the browser. */
   static async diff(user: User, repo: string, id: number) {
-    await ConnectionsService.requireBitbucket(user)
+    await this.involved(user, repo, id)
     const raw = await bitbucket.diff(repo, id)
     const LIMIT = 400_000
     return { diff: raw.length > LIMIT ? raw.slice(0, LIMIT) : raw, truncated: raw.length > LIMIT }

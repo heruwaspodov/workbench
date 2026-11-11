@@ -54,7 +54,7 @@ describe('pull request list paging', () => {
     Object.assign(bbEnv, { apiUrl: `http://localhost:${server.port}/2.0`, workspace: 'ws', accessToken: 'bb-token' })
     const [u] = await ctx.db.insert(S.users).values({ email: `${tag}-u@test.local`, name: 'U' }).returning()
     user = u!
-    await ctx.db.insert(S.connections).values({ userId: user.id, bitbucketUuid: UUID })
+    await ctx.db.insert(S.connections).values({ userId: user.id, jiraAccountId: `acct-${tag}`, jiraVerifiedEmail: user.email, bitbucketUuid: UUID, bitbucketVerifiedAccountId: `acct-${tag}` })
   })
 
   afterAll(async () => {

@@ -94,7 +94,7 @@ describe('SuggestionsService', () => {
 
     const mk = async (n: string) => (await ctx.db.insert(S.users).values({ email: `${tag}-${n}@test.local`, name: n }).returning())[0]!
     owner = await mk('owner'); other = await mk('other'); loner = await mk('loner')
-    await ctx.db.insert(S.connections).values({ userId: owner.id, jiraAccountId: ACCOUNT })
+    await ctx.db.insert(S.connections).values({ userId: owner.id, jiraAccountId: ACCOUNT, jiraVerifiedEmail: owner.email })
     const plan = async (userId: string, year: number, quarter: number) => (await ctx.db.insert(S.plans).values({ userId, year, quarter }).returning())[0]!.id
     planQ3 = await plan(owner.id, 2026, 3)
     planQ2 = await plan(owner.id, 2026, 2)

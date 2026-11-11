@@ -152,6 +152,11 @@ await step('connect Jira, Bitbucket and board (API), connections page', async ()
   await api('PUT', '/api/connections/jira/board', { boardId: 7 })
   await page.goto(`${APP}/connections`)
   await text(page, 'Dev Mekari')
+  // Nobody may link someone else's account by hand any more.
+  for (const [method, path, data] of [['PUT', '/api/connections/jira', { accountId: 'acc-other' }], ['GET', '/api/connections/jira/users?q=a', undefined], ['PUT', '/api/connections/bitbucket', { uuid: 'x' }]] as const) {
+    const r = await page.request.fetch(APP + path, { method, data: data as never, headers: { origin: APP, ...(data ? { 'content-type': 'application/json' } : {}) } })
+    if (r.status() !== 404) throw new Error(`${method} ${path} should be gone, got ${r.status()}`)
+  }
   await shot('03-connections')
 })
 

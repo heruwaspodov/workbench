@@ -23,7 +23,7 @@ describe('Kanban follows the board sub-filter', () => {
 
   const userOnBoard = async (boardId: number, n: string) => {
     const [u] = await ctx.db.insert(S.users).values({ email: `${tag}-${n}@test.local`, name: n }).returning()
-    await ctx.db.insert(S.connections).values({ userId: u!.id, jiraAccountId: `acct-${tag}-${n}`, jiraBoardId: boardId })
+    await ctx.db.insert(S.connections).values({ userId: u!.id, jiraAccountId: `acct-${tag}-${n}`, jiraVerifiedEmail: u!.email, jiraBoardId: boardId })
     return u!
   }
 

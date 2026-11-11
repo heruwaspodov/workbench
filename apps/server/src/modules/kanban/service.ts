@@ -3,6 +3,7 @@ import type { User } from '../../db/schema'
 import { jira, type JiraIssue } from '../../integrations/jira.client'
 import { adfToText } from '../../shared/adf'
 import { cached } from '../../shared/cache'
+import { NotFoundError } from '../../shared/errors'
 import { ConnectionsService } from '../connections/service'
 import type { KanbanCard } from './model'
 
@@ -89,13 +90,15 @@ export abstract class KanbanService {
     }
   }
 
+  /** Only issues the user is assigned to or reported: the service account can read far more than one person should see. */
   static async issue(user: User, key: string) {
-    await ConnectionsService.requireJira(user)
+    const { accountId } = await ConnectionsService.requireJira(user)
     const [issue, comments] = await Promise.all([
       jira.getIssue(key, [...CARD_FIELDS, 'description', 'assignee', 'reporter', 'created', 'parent', 'subtasks', 'fixVersions', 'components']),
       jira.getComments(key).catch(() => ({ comments: [] })),
     ])
     const f = issue.fields
+    if (f.assignee?.accountId !== accountId && f.reporter?.accountId !== accountId) throw new NotFoundError('Issue')
     return {
       ...toCard(issue),
       description: adfToText(f.description),

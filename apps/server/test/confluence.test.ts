@@ -55,7 +55,7 @@ describe('ConfluenceService', () => {
     const [a] = await ctx.db.insert(S.users).values({ email: `${tag}-a@test.local`, name: 'A' }).returning()
     const [b] = await ctx.db.insert(S.users).values({ email: `${tag}-b@test.local`, name: 'B' }).returning()
     connected = a!; loner = b!
-    await ctx.db.insert(S.connections).values({ userId: connected.id, jiraAccountId: ACCOUNT })
+    await ctx.db.insert(S.connections).values({ userId: connected.id, jiraAccountId: ACCOUNT, jiraVerifiedEmail: connected.email })
   })
 
   afterAll(async () => {

@@ -20,8 +20,8 @@ export class IntegrationError extends AppError {
   }
 }
 export class NotConnectedError extends AppError {
-  constructor(service: 'jira' | 'bitbucket') {
-    super(409, `Your ${service === 'jira' ? 'Jira' : 'Bitbucket'} account is not connected yet. Open Connections to link it.`, 'NOT_CONNECTED')
+  constructor(service: 'jira' | 'bitbucket', detail?: string) {
+    super(409, detail ?? `Your ${service === 'jira' ? 'Jira' : 'Bitbucket'} account is not connected yet. Open Connections to link it.`, 'NOT_CONNECTED')
   }
 }
 export class PeriodExistsError extends AppError {

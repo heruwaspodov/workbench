@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { MpAvatar, MpBadge, MpButton, MpIcon, MpInput, MpSelect, MpText, css } from '@mekari/pixel3'
+import { MpBadge, MpBanner, MpBannerDescription, MpButton, MpIcon, MpInput, MpSelect, MpText, css } from '@mekari/pixel3'
 import { onMounted, ref } from 'vue'
 import AsyncState from '@/components/AsyncState.vue'
 import PageHeader from '@/components/PageHeader.vue'
@@ -18,11 +18,6 @@ async function act(key: string, fn: () => Promise<Overview>, success: string) {
 }
 
 // Jira
-const jiraQuery = ref('')
-const jiraResults = ref<{ accountId: string; displayName: string; avatarUrl: string | null }[]>([])
-const searchJira = async () => {
-  try { jiraResults.value = await unwrap(api.connections.jira.users.get({ query: { q: jiraQuery.value } })) } catch (e) { notifyError(e) }
-}
 const boards = ref<{ id: number; name: string; type: string; project: string | null }[]>([])
 const boardQuery = ref('')
 const searchBoards = async () => {
@@ -37,28 +32,22 @@ const searchBoards = async () => {
 const onBoardChange = (value: string | number) =>
   act('board', () => unwrap(api.connections.jira.board.put({ boardId: value ? Number(value) : null })), 'Board saved')
 
-// Bitbucket
-const bbQuery = ref('')
-const bbResults = ref<{ uuid: string; displayName: string; nickname: string | null; avatarUrl: string | null }[]>([])
-const searchBb = async () => {
-  try { bbResults.value = await unwrap(api.connections.bitbucket.members.get({ query: { q: bbQuery.value } })) } catch (e) { notifyError(e) }
-}
-
 onMounted(run)
 
 const card = css({ display: 'flex', flexDirection: 'column', gap: '4' })
 const row = ui.row
 const between = ui.between
-const list = css({ display: 'flex', flexDirection: 'column', gap: '1', maxHeight: '260px', overflowY: 'auto' })
-const listItem = css({ display: 'flex', alignItems: 'center', gap: '3', p: '2', rounded: 'md', _hover: { bg: 'background.neutral.subtle' } })
 const muted = ui.note
 const grid = ui.twoCol
 </script>
 
 <template>
-  <PageHeader title="Connections" subtitle="Link your Jira and Bitbucket accounts. Data is read through a service account; your linked account is used to filter it." />
+  <PageHeader title="Connections" subtitle="Link your Jira and Bitbucket accounts. Data is read through a service account and filtered to your own account, which is matched by your Mekari email." />
 
   <AsyncState :loading="loading && !overview" :error="error" @retry="run">
+    <MpBanner v-if="overview?.notice" variant="warning" :class="css({ mb: '4' })" data-test="connection-notice">
+      <MpBannerDescription>{{ overview.notice }}</MpBannerDescription>
+    </MpBanner>
     <div v-if="overview" :class="grid">
       <!-- Jira -->
       <section :class="[ui.card, card]">
@@ -87,19 +76,9 @@ const grid = ui.twoCol
               @click="act('jira-auto', () => unwrap(api.connections.jira.auto.post()), 'Jira connected')">
               Connect automatically (by Mekari email)
             </MpButton>
-            <MpText size="label-small" color="text.secondary">Not found? Search manually:</MpText>
-            <div :class="row">
-              <MpInput v-model="jiraQuery" placeholder="Name or email" @keyup.enter="searchJira" />
-              <MpButton variant="secondary" @click="searchJira">Search</MpButton>
-            </div>
-            <div v-if="jiraResults.length" :class="list">
-              <div v-for="u in jiraResults" :key="u.accountId" :class="listItem">
-                <MpAvatar :name="u.displayName" :src="u.avatarUrl ?? undefined" size="sm" />
-                <MpText :class="css({ flex: 1 })">{{ u.displayName }}</MpText>
-                <MpButton size="sm" variant="secondary"
-                  @click="act('jira-set', () => unwrap(api.connections.jira.put({ accountId: u.accountId })), 'Jira connected')">Select</MpButton>
-              </div>
-            </div>
+            <MpText size="label-small" color="text.secondary">
+              Your Jira account is matched by your Mekari email, so you only ever see your own work. If nothing matches, ask an admin: accounts that hide their email cannot be linked.
+            </MpText>
           </div>
 
           <div v-if="overview.jira.accountId" :class="css({ display: 'flex', flexDirection: 'column', gap: '2' })">
@@ -155,22 +134,9 @@ const grid = ui.twoCol
               @click="act('bb-auto', () => unwrap(api.connections.bitbucket.auto.post()), 'Bitbucket connected')">
               Connect automatically (by Atlassian account)
             </MpButton>
-            <MpText size="label-small" color="text.secondary">Connect Jira first so automatic matching is accurate, or search manually:</MpText>
-            <div :class="row">
-              <MpInput v-model="bbQuery" placeholder="Name or username" @keyup.enter="searchBb" />
-              <MpButton variant="secondary" @click="searchBb">Search</MpButton>
-            </div>
-            <div v-if="bbResults.length" :class="list">
-              <div v-for="m in bbResults" :key="m.uuid" :class="listItem">
-                <MpAvatar :name="m.displayName" :src="m.avatarUrl ?? undefined" size="sm" />
-                <div :class="css({ flex: 1 })">
-                  <MpText>{{ m.displayName }}</MpText>
-                  <MpText v-if="m.nickname" size="label-small" color="text.secondary">@{{ m.nickname }}</MpText>
-                </div>
-                <MpButton size="sm" variant="secondary"
-                  @click="act('bb-set', () => unwrap(api.connections.bitbucket.put({ uuid: m.uuid })), 'Bitbucket connected')">Select</MpButton>
-              </div>
-            </div>
+            <MpText size="label-small" color="text.secondary">
+              Bitbucket is matched through your connected Jira account. Connect Jira first.
+            </MpText>
           </div>
         </template>
         <MpText v-else size="label" color="text.secondary">An admin needs to set BITBUCKET_WORKSPACE and a Bitbucket token.</MpText>

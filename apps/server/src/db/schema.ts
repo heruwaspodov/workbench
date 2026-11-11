@@ -57,10 +57,14 @@ export const connections = pgTable('connections', {
   userId: uuid('user_id').primaryKey().references(() => users.id, { onDelete: 'cascade' }),
   jiraAccountId: text('jira_account_id'),
   jiraDisplayName: text('jira_display_name'),
+  /** Email of the Jira account at the time it was matched to this user's SSO email: proof the link is the user's own. */
+  jiraVerifiedEmail: text('jira_verified_email'),
   jiraBoardId: integer('jira_board_id'),
   bitbucketUuid: text('bitbucket_uuid'),
   bitbucketDisplayName: text('bitbucket_display_name'),
   bitbucketNickname: text('bitbucket_nickname'),
+  /** Atlassian account id the Bitbucket member was matched on; must equal the verified Jira account id. */
+  bitbucketVerifiedAccountId: text('bitbucket_verified_account_id'),
   ...timestamps,
 })
 

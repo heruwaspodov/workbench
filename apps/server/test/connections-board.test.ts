@@ -90,7 +90,7 @@ describe('Jira board search and selection', () => {
 
   test('overview shows the selected board name', async () => {
     const [u] = await ctx.db.insert(S.users).values({ email: `${tag}-sel@test.local`, name: 'Sel' }).returning()
-    await ctx.db.insert(S.connections).values({ userId: u!.id, jiraAccountId: `acct-${tag}`, jiraBoardId: 2508 })
+    await ctx.db.insert(S.connections).values({ userId: u!.id, jiraAccountId: `acct-${tag}`, jiraVerifiedEmail: u!.email, jiraBoardId: 2508 })
     const o = await Svc.overview(u!)
     expect(o.jira).toMatchObject({ boardId: 2508, boardName: 'Escape Kanban Board', boardIsDefault: false })
   })
@@ -98,7 +98,7 @@ describe('Jira board search and selection', () => {
   test('without a choice the team default board is used and flagged as default', async () => {
     Object.assign(jiraEnv, { defaultBoardId: 212 })
     const [u] = await ctx.db.insert(S.users).values({ email: `${tag}-def@test.local`, name: 'Def' }).returning()
-    await ctx.db.insert(S.connections).values({ userId: u!.id, jiraAccountId: `acct-${tag}-2` })
+    await ctx.db.insert(S.connections).values({ userId: u!.id, jiraAccountId: `acct-${tag}-2`, jiraVerifiedEmail: u!.email })
     const o = await Svc.overview(u!)
     Object.assign(jiraEnv, { defaultBoardId: undefined })
     expect(o.jira).toMatchObject({ boardId: 212, boardName: 'MESIGN Sprint Board', boardIsDefault: true })

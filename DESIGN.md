@@ -15,7 +15,7 @@
 |---|------|-----------------|
 | G1 | **Satu app internal Mekari Sign** untuk PGP + progress kerja | Engineer tidak perlu buka Jira board / Bitbucket untuk cek pekerjaan sendiri sehari-hari |
 | G2 | **Login dengan Mekari OAuth2** | Hanya akun domain @mekari.com yang bisa masuk; tanpa password lokal |
-| G3 | **Connect akun Jira & Bitbucket** per user | User bisa link akun (otomatis via email / Atlassian account id, atau manual) |
+| G3 | **Connect akun Jira & Bitbucket** per user | User bisa link akun hanya otomatis: Jira lewat email SSO yang persis sama, Bitbucket lewat Atlassian account id akun Jira itu. Tidak ada pilih manual (OD-78) |
 | G4 | **Menu PGP** mengikuti format management yang berubah per quarter | Admin bisa: import template dari Google Sheet / .xlsx, buat dari nol, edit & tambah item. Engineer bisa: isi plan, edit/tambah item, update progress, submit, **export Excel** |
 | G5 | **Menu Kanban** milik current user | Issue Jira yang di-assign ke user, dikelompokkan per kolom board (atau status category), detail issue tanpa buka Jira |
 | G6 | **Menu Pull Request** current user lintas repo | List PR (dibuat saya / perlu review saya) dari semua repo yang terlibat + detail (files, diff, commits, comments, reviewers, build) |
@@ -138,6 +138,14 @@ Panel di halaman detail plan (hanya owner) menghitung saran dari akun Atlassian 
 - Data PGP = data personal karyawan → akses: owner (read/write), direct leader aktif yang sudah dikonfirmasi (read), admin (read). Tidak ada endpoint publik.
 - Konten dari Jira/PR dirender sebagai **teks** (bukan HTML) — ADF → plain text; evidence link hanya dirender sebagai `<a>` bila `http(s)`.
 - Redirect pasca-login hanya path relatif (anti open-redirect).
+
+### Identitas Jira/Bitbucket/Confluence = user yang login (OD-78)
+
+Kredensial Atlassian/Bitbucket di ENV adalah service account bersama yang bisa melihat banyak data, jadi **hasil selalu mengikuti user yang login**, bukan akun di ENV:
+- Tautan dibuat otomatis: akun Jira dengan `emailAddress` yang persis sama dengan email SSO (tepat satu akun aktif; email tersembunyi tidak diterima), lalu Bitbucket lewat `account_id` yang sama dengan akun Jira itu. Tidak ada pencarian atau pemilihan akun manual.
+- Bukti disimpan (`jira_verified_email`, `bitbucket_verified_account_id`). Tautan tanpa bukti diverifikasi ulang saat pertama dipakai dan diputus bila tidak cocok atau tidak bisa dibuktikan (fail closed); Connections menampilkan pemberitahuannya.
+- Semua kueri difilter dengan akun user itu. Detail issue Jira hanya untuk assignee/reporter; detail dan diff PR hanya untuk author, reviewer, atau participant; selain itu 404.
+- Keterbatasan: akun Jira yang menyembunyikan email dari service account tidak bisa ditautkan (belum ada jalur admin).
 
 ## 9. Open questions / ASSUMPTION
 

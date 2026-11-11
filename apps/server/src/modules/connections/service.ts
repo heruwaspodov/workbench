@@ -2,10 +2,15 @@ import { eq } from 'drizzle-orm'
 import { env } from '../../config/env'
 import { db } from '../../db/client'
 import { connections, type Connection, type User } from '../../db/schema'
-import { bitbucket, bitbucketConfigured, type BbUser } from '../../integrations/bitbucket.client'
+import { bitbucket, bitbucketConfigured } from '../../integrations/bitbucket.client'
 import { jira, jiraConfigured, type JiraBoard } from '../../integrations/jira.client'
 import { cached } from '../../shared/cache'
 import { NotConnectedError, NotFoundError } from '../../shared/errors'
+
+const normalize = (email: string) => email.trim().toLowerCase()
+const sameEmail = (a: string | null | undefined, b: string) => Boolean(a) && normalize(a!) === normalize(b)
+const JIRA_OFF = { jiraAccountId: null, jiraDisplayName: null, jiraVerifiedEmail: null, jiraBoardId: null }
+const BITBUCKET_OFF = { bitbucketUuid: null, bitbucketDisplayName: null, bitbucketNickname: null, bitbucketVerifiedAccountId: null }
 
 const membersCached = () => cached('bb:members', 10 * 60_000, () => bitbucket.members())
 
@@ -24,12 +29,18 @@ export abstract class ConnectionsService {
   }
 
   static async overview(user: User) {
+    let notice: string | null = null
+    if ((await this.get(user.id)).jiraAccountId && jiraConfigured()) {
+      // A link that is not the user's own is removed here, so the page never shows someone else's account as "connected".
+      try { await this.requireJira(user) } catch (e) { if (e instanceof NotConnectedError) notice = e.message }
+    }
     const c = await this.get(user.id)
     const boardId = c.jiraBoardId ?? env.jira.defaultBoardId ?? null
     const boardName = boardId && c.jiraAccountId && jiraConfigured()
       ? await cached(`jira:board:${boardId}`, 30 * 60_000, () => jira.getBoard(boardId)).then((b) => b.name, () => null)
       : null
     return {
+      notice,
       jira: {
         configured: jiraConfigured(),
         baseUrl: env.jira.baseUrl || null,
@@ -50,24 +61,27 @@ export abstract class ConnectionsService {
   }
 
   // ---------- Jira ----------
+  /**
+   * Links the SSO user to the Jira account with the same email address. The match must be exact and unambiguous:
+   * the data is read through a shared service account, so a wrong link would show someone else's work.
+   */
   static async autoConnectJira(user: User) {
     const matches = await jira.searchUsers(user.email)
-    const exact = matches.find((u) => u.emailAddress?.toLowerCase() === user.email) ?? (matches.length === 1 ? matches[0] : undefined)
-    if (!exact) throw new NotFoundError(`Jira account for ${user.email}`)
-    return this.update(user.id, { jiraAccountId: exact.accountId, jiraDisplayName: exact.displayName })
+    const exact = matches.filter((u) => u.active !== false && sameEmail(u.emailAddress, user.email))
+    if (exact.length !== 1) {
+      throw new NotFoundError(exact.length > 1
+        ? 'A single Jira account for your Mekari email (several matched)'
+        : 'Jira account for your Mekari email (accounts that hide their email cannot be matched automatically)')
+    }
+    const match = exact[0]!
+    // Bitbucket is matched through the Jira account, so it starts over whenever the Jira link changes.
+    return this.update(user.id, {
+      jiraAccountId: match.accountId, jiraDisplayName: match.displayName, jiraVerifiedEmail: normalize(user.email),
+      bitbucketUuid: null, bitbucketDisplayName: null, bitbucketNickname: null, bitbucketVerifiedAccountId: null,
+    })
   }
 
-  static searchJiraUsers = async (q: string) =>
-    (await jira.searchUsers(q)).filter((u) => u.active !== false).map((u) => ({
-      accountId: u.accountId, displayName: u.displayName, avatarUrl: u.avatarUrls?.['48x48'] ?? null,
-    }))
-
-  static async setJira(user: User, accountId: string) {
-    const u = await jira.getUser(accountId)
-    return this.update(user.id, { jiraAccountId: u.accountId, jiraDisplayName: u.displayName })
-  }
-
-  static disconnectJira = (user: User) => this.update(user.id, { jiraAccountId: null, jiraDisplayName: null, jiraBoardId: null })
+  static disconnectJira = (user: User) => this.update(user.id, { ...JIRA_OFF, ...BITBUCKET_OFF })
 
   /**
    * Board search: a pasted Jira board URL or numeric id resolves that board; a project key (e.g. MESIGN)
@@ -93,47 +107,54 @@ export abstract class ConnectionsService {
 
   static setBoard = (user: User, boardId: number | null) => this.update(user.id, { jiraBoardId: boardId })
 
+  /**
+   * The user's own Jira account id. A link is trusted only with proof that the account's email is the user's SSO email:
+   * stored when the link is made, or checked once here for links made before proof was kept. A link that fails is removed.
+   */
   static async requireJira(user: User) {
     const c = await this.get(user.id)
     if (!c.jiraAccountId) throw new NotConnectedError('jira')
+    if (c.jiraVerifiedEmail !== normalize(user.email)) {
+      const account = await jira.getUser(c.jiraAccountId)
+      if (!sameEmail(account.emailAddress, user.email)) {
+        await this.update(user.id, { ...JIRA_OFF, ...BITBUCKET_OFF })
+        throw new NotConnectedError('jira', 'Your Jira link was removed because that Jira account does not have your Mekari email (or hides it). Connect again from Connections.')
+      }
+      await this.update(user.id, { jiraVerifiedEmail: normalize(user.email) })
+    }
     return { accountId: c.jiraAccountId, boardId: c.jiraBoardId ?? env.jira.defaultBoardId ?? null }
   }
 
   // ---------- Bitbucket ----------
-  /** Bitbucket and Jira share the Atlassian account id, so we can match without asking the user. */
+  /** Bitbucket and Jira share the Atlassian account id: the member whose account id equals the user's verified Jira account. */
   static async autoConnectBitbucket(user: User) {
-    const c = await this.get(user.id)
-    const members = await membersCached()
-    const byAccount = c.jiraAccountId ? members.find((m) => m.account_id === c.jiraAccountId) : undefined
-    const byName = members.filter((m) => m.display_name.toLowerCase() === user.name.toLowerCase())
-    const match = byAccount ?? (byName.length === 1 ? byName[0] : undefined)
-    if (!match) throw new NotFoundError(`Bitbucket member for ${user.name} (connect Jira first or pick manually)`)
-    return this.saveBitbucket(user, match)
+    if (!(await this.get(user.id)).jiraAccountId) {
+      throw new NotConnectedError('jira', 'Connect Jira first: your Bitbucket account is matched through your Jira account.')
+    }
+    const { accountId } = await this.requireJira(user)
+    const member = (await membersCached()).find((m) => m.account_id === accountId)
+    if (!member) throw new NotFoundError('Bitbucket workspace member for your Atlassian account')
+    return this.update(user.id, {
+      bitbucketUuid: member.uuid, bitbucketDisplayName: member.display_name, bitbucketNickname: member.nickname ?? null, bitbucketVerifiedAccountId: accountId,
+    })
   }
 
-  static async searchBitbucketMembers(q = '') {
-    const needle = q.toLowerCase()
-    return (await membersCached())
-      .filter((m) => !needle || m.display_name.toLowerCase().includes(needle) || m.nickname?.toLowerCase().includes(needle))
-      .slice(0, 30)
-      .map((m) => ({ uuid: m.uuid, displayName: m.display_name, nickname: m.nickname ?? null, avatarUrl: m.links?.avatar?.href ?? null }))
-  }
+  static disconnectBitbucket = (user: User) => this.update(user.id, BITBUCKET_OFF)
 
-  static async setBitbucket(user: User, uuid: string) {
-    const member = (await membersCached()).find((m) => m.uuid === uuid)
-    if (!member) throw new NotFoundError('Bitbucket workspace member')
-    return this.saveBitbucket(user, member)
-  }
-
-  private static saveBitbucket = (user: User, m: BbUser) =>
-    this.update(user.id, { bitbucketUuid: m.uuid, bitbucketDisplayName: m.display_name, bitbucketNickname: m.nickname ?? null })
-
-  static disconnectBitbucket = (user: User) =>
-    this.update(user.id, { bitbucketUuid: null, bitbucketDisplayName: null, bitbucketNickname: null })
-
+  /** The user's own Bitbucket uuid: it must belong to the member whose account id is the verified Jira account. */
   static async requireBitbucket(user: User) {
     const c = await this.get(user.id)
     if (!c.bitbucketUuid) throw new NotConnectedError('bitbucket')
+    if (!c.jiraAccountId) throw new NotConnectedError('bitbucket', 'Connect Jira first: your Bitbucket account is matched through your Jira account.')
+    const { accountId } = await this.requireJira(user)
+    if (c.bitbucketVerifiedAccountId !== accountId) {
+      const member = (await membersCached()).find((m) => m.uuid === c.bitbucketUuid)
+      if (member?.account_id !== accountId) {
+        await this.update(user.id, BITBUCKET_OFF)
+        throw new NotConnectedError('bitbucket', 'Your Bitbucket link was removed because it is not the account behind your Jira login. Connect again from Connections.')
+      }
+      await this.update(user.id, { bitbucketVerifiedAccountId: accountId })
+    }
     return { uuid: c.bitbucketUuid }
   }
 }
