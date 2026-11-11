@@ -211,7 +211,10 @@ await step('Create PGP from an uploaded Excel file, then the same quarter is ref
   await page.getByRole('button', { name: 'Create PGP' }).click()
   await page.waitForURL(/\/pgp\/new$/)
   await page.getByRole('button', { name: 'Upload Excel' }).click()
+  if (!(await page.locator('[data-test="xlsx-choose"]').isVisible())) throw new Error('Choose file button is not visible')
+  await shot('04a-upload-choose-button')
   await page.locator('[data-test="xlsx-file"]').setInputFiles(xlsx)
+  await page.getByText('e2e-plan.xlsx').waitFor().catch(() => { throw new Error('chosen file name not shown') })
   await page.locator('[data-test="create-plan"]').waitFor() // initiatives sit in textareas, which getByText cannot match
   if ((await page.getByPlaceholder('2026').inputValue()) !== '2025') throw new Error('year was not read from the tab name')
   await shot('04-create-from-upload')

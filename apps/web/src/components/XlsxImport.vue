@@ -3,7 +3,7 @@
  * File picker + sheet selector for importing a growth-plan .xlsx. Shared by Create PGP and the template editor:
  * both read the file through the same server extractor, so the same file gives the same items.
  */
-import { MpFormControl, MpFormHelpText, MpFormLabel, MpSelect, MpText, css } from '@mekari/pixel3'
+import { MpButton, MpFormControl, MpFormHelpText, MpFormLabel, MpSelect, MpText, css } from '@mekari/pixel3'
 import { ref } from 'vue'
 import { notifyError } from '@/lib/api'
 import type { XlsxLoader, XlsxPreview } from '@/lib/xlsx-import'
@@ -15,6 +15,7 @@ const file = ref<File | null>(null)
 const tabs = ref<string[]>([])
 const selected = ref('')
 const reading = ref(false)
+const input = ref<HTMLInputElement | null>(null)
 
 async function read(tab?: string) {
   if (!file.value) return
@@ -37,6 +38,7 @@ function onFile(e: Event) {
   read()
 }
 
+const pick = css({ display: 'flex', alignItems: 'center', gap: '3' })
 const row = css({ display: 'flex', gap: '4', alignItems: 'flex-end', flexWrap: 'wrap' })
 </script>
 
@@ -44,7 +46,11 @@ const row = css({ display: 'flex', gap: '4', alignItems: 'flex-end', flexWrap: '
   <div :class="row">
     <MpFormControl>
       <MpFormLabel>Excel file (.xlsx, up to 10 MB)</MpFormLabel>
-      <input type="file" accept=".xlsx" data-test="xlsx-file" @change="onFile" />
+      <div :class="pick">
+        <MpButton variant="secondary" data-test="xlsx-choose" @click="input?.click()">Choose file</MpButton>
+        <MpText size="label" color="text.secondary">{{ file ? file.name : 'No file chosen' }}</MpText>
+      </div>
+      <input ref="input" type="file" accept=".xlsx" data-test="xlsx-file" :class="css({ display: 'none' })" @change="onFile" />
       <MpFormHelpText>Google Sheets: File, Download, Microsoft Excel (.xlsx).</MpFormHelpText>
     </MpFormControl>
     <MpFormControl v-if="tabs.length > 1" :class="css({ minWidth: '220px' })">
