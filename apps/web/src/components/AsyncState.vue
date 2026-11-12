@@ -26,7 +26,7 @@ const center = css({ display: 'flex', flexDirection: 'column', alignItems: 'cent
   </MpBanner>
   <MpBanner v-else-if="notConfigured" variant="info">
     <MpBannerTitle>Integration not configured</MpBannerTitle>
-    <MpBannerDescription>{{ message }}. Contact a One Desk admin.</MpBannerDescription>
+    <MpBannerDescription>{{ message }}. Contact a Workbench admin.</MpBannerDescription>
   </MpBanner>
   <MpBanner v-else-if="error" variant="danger">
     <MpBannerTitle>Could not load data</MpBannerTitle>

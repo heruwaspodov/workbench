@@ -1,6 +1,6 @@
 import { treaty } from '@elysiajs/eden'
 import { toast } from '@mekari/pixel3'
-import type { App } from '@one-desk/server'
+import type { App } from '@workbench/server'
 
 /** End-to-end typed client generated from the Elysia route tree (no codegen). */
 export const client = treaty<App>(window.location.origin, { fetch: { credentials: 'include' } })

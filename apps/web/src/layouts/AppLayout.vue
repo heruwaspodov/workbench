@@ -47,7 +47,7 @@ const content = css({ px: { base: '5', xl: '8' }, py: '8', flex: 1, minWidth: 0,
       <div :class="brand">
         <div :class="logo"><MpIcon name="sign-outline" :class="whiteIcon" size="sm" /></div>
         <div>
-          <MpText size="label" weight="semiBold">One Desk</MpText>
+          <MpText size="label" weight="semiBold">Workbench</MpText>
           <MpText size="label-small" color="text.secondary">Mekari Sign Engineering</MpText>
         </div>
       </div>

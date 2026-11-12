@@ -11,7 +11,7 @@ const SERVER_DIR = join(ROOT, 'apps/server')
 const MOCK_PORT = 4010
 const APP_PORT = 3100
 const APP = `http://localhost:${APP_PORT}`
-const DB_NAME = 'one-desk-e2e'
+const DB_NAME = 'workbench-e2e'
 const DB_URL = process.env.E2E_DATABASE_URL ?? `postgres://localhost:5432/${DB_NAME}`
 const EMAIL = 'dev@mekari.com'
 

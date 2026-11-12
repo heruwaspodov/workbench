@@ -26,7 +26,7 @@ const feature = css({ display: 'flex', gap: '2', alignItems: 'center' })
     <div :class="card">
       <div :class="logo"><MpIcon name="sign-outline" :class="whiteIcon" /></div>
       <div>
-        <MpText size="h2" weight="semiBold">One Desk</MpText>
+        <MpText size="h2" weight="semiBold">Workbench</MpText>
         <MpText color="text.secondary">PGP, Kanban and pull requests for Mekari Sign, in one tab.</MpText>
       </div>
 

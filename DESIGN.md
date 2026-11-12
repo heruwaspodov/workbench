@@ -1,4 +1,4 @@
-# One Desk — Design
+# Workbench — Design
 
 > Classification: **INTERNAL**
 > Owner: Waspodo (Mekari Sign Engineering) · Status: MVP in progress · Patokan eksekusi: [PLAN.md](./PLAN.md)
@@ -29,7 +29,7 @@
 - Skip-level (atasan dari atasan) dan struktur organisasi penuh / sinkron Talenta (post-MVP).
 - Snapshot leader per plan per quarter — MVP memakai reporting line saat ini (post-MVP).
 - Sinkronisasi dua arah dengan Google Sheet (import satu arah saja; output via export Excel).
-- Multi-tenant / dipakai di luar Mekari Sign (nama "One Desk" netral supaya bisa diperluas nanti).
+- Multi-tenant / dipakai di luar Mekari Sign (nama "Workbench" netral supaya bisa diperluas nanti).
 - Notifikasi (email/Slack).
 
 ## 4. Users & Roles
@@ -61,7 +61,7 @@
 **Monolith**: satu proses Bun menyajikan API (`/api/*`, `/auth/*`) **dan** hasil build Vue (`apps/web/dist`). Satu container, satu port.
 
 ```
-one-desk/                     (bun workspaces, linker hoisted)
+workbench/                     (bun workspaces, linker hoisted)
 ├─ apps/server                Elysia (Bun) + Drizzle + Postgres
 │  └─ src/
 │     ├─ config/env.ts        validasi env terpusat

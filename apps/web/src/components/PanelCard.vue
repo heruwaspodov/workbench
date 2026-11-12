@@ -11,7 +11,7 @@ const props = defineProps<{ id: string; title: string; subtitle?: string; count?
 
 const emit = defineEmits<{ toggle: [open: boolean] }>()
 
-const KEY = `one-desk:panel:${props.id}`
+const KEY = `workbench:panel:${props.id}`
 const read = () => {
   try {
     const v = localStorage.getItem(KEY)

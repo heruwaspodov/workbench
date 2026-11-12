@@ -1,5 +1,5 @@
 {
-  "name": "@one-desk/server",
+  "name": "@workbench/server",
   "private": true,
   "type": "module",
   "module": "src/app.ts",

@@ -24,5 +24,5 @@ if (existsSync(webDist)) {
 
 if (import.meta.main) {
   app.listen(env.port)
-  console.log(`🗂  One Desk running on http://localhost:${env.port}`)
+  console.log(`🗂  Workbench running on http://localhost:${env.port}`)
 }

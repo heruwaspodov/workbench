@@ -11,7 +11,7 @@ let shared: Promise<{ db: typeof import('../src/db/client').db; sql: typeof impo
 export const setupTestDb = () => (shared ??= init())
 
 async function init() {
-  const url = new URL(process.env.TEST_DATABASE_URL ?? 'postgres://localhost:5432/one-desk-test')
+  const url = new URL(process.env.TEST_DATABASE_URL ?? 'postgres://localhost:5432/workbench-test')
   const name = decodeURIComponent(url.pathname.slice(1))
   if (!/test/i.test(name)) throw new Error(`Refusing to run DB tests on "${name}": database name must contain "test"`)
 

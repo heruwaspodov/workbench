@@ -1,4 +1,4 @@
-# One Desk
+# Workbench
 
 > Classification: **INTERNAL**
 
@@ -13,24 +13,24 @@ Goals & arsitektur: [DESIGN.md](./DESIGN.md) · Tiket kerja: [PLAN.md](./PLAN.md
 ## Setup lokal
 
 ```bash
-createdb -h localhost one-desk     # sekali saja
+createdb -h localhost workbench     # sekali saja
 cp .env.example .env               # lalu isi APP_URL dan MEKARI_OAUTH_* (lihat di bawah)
 bun run setup                      # bun install + migrate
 bun run dev                        # server :3000 + web :5173, log ber-prefix
 ```
 
-Login hanya lewat Mekari SSO (tidak ada dev login). Karena SSO tidak menerima `localhost` sebagai redirect URI, di lokal wajib memakai host `one-desk.local` (bagian berikut), `MEKARI_OAUTH_*` terisi, dan emailmu di `ADMIN_EMAILS` bila perlu akses admin.
+Login hanya lewat Mekari SSO (tidak ada dev login). Karena SSO tidak menerima `localhost` sebagai redirect URI, di lokal wajib memakai host `workbench.local` (bagian berikut), `MEKARI_OAUTH_*` terisi, dan emailmu di `ADMIN_EMAILS` bila perlu akses admin.
 
-### Host `one-desk.local` (untuk Mekari OAuth)
+### Host `workbench.local` (untuk Mekari OAuth)
 
 Mekari SSO tidak menerima `localhost` sebagai redirect URI. Pakai host lokal:
 
 1. Tambahkan ke `/etc/hosts` (butuh sudo, sekali saja). Entri `::1` mencegah jeda ~5 detik karena macOS mencoba mDNS untuk domain `.local`:
    ```bash
-   sudo sh -c 'printf "127.0.0.1       one-desk.local\n::1             one-desk.local\n" >> /etc/hosts'
+   sudo sh -c 'printf "127.0.0.1       workbench.local\n::1             workbench.local\n" >> /etc/hosts'
    ```
-2. Di `.env` set `APP_URL=http://one-desk.local`. Redirect URI untuk didaftarkan di SSO: `http://one-desk.local/sso-callback`.
-3. `bun run dev`, lalu buka http://one-desk.local (tanpa port).
+2. Di `.env` set `APP_URL=http://workbench.local`. Redirect URI untuk didaftarkan di SSO: `http://workbench.local/sso-callback`.
+3. `bun run dev`, lalu buka http://workbench.local (tanpa port).
 
 Vite mengikuti `APP_URL`: host dan port diambil dari URL itu. Port 80 butuh bind wildcard (macOS tanpa root hanya mengizinkan itu untuk port < 1024), jadi dev server terjangkau dari jaringan lokal lewat IP. Hostname lain ditolak (`allowedHosts`), tapi akses via IP tidak. Jangan jalankan di jaringan yang tidak dipercaya; semua endpoint tetap butuh sesi login Mekari. Bila port 80 dipakai proses lain, tidak ada fallback otomatis (`strictPort`); hentikan proses itu atau pakai `APP_URL` dengan port lain jika SSO mengizinkan.
 
@@ -44,7 +44,7 @@ Setelah login, PGP bisa dipakai tanpa integrasi lain: buat template dari scratch
 | `bun run dev` | Server (watch) + Vite paralel |
 | `bun run dev:server` / `dev:web` | Salah satunya saja |
 | `bun run typecheck` | `tsc` server + `vue-tsc` web |
-| `bun run test` | `bun test` di `apps/server`. Test DB memakai database terpisah `one-desk-test` (dibuat & dimigrasi otomatis; override dengan `TEST_DATABASE_URL`, nama harus mengandung "test") |
+| `bun run test` | `bun test` di `apps/server`. Test DB memakai database terpisah `workbench-test` (dibuat & dimigrasi otomatis; override dengan `TEST_DATABASE_URL`, nama harus mengandung "test") |
 | `bun run e2e` | Uji visual end-to-end (mock Jira/Bitbucket + Chrome sistem, screenshot di `e2e/out/`); butuh `bun run build` dulu |
 | `bun run build` | Build web ke `apps/web/dist` |
 | `bun run start` | Jalankan server production (menyajikan `apps/web/dist`) |
@@ -53,7 +53,7 @@ Setelah login, PGP bisa dipakai tanpa integrasi lain: buat template dari scratch
 
 Script root memuat `.env` dari root repo. Jalankan semuanya dari root; `bun --cwd <dir> run ...` tidak berjalan di Bun 1.4.
 
-Alternatif Postgres via Docker: `docker compose up -d db`, lalu set `DATABASE_URL=postgres://onedesk:onedesk@localhost:5432/onedesk`. App penuh di container: `docker compose --profile full up` (app di :3000).
+Alternatif Postgres via Docker: `docker compose up -d db`, lalu set `DATABASE_URL=postgres://workbench:workbench@localhost:5432/workbench`. App penuh di container: `docker compose --profile full up` (app di :3000).
 
 ## Environment
 
@@ -61,7 +61,7 @@ Semua di `.env` (tidak di-commit). `.env.example` hanya berisi placeholder. Jang
 
 | Variabel | Wajib | Keterangan |
 |----------|-------|------------|
-| `DATABASE_URL` | ya | Default `postgres://localhost:5432/one-desk` (user = user OS) |
+| `DATABASE_URL` | ya | Default `postgres://localhost:5432/workbench` (user = user OS) |
 | `APP_URL`, `PORT` | tidak | Origin UI dan port API. Request `POST/PUT/PATCH/DELETE` ke `/api/*` hanya diterima bila `Origin`/`Referer` sama dengan `APP_URL` (proteksi CSRF); di production set ke URL publik, di lokal akses lewat http://localhost:5173 |
 | `MEKARI_OAUTH_*` | production | Authorize `https://account.mekari.com/auth`, token `https://account.mekari.com/auth/oauth2/token` (body JSON), userinfo `https://api.mekari.com/v1/users/me` (Mekari SSO API, Bearer token), client id/secret, scope (`esign` untuk app yang terdaftar). `MEKARI_OAUTH_REDIRECT_URI` opsional, default `{APP_URL}/sso-callback`; harus persis sama dengan yang didaftarkan di SSO. `MEKARI_OAUTH_PKCE=false` karena dokumen Mekari tidak menyebut PKCE |
 | `ADMIN_EMAILS` | tidak | Email dipisah koma; jadi admin saat login pertama |

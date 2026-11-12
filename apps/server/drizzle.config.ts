@@ -4,5 +4,5 @@ export default defineConfig({
   schema: './src/db/schema.ts',
   out: './drizzle',
   dialect: 'postgresql',
-  dbCredentials: { url: process.env.DATABASE_URL ?? 'postgres://onedesk:onedesk@localhost:5432/onedesk' },
+  dbCredentials: { url: process.env.DATABASE_URL ?? 'postgres://workbench:workbench@localhost:5432/workbench' },
 })

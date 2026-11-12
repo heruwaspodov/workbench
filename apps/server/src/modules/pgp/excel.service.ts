@@ -86,7 +86,7 @@ export abstract class ExcelService {
   /** Exports a plan in the same shape as the management growth-plan sheet. */
   static async exportPlan(plan: ExportPlan): Promise<Buffer> {
     const wb = new ExcelJS.Workbook()
-    wb.creator = 'One Desk'
+    wb.creator = 'Workbench'
     const ws = wb.addWorksheet(plan.period.replace(/[\\/*?:[\]]/g, '-').slice(0, 31))
     ws.columns = [
       { width: 24 }, { width: 28 }, { width: 36 }, { width: 11 }, { width: 52 },

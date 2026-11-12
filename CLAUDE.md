@@ -1,4 +1,4 @@
-# CLAUDE.md — One Desk
+# CLAUDE.md — Workbench
 
 Internal app Mekari Sign: PGP (Personal Growth Plan) + kanban Jira + pull request Bitbucket dalam satu tab.
 Classification: **INTERNAL**.
@@ -27,7 +27,7 @@ Baca keduanya di awal setiap sesi sebelum melakukan apa pun.
 
 - Bun workspaces (`bunfig.toml`: `linker = "hoisted"` — wajib untuk Mekari Pixel postcss).
 - `apps/server` — **Elysia (Bun)** + Drizzle + Postgres.
-- `apps/web` — **Vue 3 + TypeScript + Vite + Mekari Pixel 3** (`@mekari/pixel3`) + Pinia + Vue Router. Client API = Eden Treaty (`src/lib/api.ts`), type diambil langsung dari `@one-desk/server` (`apps/server/src/app.ts`).
+- `apps/web` — **Vue 3 + TypeScript + Vite + Mekari Pixel 3** (`@mekari/pixel3`) + Pinia + Vue Router. Client API = Eden Treaty (`src/lib/api.ts`), type diambil langsung dari `@workbench/server` (`apps/server/src/app.ts`).
 - Monolith: di production server menyajikan `apps/web/dist`.
 
 ### Konvensi backend (per module)
@@ -60,8 +60,8 @@ apps/server/src/modules/<nama>/
 
 ```bash
 bun install
-docker compose up -d db            # Postgres 16 (onedesk/onedesk)
-cp .env.example .env               # isi MEKARI_OAUTH_* dan APP_URL=http://one-desk.local (login hanya lewat Mekari SSO)
+docker compose up -d db            # Postgres 16 (workbench/workbench)
+cp .env.example .env               # isi MEKARI_OAUTH_* dan APP_URL=http://workbench.local (login hanya lewat Mekari SSO)
 bun run db:migrate
 bun run dev:server                 # API :3000
 bun run dev:web                    # Vite :5173 (proxy /api & /auth)
