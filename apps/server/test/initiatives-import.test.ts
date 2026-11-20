@@ -109,6 +109,31 @@ describe('sheet parser', () => {
     expect(warnings.some((w) => w.includes('not a YYYY-MM-DD date'))).toBe(true)
   })
 
+  test('progress that Sheets turned into a date is read back as Done/Total, and checked against the percentage', () => {
+    const line = (key: string, progress: string, pct?: string) => row({ 'Jira Key': key, Initiative: key, 'Jira Progress (Done/Total)': progress, 'Jira Progress %': pct ?? '' })
+    const grid = [HEAD,
+      line('MESIGN-90101', '2026-05-05', '100%'), // 5/5
+      line('MESIGN-90102', '2026-07-11', '64%'), // 7/11 = 63.6%
+      line('MESIGN-90103', '2026-01-08', '13%'), // 1/8 = 12.5%
+      line('MESIGN-90104', '2026-10-13', '50%'), // 10/13 = 77%: the percentage disagrees, so it is not trusted
+      line('MESIGN-90105', '2026-09-09'), // no percentage to check against: accepted
+      line('MESIGN-90106', '2026-12-03', '100%'), // 12/3: more done than total, cannot be Done/Total
+      line('MESIGN-90107', "'25/25", '100%'), // real text stays as it is
+    ]
+    const { items, warnings } = parseInitiativeSheet(grid)
+    const by = Object.fromEntries(items.map((i) => [i.jiraKey, [i.doneItems, i.totalItems]]))
+    expect(by['MESIGN-90101']).toEqual([5, 5])
+    expect(by['MESIGN-90102']).toEqual([7, 11])
+    expect(by['MESIGN-90103']).toEqual([1, 8])
+    expect(by['MESIGN-90104']).toEqual([null, null])
+    expect(by['MESIGN-90105']).toEqual([9, 9])
+    expect(by['MESIGN-90106']).toEqual([null, null])
+    expect(by['MESIGN-90107']).toEqual([25, 25])
+    expect(warnings.filter((w) => w.includes('does not match'))).toHaveLength(1)
+    expect(warnings.some((w) => w.includes('MESIGN-90106') && w.includes('more done than total'))).toBe(true)
+    expect(warnings.some((w) => w.startsWith('4 progress cell(s) were dates'))).toBe(true)
+  })
+
   test('column order does not matter', () => {
     const reversed = [[...HEAD].reverse(), ...[row({ 'Jira Key': 'MESIGN-90010', Initiative: 'Reordered', Squad: 'Escape' })].map((r) => [...r].reverse())]
     const { items } = parseInitiativeSheet(reversed)

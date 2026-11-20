@@ -32,10 +32,11 @@ export interface ParsedInitiative {
 export interface ParsedInitiativeSheet { items: ParsedInitiative[]; warnings: string[] }
 
 type Field = Exclude<keyof ParsedInitiative, 'milestones'>
+type Col = Field | 'progress' | 'progressPct'
 
 const norm = (s: string) => s.replace(/\s+/g, ' ').trim().toLowerCase()
 
-const HEADERS: [Field | 'progress', RegExp][] = [
+const HEADERS: [Col, RegExp][] = [
   ['jiraKey', /^jira key$/],
   ['title', /^initiative$/],
   ['squad', /^squad$/],
@@ -46,6 +47,7 @@ const HEADERS: [Field | 'progress', RegExp][] = [
   ['estDeliveryDate', /^est\.? delivery date$/],
   ['actualDeliveryDate', /^actual delivery date$/],
   ['progress', /^jira progress \(done\/total\)$/],
+  ['progressPct', /^jira progress ?%$/],
   ['prdUrl', /^prd$/],
   ['rfcUrl', /^rfc$/],
   ['remarkProposed', /remark.*proposed/],
@@ -63,7 +65,7 @@ function locateHeader(rows: string[][]) {
   for (let r = 0; r < Math.min(rows.length, 15); r++) {
     const cells = rows[r]!.map(norm)
     if (!cells.includes('jira key') || !cells.includes('initiative')) continue
-    const cols = new Map<Field | 'progress', number>()
+    const cols = new Map<Col, number>()
     cells.forEach((cell, c) => {
       const hit = HEADERS.find(([field, re]) => !cols.has(field) && re.test(cell))
       if (hit) cols.set(hit[0], c)
@@ -107,10 +109,11 @@ export function parseInitiativeSheet(rows: string[][], links: string[][] = []): 
   const items: ParsedInitiative[] = []
   const seen = new Set<string>()
   let skippedMarkers = 0
+  let recoveredFromDates = 0
 
   for (let r = header.row + 1; r < rows.length; r++) {
     const row = rows[r]!
-    const cell = (f: Field | 'progress') => { const c = cols.get(f); return c == null ? '' : (row[c] ?? '').trim() }
+    const cell = (f: Col) => { const c = cols.get(f); return c == null ? '' : (row[c] ?? '').trim() }
     const link = (f: Field) => { const c = cols.get(f); return c == null ? '' : (links[r]?.[c] ?? '') }
     const jiraKey = cell('jiraKey').toUpperCase()
     const title = cell('title')
@@ -130,15 +133,30 @@ export function parseInitiativeSheet(rows: string[][], links: string[][] = []): 
       return d
     }
 
-    // "108/152" (a leading apostrophe is how the sheet keeps it as text)
-    const prog = cell('progress').replace(/^'/, '').match(/^(\d+)\s*\/\s*(\d+)$/)
+    // "108/152" (a leading apostrophe is how the sheet keeps it as text). Sheets turns short ones like "5/5" into the
+    // date 5 May when the apostrophe is missing, and the export then holds "2026-05-05": month = done, day = total.
+    const rawProgress = cell('progress').replace(/^'/, '')
+    let prog = rawProgress.match(/^(\d+)\s*\/\s*(\d+)$/)
+    let fromDate = false
+    if (!prog) {
+      const d = rawProgress.match(/^\d{4}-(\d{2})-(\d{2})/)
+      if (d) { prog = [rawProgress, String(Number(d[1])), String(Number(d[2]))] as unknown as RegExpMatchArray; fromDate = true }
+    }
     let doneItems: number | null = null
     let totalItems: number | null = null
     if (prog) {
       doneItems = Number(prog[1]); totalItems = Number(prog[2])
-      if (doneItems > totalItems) { warnings.push(`Row ${n}: ${jiraKey} progress ${cell('progress')} has more done than total, left empty.`); doneItems = totalItems = null }
-    } else if (cell('progress')) {
-      warnings.push(`Row ${n}: ${jiraKey} progress "${cell('progress')}" is not Done/Total, left empty.`)
+      if (doneItems > totalItems) { warnings.push(`Row ${n}: ${jiraKey} progress ${rawProgress} has more done than total, left empty.`); doneItems = totalItems = null }
+      else if (fromDate) {
+        // A date is only a guess at "done/total", so the Jira Progress % column has to agree when it is there.
+        const pct = Number.parseFloat(cell('progressPct'))
+        if (Number.isFinite(pct) && totalItems > 0 && Math.abs(Math.round((doneItems / totalItems) * 100) - pct) > 1) {
+          warnings.push(`Row ${n}: ${jiraKey} progress "${rawProgress}" looks like a date and does not match ${cell('progressPct')}, left empty.`)
+          doneItems = totalItems = null
+        } else recoveredFromDates++
+      }
+    } else if (rawProgress) {
+      warnings.push(`Row ${n}: ${jiraKey} progress "${rawProgress}" is not Done/Total, left empty.`)
     }
 
     const milestones: ParsedMilestone[] = []
@@ -173,6 +191,7 @@ export function parseInitiativeSheet(rows: string[][], links: string[][] = []): 
     })
   }
 
+  if (recoveredFromDates) warnings.push(`${recoveredFromDates} progress cell(s) were dates (Google Sheets turns "5/5" into 5 May) and were read back as Done/Total.`)
   if (skippedMarkers) warnings.push(`${skippedMarkers} week cell(s) are neither Release nor Self Test (for example "runs on") and were skipped.`)
   if (!items.length) warnings.push('No initiative rows were found under the header.')
   return { items, warnings }
