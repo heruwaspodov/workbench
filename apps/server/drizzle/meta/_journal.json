@@ -50,6 +50,13 @@
       "when": 1795170783995,
       "tag": "0006_initiatives",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1795178333276,
+      "tag": "0007_user_admin",
+      "breakpoints": true
     }
   ]
 }

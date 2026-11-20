@@ -15,7 +15,7 @@ const nav = computed(() => [
   { to: '/pull-requests', label: 'My Pull Requests', icon: 'file-code' as const },
   { to: '/confluence', label: 'My Confluence', icon: 'draft' as const },
   ...(auth.me?.role === 'admin'
-    ? [{ to: '/pgp/templates', label: 'PGP Templates', icon: 'plans' as const }, { to: '/admin/sla', label: 'SLA goals', icon: 'goal' as const }]
+    ? [{ to: '/pgp/templates', label: 'PGP Templates', icon: 'plans' as const }, { to: '/admin/sla', label: 'SLA goals', icon: 'goal' as const }, { to: '/admin/users', label: 'Users', icon: 'people' as const }]
     : []),
   { to: '/connections', label: 'Connections', icon: 'connected_apps' as const },
 ])

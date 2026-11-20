@@ -8,6 +8,7 @@ import { orgModule } from './modules/org'
 import { pgpModule } from './modules/pgp'
 import { pullRequestsModule } from './modules/pull-requests'
 import { slaModule } from './modules/sla'
+import { usersModule } from './modules/users'
 import { env } from './config/env'
 import { AppError, PeriodExistsError } from './shared/errors'
 import { originGuard } from './shared/origin-guard'
@@ -37,5 +38,6 @@ export const app = new Elysia()
   .use(pullRequestsModule)
   .use(slaModule)
   .use(initiativesModule)
+  .use(usersModule)
 
 export type App = typeof app

@@ -653,6 +653,51 @@ await step('Timelines dashboard: quarter, KPIs, filters, grid, and admin add / e
   await clean()
 })
 
+await step('Users page: make someone admin, see it apply, remove it again', async () => {
+  const db = postgres(DB_URL, { max: 1 })
+  const email = `e2e-member-${Math.random().toString(36).slice(2, 8)}@test.local`
+  await db`insert into users (email, name) values (${email}, 'E2E Member')`
+  try {
+    await page.goto(`${APP}/timelines`)
+    await page.getByRole('link', { name: 'Users', exact: true }).click()
+    await page.waitForURL('**/admin/users')
+    await page.getByPlaceholder('Search by name or email').fill('E2E Member')
+    await page.getByRole('button', { name: 'Search' }).click()
+    const row = page.locator(`[data-row][data-email="${email}"]`)
+    await row.waitFor()
+    if ((await row.locator('[data-test="badge-admin"]').count()) !== 0) throw new Error('A new account should start as a member')
+    await shot('02j-users')
+
+    await row.locator('[data-test="make-admin"]').click()
+    await text(page, 'Make this person an admin?')
+    await page.locator('[data-test="confirm-admin"]').click()
+    await row.locator('[data-test="badge-admin"]').waitFor()
+    if ((await page.locator('[data-test="env-fallback"]').count()) !== 0) throw new Error('The ADMIN_EMAILS notice should be gone after the first grant')
+    const me = await page.evaluate(async () => (await fetch('/api/users', { credentials: 'include' })).status)
+    if (me !== 200) throw new Error(`The signed-in admin lost access after granting someone else: ${me}`)
+
+    // You cannot remove yourself: your own row has no remove button.
+    await page.getByPlaceholder('Search by name or email').fill(EMAIL)
+    await page.getByRole('button', { name: 'Search' }).click()
+    const mine = page.locator(`[data-row][data-email="${EMAIL}"]`)
+    await mine.waitFor()
+    if ((await mine.locator('[data-test="remove-admin"]').count()) !== 0) throw new Error('Your own row must not offer Remove admin')
+    await text(page, '(you)')
+
+    await page.getByPlaceholder('Search by name or email').fill('E2E Member')
+    await page.getByRole('button', { name: 'Search' }).click()
+    await row.waitFor()
+    await row.locator('[data-test="remove-admin"]').click()
+    await text(page, 'Remove admin access?')
+    await page.locator('[data-test="confirm-admin"]').click()
+    await row.locator('[data-test="make-admin"]').waitFor()
+    if ((await row.locator('[data-test="badge-admin"]').count()) !== 0) throw new Error('The account should be a member again')
+  } finally {
+    await db`delete from users where email = ${email}`
+    await db.end()
+  }
+})
+
 await step('kanban shows columns and cards', async () => {
   await page.goto(`${APP}/kanban`)
   await text(page, 'Tidy up the signing endpoint')

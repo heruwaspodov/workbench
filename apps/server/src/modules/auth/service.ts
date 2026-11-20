@@ -1,7 +1,8 @@
 import { and, count, eq, gt, lt } from 'drizzle-orm'
 import { env } from '../../config/env'
 import { db } from '../../db/client'
-import { sessions, users, type User } from '../../db/schema'
+import { sessions, userAdmin, users, type User } from '../../db/schema'
+import { adminTableEmpty, emailInAdminEnv } from '../../shared/admin'
 import { AppError, ForbiddenError } from '../../shared/errors'
 import type { OAuthProfile } from './model'
 
@@ -106,7 +107,6 @@ export abstract class AuthService {
     if (env.allowedDomains.length && !env.allowedDomains.includes(domain)) {
       throw new ForbiddenError(`Email domain "${domain}" is not allowed`)
     }
-    const isAdmin = env.adminEmails.includes(profile.email)
     const [user] = await db
       .insert(users)
       .values({
@@ -114,7 +114,6 @@ export abstract class AuthService {
         name: profile.name,
         avatarUrl: profile.avatarUrl,
         oauthSubject: profile.subject,
-        role: isAdmin ? 'admin' : 'member',
         lastLoginAt: new Date(),
       })
       .onConflictDoUpdate({
@@ -124,7 +123,6 @@ export abstract class AuthService {
           avatarUrl: profile.avatarUrl,
           oauthSubject: profile.subject,
           lastLoginAt: new Date(),
-          ...(isAdmin ? { role: 'admin' as const } : {}),
         },
       })
       .returning()
@@ -148,12 +146,20 @@ export abstract class AuthService {
   static async userFromSession(token: unknown): Promise<User | null> {
     if (typeof token !== 'string' || !token) return null
     const [row] = await db
-      .select({ user: users })
+      .select({ user: users, adminId: userAdmin.userId })
       .from(sessions)
       .innerJoin(users, eq(users.id, sessions.userId))
+      .leftJoin(userAdmin, eq(userAdmin.userId, users.id))
       .where(and(eq(sessions.id, await sha256(token)), gt(sessions.expiresAt, new Date())))
       .limit(1)
-    return row?.user ?? null
+    if (!row) return null
+    return { ...row.user, role: await this.effectiveRole(row.user.email, row.adminId != null) }
+  }
+
+  /** `user_admin` decides. ADMIN_EMAILS counts only while that table is empty (see shared/admin.ts). */
+  static async effectiveRole(email: string, hasAdminRow: boolean): Promise<'admin' | 'member'> {
+    if (hasAdminRow) return 'admin'
+    return emailInAdminEnv(email) && (await adminTableEmpty()) ? 'admin' : 'member'
   }
 
   static async destroySession(token: unknown) {

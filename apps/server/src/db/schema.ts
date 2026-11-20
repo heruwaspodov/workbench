@@ -221,3 +221,15 @@ export const initiativeMilestones = pgTable('initiative_milestones', {
 
 export type Initiative = typeof initiatives.$inferSelect
 export type InitiativeMilestone = typeof initiativeMilestones.$inferSelect
+
+/**
+ * Who is an admin. Admin = has a row here. Only while this table is empty does ADMIN_EMAILS decide (bootstrap fallback).
+ * The old users.role column is no longer read or written.
+ */
+export const userAdmin = pgTable('user_admin', {
+  userId: uuid('user_id').primaryKey().references(() => users.id, { onDelete: 'cascade' }),
+  grantedBy: uuid('granted_by').references(() => users.id, { onDelete: 'set null' }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+})
+
+export type UserAdmin = typeof userAdmin.$inferSelect

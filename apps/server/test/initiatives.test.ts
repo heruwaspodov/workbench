@@ -84,7 +84,12 @@ describe('initiatives API', () => {
     handler = (await import('../src/app')).app
     appOrigin = new URL((await import('../src/config/env')).env.appUrl).origin
     const { AuthService } = await import('../src/modules/auth/service')
-    const mk = async (n: string, role: 'admin' | 'member') => (await ctx.db.insert(S.users).values({ email: `${tag}-${n}@test.local`, name: n, role }).returning())[0]!
+    // Admin means a row in user_admin (the users.role column is no longer read). Deleting the user in afterAll removes the row.
+    const mk = async (n: string, role: 'admin' | 'member') => {
+      const user = (await ctx.db.insert(S.users).values({ email: `${tag}-${n}@test.local`, name: n }).returning())[0]!
+      if (role === 'admin') await ctx.db.insert(S.userAdmin).values({ userId: user.id })
+      return user
+    }
     adminToken = (await AuthService.createSession((await mk('admin', 'admin')).id)).token
     memberToken = (await AuthService.createSession((await mk('member', 'member')).id)).token
     await clear()
