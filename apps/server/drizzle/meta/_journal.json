@@ -43,6 +43,13 @@
       "when": 1794392241611,
       "tag": "0005_sla_goals",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1795170783995,
+      "tag": "0006_initiatives",
+      "breakpoints": true
     }
   ]
 }
