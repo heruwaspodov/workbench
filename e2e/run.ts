@@ -717,6 +717,72 @@ await step('Timelines dashboard: quarter, KPIs, filters, grid, and admin add / e
   await clean()
 })
 
+await step('Timelines: long titles wrap inside their cells in every view', async () => {
+  const YEAR = 2098 // a quarter of its own, so the other Timelines steps are unaffected
+  const call = (method: string, path: string, body?: unknown) => page.evaluate(async ([m, u, b]) => {
+    const res = await fetch(u as string, { method: m as string, credentials: 'include', headers: b ? { 'content-type': 'application/json' } : {}, body: b ? JSON.stringify(b) : undefined })
+    return { status: res.status, json: await res.json().catch(() => null) }
+  }, [method, path, body] as const)
+  const clean = async () => { for (const r of (await call('GET', `/api/initiatives?year=${YEAR}&quarter=4`)).json ?? []) await call('DELETE', `/api/initiatives/${r.id}`) }
+  await page.goto(`${APP}/timelines`)
+  await clean()
+  const long = 'Autosign Management Page and Configuration for Partner Portal Phase 1: Portal Setup, Sending with Quota and Embedded Mode'
+  for (const [key, title, squad] of [['MESIGN-97001', long, 'Escape'], ['MESIGN-97002', `X${'a'.repeat(90)}`, 'Intact']] as const) {
+    await call('POST', '/api/initiatives', { year: YEAR, quarter: 4, jiraKey: key, title, squad, criticality: 'BaU', milestones: [{ kind: 'release', date: `${YEAR}-12-23` }] })
+  }
+  for (let i = 0; i < 26; i++) { // enough rows that the table has to scroll
+    await call('POST', '/api/initiatives', { year: YEAR, quarter: 4, jiraKey: `MESIGN-97${String(100 + i)}`, title: `Filler initiative number ${i + 1}`, squad: 'Utmost', criticality: 'BaU' })
+  }
+  await page.goto(`${APP}/timelines`)
+  await page.locator('select[data-test="period-select"], [data-test="period-select"] select').first().selectOption(`${YEAR}-4`)
+  await page.locator('[data-test="view-timeline"]').waitFor()
+  // The week header stays visible while the rows scroll.
+  const scroll = page.locator('[data-test="timeline-scroll"]')
+  if (!(await scroll.evaluate((el) => el.scrollHeight > el.clientHeight + 20))) throw new Error('The timeline should scroll inside its card when there are many rows')
+  await scroll.evaluate((el) => { el.scrollTop = el.scrollHeight })
+  const headerTop = await page.evaluate(() => {
+    const box = document.querySelector('[data-test="timeline-scroll"]')!.getBoundingClientRect()
+    const head = document.querySelector('[data-week="0"]')!.getBoundingClientRect()
+    return { head: head.top, box: box.top, bottom: head.bottom, boxBottom: box.bottom }
+  })
+  if (headerTop.head < headerTop.box - 1 || headerTop.bottom > headerTop.boxBottom) throw new Error(`The week header scrolled out of view: ${JSON.stringify(headerTop)}`)
+  await scroll.evaluate((el) => { el.scrollTop = 0 })
+
+  /** Every title must sit inside the first cell of its row, and the next cell must start after the title ends. */
+  const inside = (view: string, cellSelector: string) => page.evaluate(([v, c]) => {
+    const bad: string[] = []
+    for (const btn of document.querySelectorAll(`[data-test="${v}"] [data-test="open-initiative"]`)) {
+      const cell = btn.closest(c as string)
+      if (!cell) { bad.push(`no ${c}`); continue }
+      // The button box is stretched to the cell, so measure the text itself: unwrapped text spills past the cell while the box does not.
+      const range = document.createRange()
+      range.selectNodeContents(btn)
+      const t = range.getBoundingClientRect(), r = cell.getBoundingClientRect()
+      if (t.right > r.right + 1 || t.left < r.left - 1 || t.bottom > r.bottom + 1) bad.push(`${btn.textContent?.slice(0, 30)} (${Math.round(t.right)} > ${Math.round(r.right)})`)
+    }
+    return bad
+  }, [view, cellSelector] as const)
+
+  for (const width of [1440, 1024]) {
+    await page.setViewportSize({ width, height: 900 })
+    let bad = await inside('view-timeline', 'td, th')
+    if (bad.length) throw new Error(`Timeline titles overflow their cell at ${width}px: ${bad.join('; ')}`)
+    await page.getByRole('button', { name: /^Grid view/ }).click()
+    await page.locator('[data-test="view-grid"]').waitFor()
+    bad = await inside('view-grid', 'td, th')
+    if (bad.length) throw new Error(`Grid titles overflow their cell at ${width}px: ${bad.join('; ')}`)
+    await page.getByRole('button', { name: /^Health & anomalies/ }).click()
+    await page.getByRole('button', { name: /^All initiatives/ }).click()
+    bad = await inside('view-health', '[data-row]')
+    if (bad.length) throw new Error(`Health titles overflow their row at ${width}px: ${bad.join('; ')}`)
+    await page.getByRole('button', { name: 'Delivery timeline & releases' }).click()
+    await page.locator('[data-test="view-timeline"]').waitFor()
+  }
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await shot('02m-timeline-long-titles')
+  await clean()
+})
+
 await step('Users page: make someone admin, see it apply, remove it again', async () => {
   const db = postgres(DB_URL, { max: 1 })
   const email = `e2e-member-${Math.random().toString(36).slice(2, 8)}@test.local`

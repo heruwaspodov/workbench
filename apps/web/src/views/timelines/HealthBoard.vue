@@ -26,7 +26,7 @@ const meta = css({ display: 'flex', alignItems: 'center', gap: '2', flexWrap: 'w
 const reasons = css({ listStyle: 'disc', pl: '5', display: 'flex', flexDirection: 'column', gap: '1' })
 const sheetBox = css({ display: 'flex', flexDirection: 'column', gap: '1', mt: '1' })
 const pre = css({ whiteSpace: 'pre-wrap', wordBreak: 'break-word' })
-const link = css({ cursor: 'pointer', textAlign: 'left', fontWeight: 'semiBold', _hover: { textDecoration: 'underline' } })
+const link = css({ cursor: 'pointer', textAlign: 'left', whiteSpace: 'normal', overflowWrap: 'anywhere', maxWidth: '100%', fontWeight: 'semiBold', _hover: { textDecoration: 'underline' } })
 </script>
 
 <template>

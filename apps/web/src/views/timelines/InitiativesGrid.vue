@@ -23,7 +23,7 @@ const metaRow = css({ display: 'flex', alignItems: 'center', gap: '2', flexWrap:
 const remark = css({ lineClamp: 2 })
 const links = css({ display: 'flex', gap: '3' })
 const flag = css({ cursor: 'help' })
-const titleLink = css({ textAlign: 'left', fontWeight: 'semiBold', cursor: 'pointer', _hover: { textDecoration: 'underline' } })
+const titleLink = css({ textAlign: 'left', fontWeight: 'semiBold', cursor: 'pointer', whiteSpace: 'normal', overflowWrap: 'anywhere', maxWidth: '100%', _hover: { textDecoration: 'underline' } })
 const resolveCell = css({ display: 'flex', alignItems: 'center', gap: '2', flexWrap: 'wrap' })
 </script>
 

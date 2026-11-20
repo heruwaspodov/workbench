@@ -31,19 +31,22 @@ const wide = css({
   tableLayout: 'fixed', minWidth: '1080px',
   '& th, & td': { px: '1', textAlign: 'center' },
   '& thead th': { fontSize: 'xs', lineHeight: '1.25', whiteSpace: 'normal', py: '2' },
+  '& thead': { position: 'sticky', top: 0, zIndex: 2 },
   '& tbody tr:hover > *': { bg: 'transparent' },
 })
 /** Keeps "5-9 Oct" and "30 Nov" in one piece so a narrow week column only breaks between the two halves of "30 Nov - 4 Dec". */
 const nb = (range: string) => range.replace(/(\d) ([A-Z])/g, '$1\u00a0$2').replace(/(\d)-(\d)/g, '$1\u2011$2').replace(' - ', '\u00a0- ')
 const nowrap = css({ whiteSpace: 'nowrap' })
-const left = css({ textAlign: 'left !important' })
+/** With dozens of initiatives the week header would scroll away, so the table scrolls inside its card and the header sticks. */
+const scroller = css({ maxHeight: 'calc(100vh - 220px)', minHeight: '240px', overflowY: 'auto' })
+const left = css({ textAlign: 'left !important', overflow: 'hidden', verticalAlign: 'middle' })
 const now = css({ bg: 'background.information !important', color: 'text.link !important' })
-const stack = css({ display: 'flex', flexDirection: 'column', gap: '1', minWidth: 0 })
+const stack = css({ display: 'flex', flexDirection: 'column', gap: '1', minWidth: 0, maxWidth: '100%' })
 const metaRow = css({ display: 'flex', alignItems: 'center', gap: '2', flexWrap: 'wrap' })
 const chip = css({ whiteSpace: 'normal', textAlign: 'center', lineHeight: '1.2', px: '1', display: 'inline-block' })
 const cell = css({ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1' })
 const head = css({ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '3', flexWrap: 'wrap', px: '4', py: '3', borderBottomWidth: '1px', borderColor: 'border.default.subtle' })
-const title = css({ display: 'block', textAlign: 'left', cursor: 'pointer', _hover: { textDecoration: 'underline' } })
+const title = css({ display: 'block', textAlign: 'left', cursor: 'pointer', whiteSpace: 'normal', overflowWrap: 'anywhere', maxWidth: '100%', _hover: { textDecoration: 'underline' } })
 </script>
 
 <template>
@@ -55,10 +58,10 @@ const title = css({ display: 'block', textAlign: 'left', cursor: 'pointer', _hov
           Goal risk: progress under 50% with a release next week · {{ risky.length }}
         </MpBadge>
       </div>
-      <MpTableContainer>
+      <MpTableContainer :class="scroller" data-test="timeline-scroll">
         <MpTable :class="[ui.table, wide]">
           <colgroup>
-            <col style="width: 220px" />
+            <col style="width: 240px" />
             <col style="width: 72px" />
             <col v-for="w in layout.weeks" :key="w.index" />
           </colgroup>
