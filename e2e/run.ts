@@ -483,6 +483,18 @@ await step('My Confluence lists, searches and links my pages', async () => {
   await shot('02c-my-confluence')
 })
 
+await step('Timelines menu in the sidebar opens the Timelines page', async () => {
+  await page.goto(`${APP}/pgp`)
+  await page.getByRole('link', { name: 'Timelines' }).click()
+  await page.waitForURL('**/timelines')
+  await text(page, 'Delivery timeline and releases')
+  const title = await page.title()
+  if (title !== 'Timelines · Workbench') throw new Error(`Unexpected tab title: ${title}`)
+  const active = await page.getByRole('link', { name: 'Timelines' }).evaluate((el) => getComputedStyle(el).fontWeight)
+  if (Number(active) < 600) throw new Error(`Timelines menu is not highlighted (font-weight ${active})`)
+  await shot('02d-timelines')
+})
+
 await step('kanban shows columns and cards', async () => {
   await page.goto(`${APP}/kanban`)
   await text(page, 'Tidy up the signing endpoint')

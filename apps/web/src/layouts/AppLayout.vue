@@ -10,6 +10,7 @@ const route = useRoute()
 const nav = computed(() => [
   { to: '/pgp', label: 'Personal Growth Plan', icon: 'goal' as const },
   ...((auth.me?.reportCount ?? 0) > 0 ? [{ to: '/team', label: 'My Team', icon: 'team' as const }] : []),
+  { to: '/timelines', label: 'Timelines', icon: 'calendar' as const },
   { to: '/kanban', label: 'My Kanban', icon: 'table-view-column' as const },
   { to: '/pull-requests', label: 'My Pull Requests', icon: 'file-code' as const },
   { to: '/confluence', label: 'My Confluence', icon: 'draft' as const },
