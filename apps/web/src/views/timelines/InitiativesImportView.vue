@@ -158,6 +158,7 @@ const warn = css({ mb: '4' })
       </div>
       <MpText size="label-small" color="text.secondary" :class="css({ mt: '3', display: 'block' })">
         Initiatives that are not in the file are kept. A Key Info / Remark that is already filled is never overwritten.
+        An upload replaces status, progress, dates and owner with the file's values, so use Sync from Jira on the Timelines page afterwards to bring them up to date.
       </MpText>
       <div :class="foot">
         <RouterLink to="/timelines"><MpButton variant="ghost">Cancel</MpButton></RouterLink>

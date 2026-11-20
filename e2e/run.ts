@@ -783,6 +783,90 @@ await step('Timelines: long titles wrap inside their cells in every view', async
   await clean()
 })
 
+await step('Sync from Jira: stale rows are refreshed, the sheet-owned text is kept, members cannot sync', async () => {
+  const YEAR = 2096 // a quarter of its own
+  const call = (method: string, path: string, body?: unknown) => page.evaluate(async ([m, u, b]) => {
+    const res = await fetch(u as string, { method: m as string, credentials: 'include', headers: b ? { 'content-type': 'application/json' } : {}, body: b ? JSON.stringify(b) : undefined })
+    return { status: res.status, json: await res.json().catch(() => null) }
+  }, [method, path, body] as const)
+  const clean = async () => { for (const r of (await call('GET', `/api/initiatives?year=${YEAR}&quarter=4`)).json ?? []) await call('DELETE', `/api/initiatives/${r.id}`) }
+  await page.goto(`${APP}/timelines`)
+  await clean()
+  const stale = { year: YEAR, quarter: 4, squad: 'Escape', criticality: 'Strategic', ownerName: 'Old Owner', estDeliveryDate: `${YEAR}-01-01`, doneItems: 1, totalItems: 3, remarkProposed: 'Written before the sync', sheetAnomalies: '1) Epic reads Done but 2 child item(s) are still open.', sheetResolution: 'Open' }
+  await call('POST', '/api/initiatives', { ...stale, jiraKey: 'MESIGN-96001', title: 'Sheet title one', epicStatus: 'Done', actualDeliveryDate: `${YEAR}-11-19` })
+  await call('POST', '/api/initiatives', { ...stale, jiraKey: 'MESIGN-96002', title: 'Sheet title two', epicStatus: 'To Do', doneItems: 0, totalItems: 2 })
+  await call('POST', '/api/initiatives', { ...stale, jiraKey: 'MESIGN-96009', title: 'Sheet title not in Jira', epicStatus: 'To Do' })
+
+  await page.goto(`${APP}/timelines?tab=grid`)
+  await page.locator('select[data-test="period-select"], [data-test="period-select"] select').first().selectOption(`${YEAR}-4`)
+  const rowOne = page.locator('[data-test="view-grid"] [data-row]', { hasText: 'Sheet title one' })
+  await rowOne.waitFor()
+  if (!(await rowOne.innerText()).includes('1/3')) throw new Error('The seeded row should start with the stale 1/3')
+  if ((await rowOne.locator('[data-test="anomaly-badge"]').count()) !== 1) throw new Error('The stale row should show its anomaly before the sync')
+  await text(page, 'Sync from Jira')
+
+  await page.locator('[data-test="sync-quarter"]').click()
+  const result = page.locator('[data-test="sync-result"]')
+  await result.waitFor()
+  const said = (id: string) => result.locator(`[data-test="${id}"]`).innerText()
+  if (!(await said('sync-updated')).startsWith('2 ')) throw new Error(`Expected 2 updated, got "${await said('sync-updated')}"`)
+  if (!(await said('sync-missing')).startsWith('1 ')) throw new Error(`Expected 1 not found, got "${await said('sync-missing')}"`)
+  const changes = await result.locator('[data-test="sync-changes"]').innerText()
+  if (!changes.includes('MESIGN-96001') || !changes.includes('Progress') || !changes.includes('Owner')) throw new Error(`The change list is incomplete: ${changes}`)
+  if (changes.includes('MESIGN-96009')) throw new Error('The row Jira does not know must not be listed as changed')
+  await page.waitForTimeout(400)
+  await page.screenshot({ path: join(OUT, '02n-sync-result.png') })
+  await page.getByRole('button', { name: 'Close', exact: true }).last().click()
+  await result.waitFor({ state: 'detached' })
+
+  const afterOne = page.locator('[data-test="view-grid"] [data-row]', { hasText: 'Sheet title one' })
+  await afterOne.locator('[data-test="anomaly-badge"]').waitFor({ state: 'detached' }) // "Done but children open" is gone with the fresh counts
+  const gridText = await afterOne.innerText()
+  if (!gridText.includes('3/3') || !gridText.includes('Synced Owner')) throw new Error(`The grid row was not refreshed: ${gridText.replace(/\s+/g, ' ')}`)
+  const notFound = await page.locator('[data-test="view-grid"] [data-row]', { hasText: 'not in Jira' }).innerText()
+  if (!notFound.includes('1/3') || !notFound.includes('Old Owner')) throw new Error('The row Jira does not know should be left as it was')
+
+  // Sheet-owned text is untouched, and the panel says when Jira was last read.
+  await afterOne.locator('[data-test="open-initiative"]').click()
+  const detail = page.locator('[data-test="initiative-detail"]')
+  await detail.waitFor()
+  await page.waitForTimeout(600)
+  if (!(await detail.locator('[data-test="detail-synced"]').innerText()).includes('Jira synced')) throw new Error('The panel should say when Jira was last read')
+  if (!(await detail.locator('[data-test="detail-remark-proposed"]').innerText()).includes('Written before the sync')) throw new Error('A sync must not change the remark')
+  if (!(await detail.locator('[data-test="detail-sheet-anomalies"]').innerText()).includes('Epic reads Done')) throw new Error('A sync must not change the sheet anomalies')
+  await page.screenshot({ path: join(OUT, '02o-sync-detail.png') })
+
+  // One initiative from its panel: nothing new in Jira, so nothing changes.
+  await page.locator('[data-test="detail-sync"]').click() // the footer is outside the panel body
+  await result.waitFor()
+  if (!(await said('sync-unchanged')).startsWith('1 ')) throw new Error('Syncing a single, current initiative should report 1 unchanged')
+  await page.getByRole('button', { name: 'Close', exact: true }).last().click()
+  await result.waitFor({ state: 'detached' })
+
+  // A member sees no sync buttons.
+  const viewer = await AuthService.upsertUser({ subject: 'e2e-sync-viewer', email: 'e2e-sync-viewer@mekari.com', name: 'E2E Sync Viewer' })
+  const viewerSession = await AuthService.createSession(viewer.id)
+  const viewerContext = await browser.newContext({ viewport: { width: 1440, height: 900 } })
+  try {
+    await viewerContext.addCookies([{ name: 'od_session', value: viewerSession.token, url: APP }])
+    const vp = await viewerContext.newPage()
+    await vp.goto(`${APP}/timelines?tab=grid`)
+    await vp.locator('select[data-test="period-select"], [data-test="period-select"] select').first().selectOption(`${YEAR}-4`)
+    await vp.locator('[data-test="view-grid"] [data-test="open-initiative"]', { hasText: 'Sheet title one' }).click()
+    await vp.locator('[data-test="initiative-detail"]').waitFor()
+    if ((await vp.locator('[data-test="sync-quarter"]').count()) !== 0 || (await vp.locator('[data-test="detail-sync"]').count()) !== 0) throw new Error('A member must not see the sync buttons')
+    const denied = await vp.evaluate(async (y) => (await fetch('/api/initiatives/sync', { method: 'POST', credentials: 'include', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ year: y, quarter: 4 }) })).status, YEAR)
+    if (denied !== 403) throw new Error(`The sync endpoint should refuse a member, got ${denied}`)
+  } finally {
+    await viewerContext.close()
+    const { db: appDb } = await import('../apps/server/src/db/client')
+    const { users: usersTable } = await import('../apps/server/src/db/schema')
+    const { eq: eqOp } = await import('drizzle-orm')
+    await appDb.delete(usersTable).where(eqOp(usersTable.id, viewer.id))
+  }
+  await clean()
+})
+
 await step('Users page: make someone admin, see it apply, remove it again', async () => {
   const db = postgres(DB_URL, { max: 1 })
   const email = `e2e-member-${Math.random().toString(36).slice(2, 8)}@test.local`

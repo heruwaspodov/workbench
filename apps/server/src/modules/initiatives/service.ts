@@ -6,7 +6,7 @@ import { anomaliesFor, statusCategory, type StatusCategory } from './anomalies'
 import type { InitiativeFilters } from './model'
 
 export type Milestone = { kind: 'release' | 'self_test'; date: string; label?: string | null }
-export type Fields = Partial<Omit<Initiative, 'id' | 'year' | 'quarter' | 'jiraKey' | 'sourceRef' | 'createdAt' | 'updatedAt'>> & { milestones?: Milestone[] }
+export type Fields = Partial<Omit<Initiative, 'id' | 'year' | 'quarter' | 'jiraKey' | 'sourceRef' | 'jiraSyncedAt' | 'createdAt' | 'updatedAt'>> & { milestones?: Milestone[] }
 
 export interface InitiativeView extends Initiative {
   statusCategory: StatusCategory

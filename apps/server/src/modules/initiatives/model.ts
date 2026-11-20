@@ -76,6 +76,12 @@ export const InitiativesModel = {
       milestones: t.Optional(t.Array(importMilestone, { maxItems: 40 })),
     }), { minItems: 1, maxItems: 500 }),
   }),
+  sync: t.Object({
+    year: t.Integer({ minimum: 2000, maximum: 2100 }),
+    quarter: t.Integer({ minimum: 1, maximum: 4 }),
+    /** Only these Jira keys; leave out for the whole quarter. */
+    keys: t.Optional(t.Array(t.String({ minLength: 3, maxLength: 40 }), { maxItems: 500 })),
+  }),
   id: t.Object({ id: t.String({ pattern: '^[0-9a-fA-F-]{36}$' }) }),
 }
 

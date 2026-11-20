@@ -64,6 +64,13 @@
       "when": 1795180653145,
       "tag": "0008_initiatives_sheet_columns",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1795182992541,
+      "tag": "0009_initiatives_jira_synced_at",
+      "breakpoints": true
     }
   ]
 }

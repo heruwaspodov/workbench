@@ -203,6 +203,8 @@ export const initiatives = pgTable('initiatives', {
   sheetAnomalies: text('sheet_anomalies'),
   sheetResolution: text('sheet_resolution'),
   repoNote: text('repo_note'),
+  /** When the Jira-owned columns were last refreshed from Jira (null = never). */
+  jiraSyncedAt: timestamp('jira_synced_at', { withTimezone: true }),
   ...timestamps,
 }, (t) => [
   uniqueIndex('initiatives_period_key_uq').on(t.year, t.quarter, t.jiraKey),

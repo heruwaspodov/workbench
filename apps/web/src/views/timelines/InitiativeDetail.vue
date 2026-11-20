@@ -4,11 +4,11 @@ import {
   MpBadge, MpButton, MpDrawer, MpDrawerBody, MpDrawerCloseButton, MpDrawerContent, MpDrawerFooter, MpDrawerHeader, MpDrawerOverlay, MpText, css,
 } from '@mekari/pixel3'
 import { isHttpUrl } from '@/lib/clipboard'
-import { formatDate, isoDay } from '@/lib/format'
+import { formatDate, isoDay, timeAgo } from '@/lib/format'
 import { type Initiative, STATUS_COLOR, progressText, resolutionColor, statusText } from './types'
 
-defineProps<{ row: Initiative | null; canEdit: boolean }>()
-const emit = defineEmits<{ close: []; edit: [row: Initiative] }>()
+defineProps<{ row: Initiative | null; canEdit: boolean; syncing?: boolean }>()
+const emit = defineEmits<{ close: []; edit: [row: Initiative]; sync: [row: Initiative] }>()
 
 const meta = css({ display: 'grid', gridTemplateColumns: '150px minmax(0, 1fr)', rowGap: '2', columnGap: '3', mb: '5' })
 const block = css({ mb: '5' })
@@ -34,6 +34,11 @@ const links = css({ display: 'flex', gap: '3' })
           <MpBadge v-if="row.criticality" variant="subtle" :variant-color="row.criticality === 'Strategic' ? 'blue' : 'gray'">{{ row.criticality }}</MpBadge>
           <MpBadge v-if="row.needsReview" variant="subtle" variant-color="orange">Needs review</MpBadge>
         </div>
+
+        <MpText size="label-small" color="text.secondary" :class="css({ mb: '4', display: 'block' })" data-test="detail-synced">
+          <template v-if="row.jiraSyncedAt">Jira synced {{ timeAgo(row.jiraSyncedAt) }}. Remarks and the sheet's anomalies were written for the last upload and a sync does not change them.</template>
+          <template v-else>Not synced from Jira yet. Status, progress, dates and owner are as of the last upload.</template>
+        </MpText>
 
         <div :class="meta">
           <MpText size="label" color="text.secondary">Squad</MpText><MpText size="label">{{ row.squad ?? 'Unassigned' }}</MpText>
@@ -89,6 +94,7 @@ const links = css({ display: 'flex', gap: '3' })
       </MpDrawerBody>
       <MpDrawerFooter>
         <MpButton variant="ghost" @click="emit('close')">Close</MpButton>
+        <MpButton v-if="canEdit && row" variant="secondary" left-icon="refresh" :is-loading="syncing" data-test="detail-sync" @click="emit('sync', row)">Sync from Jira</MpButton>
         <MpButton v-if="canEdit && row" variant="secondary" left-icon="edit" data-test="detail-edit" @click="emit('edit', row)">Edit</MpButton>
       </MpDrawerFooter>
     </MpDrawerContent>

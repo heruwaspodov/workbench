@@ -97,6 +97,20 @@ const monthsIn = (from: string, to: string) => {
 }
 const epic = (n: number, summary: string, cat: string, st: string) =>
   ({ id: String(20000 + n), key: `MESIGN-${900 + n}`, fields: { summary, status: { id: '9', name: st, statusCategory: { key: cat } }, resolutiondate: null } })
+const field = (name: string, fallback: string) => process.env[name] || fallback
+const syncEpics = [
+  { key: 'MESIGN-96001', status: 'Done', cat: 'done', owner: 'Synced Owner', est: '2099-11-30', actual: '2099-11-19', crit: 'BaU', pstatus: 'Done', children: ['done', 'done', 'done'] },
+  { key: 'MESIGN-96002', status: 'In Progress', cat: 'indeterminate', owner: 'Synced Owner', est: '2099-12-15', actual: null, crit: 'Strategic', pstatus: 'In Testing', children: ['done', 'done', 'indeterminate', 'indeterminate'] },
+]
+const syncEpic = (e: (typeof syncEpics)[number]) => ({
+  id: e.key, key: e.key,
+  fields: {
+    summary: `Jira title of ${e.key}`, status: { name: e.status, statusCategory: { key: e.cat } }, assignee: { displayName: e.owner },
+    [field('JIRA_EST_DELIVERY_FIELD', 'customfield_11728')]: e.est, [field('JIRA_DELIVERY_DATE_FIELD', 'customfield_11781')]: e.actual,
+    [field('JIRA_CRITICALITY_FIELD', 'customfield_11757')]: { value: e.crit }, [field('JIRA_PROJECT_STATUS_FIELD', 'customfield_12356')]: { value: e.pstatus },
+  },
+})
+
 function searchJql(jql: string) {
   if (jql.includes('issuetype = Epic')) return [epic(1, 'Mock epic for e2e', 'indeterminate', 'In Progress'), epic(2, 'Mock finished epic', 'done', 'Done')]
   if (jql.includes('issuetype = "Fast Track"')) {
@@ -109,6 +123,13 @@ function searchJql(jql: string) {
       },
     })
     return [ft(1, 'Medium - P2', ['team-x', 'mesign-p2'], 6, 3), ft(2, 'Medium - P2', ['team-x', 'mesign-p2'], 5, 24 * 14), ft(3, 'High - P1', ['team-x', 'mesign-p1'], 4, 2), ft(4, 'Medium - P2', ['team-x', 'other'], 3, 1)]
+  }
+  // Initiatives sync (OD-94): live data for the epics the e2e seeds as stale rows. MESIGN-96009 is deliberately unknown to Jira.
+  if (jql.startsWith('key in (') && syncEpics.some((e) => jql.includes(`"${e.key}"`))) return syncEpics.filter((e) => jql.includes(`"${e.key}"`)).map(syncEpic)
+  if (jql.startsWith('parent in (') && syncEpics.some((e) => jql.includes(`"${e.key}"`))) {
+    return syncEpics.filter((e) => jql.includes(`"${e.key}"`)).flatMap((e) => e.children.map((cat, n) => ({
+      id: `${e.key}-c${n}`, key: `${e.key}-c${n}`, fields: { parent: { key: e.key }, status: { name: cat === 'done' ? 'Done' : 'In Progress', statusCategory: { key: cat } } },
+    })))
   }
   if (jql.startsWith('key in (')) return jql.includes('"MESIGN-899"') ? [{ id: '899', key: 'MESIGN-899', fields: { summary: '26Q4 Unlabelled mock initiative', created: iso(5), resolutiondate: null, issuetype: { name: 'Epic' }, status: { name: 'To Do' } } }] : []
   if (jql.includes('parent is not EMPTY') || jql.startsWith('parent in (')) return []

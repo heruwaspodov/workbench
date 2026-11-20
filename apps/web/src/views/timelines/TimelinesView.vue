@@ -6,7 +6,7 @@ import AsyncState from '@/components/AsyncState.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import SearchInput from '@/components/SearchInput.vue'
 import SegmentedControl from '@/components/SegmentedControl.vue'
-import { api, unwrap } from '@/lib/api'
+import { api, notifyError, unwrap } from '@/lib/api'
 import { isoDay, monthLabel } from '@/lib/format'
 import { ui } from '@/lib/ui'
 import { useAsync } from '@/lib/use-async'
@@ -16,6 +16,7 @@ import InitiativeDrawer from './InitiativeDrawer.vue'
 import InitiativeDetail from './InitiativeDetail.vue'
 import InitiativesGrid from './InitiativesGrid.vue'
 import KanbanBoard from './KanbanBoard.vue'
+import SyncResultModal, { type SyncResult } from './SyncResultModal.vue'
 import TimelineBoard from './TimelineBoard.vue'
 import type { Initiative as Row } from './types'
 
@@ -104,6 +105,20 @@ const openEdit = (row: Row) => { detail.value = null; drawer.value = { open: tru
 /** Read-only detail for everyone; admins edit from inside it. */
 const detail = ref<Row | null>(null)
 const openDetail = (row: Row) => { detail.value = row }
+
+// ----- sync from Jira (admin): the whole quarter, or one initiative from its detail panel -----
+const syncing = ref<'quarter' | 'one' | null>(null)
+const syncResult = ref<SyncResult | null>(null)
+async function syncFromJira(only?: Row) {
+  if (!current.value || syncing.value) return
+  syncing.value = only ? 'one' : 'quarter'
+  try {
+    syncResult.value = await unwrap(api.initiatives.sync.post({ year: current.value.year, quarter: current.value.quarter, ...(only ? { keys: [only.jiraKey] } : {}) }))
+    await loadBoard()
+    // Keep the open panel on the same initiative, now with the fresh numbers.
+    if (only) detail.value = board.data.value?.rows.find((r) => r.id === only.id) ?? null
+  } catch (e) { notifyError(e) } finally { syncing.value = null }
+}
 const closeDrawer = () => { drawer.value = { ...drawer.value, open: false } }
 async function onSaved() {
   closeDrawer()
@@ -141,6 +156,7 @@ const periodBox = css({ minWidth: '140px' })
       </MpSelect>
     </div>
     <template v-if="isAdmin">
+      <MpButton v-if="current" variant="secondary" left-icon="refresh" :is-loading="syncing === 'quarter'" :is-disabled="syncing === 'one'" data-test="sync-quarter" @click="syncFromJira()">Sync from Jira</MpButton>
       <MpButton variant="secondary" left-icon="add" data-test="new-initiative" @click="openNew">New initiative</MpButton>
       <RouterLink to="/timelines/import"><MpButton variant="secondary" left-icon="upload">Import initiatives</MpButton></RouterLink>
     </template>
@@ -193,7 +209,8 @@ const periodBox = css({ minWidth: '140px' })
     </AsyncState>
   </AsyncState>
 
-  <InitiativeDetail :row="detail" :can-edit="isAdmin" @close="detail = null" @edit="openEdit" />
+  <InitiativeDetail :row="detail" :can-edit="isAdmin" :syncing="syncing === 'one'" @close="detail = null" @edit="openEdit" @sync="syncFromJira" />
+  <SyncResultModal :result="syncResult" @close="syncResult = null" />
   <InitiativeDrawer v-if="isAdmin" :open="drawer.open" :initiative="drawer.row" :year="defaults.year" :quarter="defaults.quarter"
     :statuses="knownStatuses" @close="closeDrawer" @saved="onSaved" />
 </template>
