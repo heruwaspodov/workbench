@@ -539,6 +539,79 @@ await step('admin uploads an initiatives .xlsx, previews it, saves it for a chos
   }, year)
 })
 
+await step('Timelines dashboard: quarter, KPIs, filters, grid, and admin add / edit / delete', async () => {
+  const YEAR = 2099 // newest quarter, so it is the default one; cleaned before and after
+  const api = (method: string, path: string, body?: unknown) => page.evaluate(async ([m, u, b]) => {
+    const res = await fetch(u as string, { method: m as string, credentials: 'include', headers: b ? { 'content-type': 'application/json' } : {}, body: b ? JSON.stringify(b) : undefined })
+    return { status: res.status, json: await res.json().catch(() => null) }
+  }, [method, path, body] as const)
+  const clean = async () => {
+    for (const r of (await api('GET', `/api/initiatives?year=${YEAR}&quarter=4`)).json ?? []) await api('DELETE', `/api/initiatives/${r.id}`)
+  }
+  await page.goto(`${APP}/timelines`)
+  await clean()
+  const seed = (o: Record<string, unknown>) => api('POST', '/api/initiatives', { year: YEAR, quarter: 4, criticality: 'Strategic', ...o })
+  await seed({ jiraKey: 'MESIGN-98001', title: 'E2E signing flow', squad: 'Escape', epicStatus: 'In Progress', ownerName: 'Synthetic Owner', estDeliveryDate: `${YEAR}-11-30`, doneItems: 3, totalItems: 10, remarkProposed: 'Tail is in QA.' })
+  await seed({ jiraKey: 'MESIGN-98002', title: 'E2E stamp tool', squad: 'Intact', criticality: 'BaU', epicStatus: 'Done', ownerName: 'Synthetic Owner', estDeliveryDate: `${YEAR}-10-16`, actualDeliveryDate: `${YEAR}-10-19`, doneItems: 5, totalItems: 5, prdUrl: 'https://docs.example.test/prd', rfcUrl: 'https://docs.example.test/rfc' })
+  await seed({ jiraKey: 'MESIGN-98003', title: 'E2E backlog item', squad: 'Utmost', epicStatus: 'To Do', needsReview: true })
+  await page.goto(`${APP}/timelines`)
+
+  await text(page, 'Grid view · 3')
+  const kpi = async (id: string) => (await page.locator(`[data-test="${id}"]`).innerText()).replace(/\s+/g, ' ')
+  for (const [id, expected] of [['kpi-total', '3'], ['kpi-done', '1'], ['kpi-active', '1'], ['kpi-review', '1']] as const) {
+    if (!(await kpi(id)).includes(` ${expected} `) && !(await kpi(id)).match(new RegExp(`\\b${expected}\\b`))) throw new Error(`KPI ${id} is not ${expected}: ${await kpi(id)}`)
+  }
+  const period = await page.locator('select[data-test="period-select"], [data-test="period-select"] select').first().inputValue()
+  if (period !== `${YEAR}-4`) throw new Error(`Newest quarter is not selected: ${period}`)
+  // The server refuses non-http links outright (see the server tests), so here only the http ones appear.
+  if ((await page.getByRole('link', { name: 'PRD' }).count()) !== 1 || (await page.getByRole('link', { name: 'RFC' }).count()) !== 1) throw new Error('The PRD / RFC links are missing')
+  await text(page, 'Tail is in QA.')
+  await shot('02f-timelines-grid')
+
+  const pick = (id: string, value: string) => page.locator(`select[data-test="${id}"], [data-test="${id}"] select`).first().selectOption(value)
+  await pick('f-squad', 'Intact')
+  await text(page, 'Grid view · 1')
+  await pick('f-squad', '')
+  await pick('f-status', 'Done')
+  await text(page, 'Grid view · 1')
+  await pick('f-status', '')
+  await pick('f-criticality', 'BaU')
+  await text(page, 'Grid view · 1')
+  await pick('f-criticality', '')
+  await pick('f-month', `${YEAR}-11`)
+  await text(page, 'Grid view · 1')
+  await pick('f-month', '')
+  await page.getByPlaceholder('Search initiatives').fill('backlog')
+  await text(page, 'Grid view · 1')
+  await page.getByPlaceholder('Search initiatives').fill('nothing matches this')
+  await text(page, 'No initiatives match these filters.')
+  await page.getByPlaceholder('Search initiatives').fill('')
+  await text(page, 'Grid view · 3')
+
+  // add
+  await page.locator('[data-test="new-initiative"]').click()
+  await page.locator('[data-test="f-key"]').fill('MESIGN-98004')
+  await page.locator('[data-test="f-title"]').fill('E2E added by form')
+  await page.locator('[data-test="add-marker"]').click()
+  await page.locator('[data-test="initiative-form"] input[type="date"]').last().fill(`${YEAR}-12-11`)
+  await page.locator('[data-test="save-initiative"]').click()
+  await text(page, 'Grid view · 4')
+  await text(page, 'E2E added by form')
+  // edit
+  await page.locator('[data-row]', { hasText: 'E2E added by form' }).locator('[data-test="edit-initiative"]').click()
+  await page.locator('[data-test="f-title"]').fill('E2E edited by form')
+  await page.locator('[data-test="save-initiative"]').click()
+  await text(page, 'E2E edited by form')
+  const marks = (await api('GET', `/api/initiatives?year=${YEAR}&quarter=4&q=98004`)).json[0].milestones
+  if (marks.length !== 1 || !String(marks[0].date).startsWith(`${YEAR}-12-11`)) throw new Error(`Release marker not saved: ${JSON.stringify(marks)}`)
+  // delete
+  await page.locator('[data-row]', { hasText: 'E2E edited by form' }).locator('[data-test="edit-initiative"]').click()
+  await page.getByRole('button', { name: 'Delete', exact: true }).click()
+  await page.locator('[data-test="confirm-delete-initiative"]').click()
+  await text(page, 'Grid view · 3')
+  await clean()
+})
+
 await step('kanban shows columns and cards', async () => {
   await page.goto(`${APP}/kanban`)
   await text(page, 'Tidy up the signing endpoint')

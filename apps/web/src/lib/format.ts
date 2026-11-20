@@ -12,3 +12,13 @@ export function timeAgo(iso?: string | Date | null) {
 }
 
 export const pct = (n?: number | null) => (n == null ? '-' : `${Math.round(n * 100) / 100}%`)
+
+/**
+ * "YYYY-MM-DD" of a date column. The API client (Eden) turns date strings into Date objects (UTC midnight),
+ * so both shapes arrive here and the day must be read in UTC to stay the same day.
+ */
+export const isoDay = (v?: string | Date | null) => (v ? (v instanceof Date ? v.toISOString() : String(v)).slice(0, 10) : '')
+
+const monthFmt = new Intl.DateTimeFormat('en-GB', { month: 'short', year: 'numeric', timeZone: 'UTC' })
+/** "2026-11" → "Nov 2026". */
+export const monthLabel = (month: string) => monthFmt.format(new Date(`${month}-01T00:00:00Z`))
