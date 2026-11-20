@@ -2,11 +2,13 @@ import { Elysia } from 'elysia'
 import { authModule } from './modules/auth'
 import { confluenceModule } from './modules/confluence'
 import { connectionsModule } from './modules/connections'
+import { initiativesModule } from './modules/initiatives'
 import { kanbanModule } from './modules/kanban'
 import { orgModule } from './modules/org'
 import { pgpModule } from './modules/pgp'
 import { pullRequestsModule } from './modules/pull-requests'
 import { slaModule } from './modules/sla'
+import { usersModule } from './modules/users'
 import { env } from './config/env'
 import { AppError, PeriodExistsError } from './shared/errors'
 import { originGuard } from './shared/origin-guard'
@@ -35,5 +37,7 @@ export const app = new Elysia()
   .use(orgModule)
   .use(pullRequestsModule)
   .use(slaModule)
+  .use(initiativesModule)
+  .use(usersModule)
 
 export type App = typeof app

@@ -59,18 +59,22 @@ export abstract class ExcelService {
   }
 
   /** Cell text plus a same-shaped grid of hyperlink targets (empty string where a cell has none). */
-  static async readWorkbookWithLinks(buffer: ArrayBuffer): Promise<Map<string, { rows: string[][]; links: string[][] }>> {
+  static async readWorkbookWithLinks(
+    buffer: ArrayBuffer,
+    limits: { maxRows?: number; maxCols?: number } = {},
+  ): Promise<Map<string, { rows: string[][]; links: string[][] }>> {
+    const { maxRows = 300, maxCols = 26 } = limits
     const wb = new ExcelJS.Workbook()
     await wb.xlsx.load(buffer)
     const out = new Map<string, { rows: string[][]; links: string[][] }>()
     wb.eachSheet((ws) => {
       const rows: string[][] = []
       const links: string[][] = []
-      for (let r = 1; r <= Math.min(ws.rowCount, 300); r++) {
+      for (let r = 1; r <= Math.min(ws.rowCount, maxRows); r++) {
         const row = ws.getRow(r)
         const cells: string[] = []
         const urls: string[] = []
-        for (let c = 1; c <= Math.min(ws.columnCount, 26); c++) {
+        for (let c = 1; c <= Math.min(ws.columnCount, maxCols); c++) {
           const cell = row.getCell(c)
           cells.push(cellText(cell))
           urls.push(cellLink(cell))

@@ -10,11 +10,12 @@ const route = useRoute()
 const nav = computed(() => [
   { to: '/pgp', label: 'Personal Growth Plan', icon: 'goal' as const },
   ...((auth.me?.reportCount ?? 0) > 0 ? [{ to: '/team', label: 'My Team', icon: 'team' as const }] : []),
+  { to: '/timelines', label: 'Timelines', icon: 'calendar' as const },
   { to: '/kanban', label: 'My Kanban', icon: 'table-view-column' as const },
   { to: '/pull-requests', label: 'My Pull Requests', icon: 'file-code' as const },
   { to: '/confluence', label: 'My Confluence', icon: 'draft' as const },
   ...(auth.me?.role === 'admin'
-    ? [{ to: '/pgp/templates', label: 'PGP Templates', icon: 'plans' as const }, { to: '/admin/sla', label: 'SLA goals', icon: 'goal' as const }]
+    ? [{ to: '/pgp/templates', label: 'PGP Templates', icon: 'plans' as const }, { to: '/admin/sla', label: 'SLA goals', icon: 'goal' as const }, { to: '/admin/users', label: 'Users', icon: 'people' as const }]
     : []),
   { to: '/connections', label: 'Connections', icon: 'connected_apps' as const },
 ])

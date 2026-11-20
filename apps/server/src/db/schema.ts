@@ -1,6 +1,6 @@
 import { relations, sql } from 'drizzle-orm'
 import {
-  type AnyPgColumn, check, integer, jsonb, numeric, pgEnum, pgTable, text, timestamp, uniqueIndex, uuid, index,
+  type AnyPgColumn, boolean, check, date, integer, jsonb, numeric, pgEnum, pgTable, text, timestamp, uniqueIndex, uuid, index,
 } from 'drizzle-orm/pg-core'
 
 export const roleEnum = pgEnum('user_role', ['admin', 'member'])
@@ -174,3 +174,68 @@ export const slaGoals = pgTable('sla_goals', {
 }, (t) => [index('sla_goals_position_idx').on(t.position), check('sla_goals_calendar_chk', sql`${t.calendar} in ('weekdays', 'always')`)])
 
 export type SlaGoal = typeof slaGoals.$inferSelect
+
+/** One Jira epic that belongs to a quarter (Initiatives Hub). Anomalies and resolution are derived, never stored. */
+export const initiatives = pgTable('initiatives', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  year: integer('year').notNull(),
+  quarter: integer('quarter').notNull(),
+  /** Where the row came from, e.g. "26Q4.xlsx#26Q4 Initiatives"; null when created by hand. */
+  sourceRef: text('source_ref'),
+  jiraKey: text('jira_key').notNull(),
+  squad: text('squad'),
+  title: text('title').notNull(),
+  criticality: text('criticality'),
+  epicStatus: text('epic_status').notNull().default('To Do'),
+  projectStatus: text('project_status'),
+  ownerName: text('owner_name'),
+  estDeliveryDate: date('est_delivery_date', { mode: 'string' }),
+  actualDeliveryDate: date('actual_delivery_date', { mode: 'string' }),
+  doneItems: integer('done_items'),
+  totalItems: integer('total_items'),
+  prdUrl: text('prd_url'),
+  rfcUrl: text('rfc_url'),
+  /** Owned by the TPM; an import never overwrites a filled value. */
+  remark: text('remark'),
+  remarkProposed: text('remark_proposed'),
+  needsReview: boolean('needs_review').notNull().default(false),
+  /** Owned by the sheet (TPM automation): an import overwrites them. Shown next to the anomalies the app works out itself. */
+  sheetAnomalies: text('sheet_anomalies'),
+  sheetResolution: text('sheet_resolution'),
+  repoNote: text('repo_note'),
+  /** When the Jira-owned columns were last refreshed from Jira (null = never). */
+  jiraSyncedAt: timestamp('jira_synced_at', { withTimezone: true }),
+  ...timestamps,
+}, (t) => [
+  uniqueIndex('initiatives_period_key_uq').on(t.year, t.quarter, t.jiraKey),
+  index('initiatives_period_idx').on(t.year, t.quarter),
+  check('initiatives_quarter_chk', sql`${t.quarter} between 1 and 4`),
+  check('initiatives_items_chk', sql`${t.doneItems} is null or ${t.totalItems} is null or (${t.doneItems} >= 0 and ${t.doneItems} <= ${t.totalItems})`),
+])
+
+/** Release / self-test markers shown on the delivery timeline. */
+export const initiativeMilestones = pgTable('initiative_milestones', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  initiativeId: uuid('initiative_id').notNull().references(() => initiatives.id, { onDelete: 'cascade' }),
+  kind: text('kind').notNull(),
+  date: date('date', { mode: 'string' }).notNull(),
+  label: text('label'),
+}, (t) => [
+  index('initiative_milestones_initiative_idx').on(t.initiativeId),
+  check('initiative_milestones_kind_chk', sql`${t.kind} in ('release', 'self_test')`),
+])
+
+export type Initiative = typeof initiatives.$inferSelect
+export type InitiativeMilestone = typeof initiativeMilestones.$inferSelect
+
+/**
+ * Who is an admin. Admin = has a row here. Only while this table is empty does ADMIN_EMAILS decide (bootstrap fallback).
+ * The old users.role column is no longer read or written.
+ */
+export const userAdmin = pgTable('user_admin', {
+  userId: uuid('user_id').primaryKey().references(() => users.id, { onDelete: 'cascade' }),
+  grantedBy: uuid('granted_by').references(() => users.id, { onDelete: 'set null' }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+})
+
+export type UserAdmin = typeof userAdmin.$inferSelect

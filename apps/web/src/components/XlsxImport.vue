@@ -1,15 +1,15 @@
-<script setup lang="ts">
+<script setup lang="ts" generic="T extends XlsxTabs">
 /**
- * File picker + sheet selector for importing a growth-plan .xlsx. Shared by Create PGP and the template editor:
- * both read the file through the same server extractor, so the same file gives the same items.
+ * File picker + sheet selector for importing an .xlsx. Shared by Create PGP, the template editor and the initiatives
+ * upload: each reads the file through its own server extractor, so the same file always gives the same rows.
  */
 import { MpButton, MpFormControl, MpFormHelpText, MpFormLabel, MpSelect, MpText, css } from '@mekari/pixel3'
 import { ref } from 'vue'
 import { notifyError } from '@/lib/api'
-import type { XlsxLoader, XlsxPreview } from '@/lib/xlsx-import'
+import type { XlsxLoader, XlsxTabs } from '@/lib/xlsx-import'
 
-const props = defineProps<{ load: XlsxLoader }>()
-const emit = defineEmits<{ loaded: [preview: XlsxPreview, file: File]; cleared: [] }>()
+const props = defineProps<{ load: XlsxLoader<T> }>()
+const emit = defineEmits<{ loaded: [preview: T, file: File]; cleared: [] }>()
 
 const file = ref<File | null>(null)
 const tabs = ref<string[]>([])

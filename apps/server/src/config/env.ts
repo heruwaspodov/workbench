@@ -51,6 +51,9 @@ export const env = {
     slaProject: read('JIRA_SLA_PROJECT', 'MESIGN') ?? '',
     periodField: read('JIRA_PERIOD_FIELD', 'customfield_11804') ?? '',
     projectStatusField: read('JIRA_PROJECT_STATUS_FIELD', 'customfield_12356') ?? '',
+    /** Epic "Est Delivery Date" and "Project Criticality" fields read by the initiatives sync. Empty value = not synced. */
+    estDeliveryField: read('JIRA_EST_DELIVERY_FIELD', 'customfield_11728') ?? '',
+    criticalityField: read('JIRA_CRITICALITY_FIELD', 'customfield_11757') ?? '',
   },
   bitbucket: {
     apiUrl: read('BITBUCKET_API_URL', 'https://api.bitbucket.org/2.0')!.replace(/\/$/, ''),
