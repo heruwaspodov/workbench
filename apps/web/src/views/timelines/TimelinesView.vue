@@ -1,22 +1,22 @@
 <script setup lang="ts">
-import {
-  MpBadge, MpButton, MpSelect, MpTable, MpTableBody, MpTableCell, MpTableContainer, MpTableHead, MpTableRow, MpText, css,
-} from '@mekari/pixel3'
+import { MpButton, MpSelect, MpText, css } from '@mekari/pixel3'
 import { computed, onMounted, ref, watch } from 'vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import AsyncState from '@/components/AsyncState.vue'
 import PageHeader from '@/components/PageHeader.vue'
-import PaginationBar from '@/components/PaginationBar.vue'
 import SearchInput from '@/components/SearchInput.vue'
+import SegmentedControl from '@/components/SegmentedControl.vue'
 import { api, unwrap } from '@/lib/api'
-import { isHttpUrl } from '@/lib/clipboard'
-import { formatDate, isoDay, monthLabel } from '@/lib/format'
+import { isoDay, monthLabel } from '@/lib/format'
 import { ui } from '@/lib/ui'
 import { useAsync } from '@/lib/use-async'
 import { useAuth } from '@/stores/auth'
+import HealthBoard from './HealthBoard.vue'
 import InitiativeDrawer from './InitiativeDrawer.vue'
-
-type Row = NonNullable<Awaited<ReturnType<typeof api.initiatives.get>>['data']>[number]
+import InitiativesGrid from './InitiativesGrid.vue'
+import KanbanBoard from './KanbanBoard.vue'
+import TimelineBoard from './TimelineBoard.vue'
+import type { Initiative as Row } from './types'
 
 const auth = useAuth()
 const isAdmin = computed(() => auth.me?.role === 'admin')
@@ -57,9 +57,7 @@ const squad = ref('')
 const status = ref('')
 const criticality = ref('')
 const month = ref('')
-const page = ref(1)
-const pageSize = ref(20)
-function resetFilters() { q.value = squad.value = status.value = criticality.value = month.value = ''; page.value = 1 }
+function resetFilters() { q.value = squad.value = status.value = criticality.value = month.value = '' }
 
 const rows = computed<Row[]>(() => board.data.value?.rows ?? [])
 const squadOf = (r: Row) => r.squad ?? 'Unassigned'
@@ -78,14 +76,25 @@ const filtered = computed(() => {
     && (!month.value || isoDay(r.estDeliveryDate).slice(0, 7) === month.value)
     && (!needle || [r.title, r.jiraKey, r.ownerName, r.remark, r.remarkProposed].some((v) => v?.toLowerCase().includes(needle))))
 })
-watch([q, squad, status, criticality, month, pageSize], () => { page.value = 1 })
-const shown = computed(() => filtered.value.slice((page.value - 1) * pageSize.value, page.value * pageSize.value))
-const hasNext = computed(() => page.value * pageSize.value < filtered.value.length)
 
-// ----- presentation -----
-const STATUS_COLOR = { done: 'green', active: 'blue', todo: 'gray' } as const
-const progress = (r: Row) => (r.totalItems ? `${r.doneItems ?? 0}/${r.totalItems} · ${Math.round(((r.doneItems ?? 0) / r.totalItems) * 100)}%` : '-')
-const remarkOf = (r: Row) => r.remark || r.remarkProposed || ''
+// ----- the four views share the same filtered rows; the chosen one lives in the URL (?tab=) -----
+type Tab = 'timeline' | 'kanban' | 'grid' | 'health'
+const TABS: Tab[] = ['timeline', 'kanban', 'grid', 'health']
+const route = useRoute()
+const router = useRouter()
+const asTab = (v: unknown): Tab => (TABS.includes(v as Tab) ? (v as Tab) : 'timeline')
+const tab = ref<Tab>(asTab(route.query.tab))
+watch(tab, (t) => { router.replace({ query: { ...route.query, tab: t } }) })
+const openCount = computed(() => filtered.value.filter((r) => r.resolution === 'Open').length)
+const tabs = computed(() => [
+  { value: 'timeline' as const, label: 'Delivery timeline & releases' },
+  { value: 'kanban' as const, label: 'Kanban board' },
+  { value: 'grid' as const, label: `Grid view (${filtered.value.length})` },
+  { value: 'health' as const, label: `Health & anomalies (${openCount.value})` },
+])
+
+/** Today in Jakarta, the team's calendar, as YYYY-MM-DD (marks the current week and decides "release next week"). */
+const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(new Date())
 
 // ----- add / edit (admin) -----
 const drawer = ref<{ open: boolean; row: Row | null }>({ open: false, row: null })
@@ -117,11 +126,6 @@ const kpiRow = css({ display: 'flex', alignItems: 'baseline', justifyContent: 's
 const filters = `${ui.toolbar} ${css({ mb: '4' })}`
 const search = css({ flex: '1 1 260px', minWidth: '220px', maxWidth: '420px' })
 const periodBox = css({ minWidth: '140px' })
-const titleCell = css({ display: 'flex', flexDirection: 'column', gap: '1', minWidth: 0, maxWidth: '420px' })
-const metaRow = css({ display: 'flex', alignItems: 'center', gap: '2', flexWrap: 'wrap' })
-const remark = css({ lineClamp: 2 })
-const links = css({ display: 'flex', gap: '3' })
-const flag = css({ cursor: 'help' })
 </script>
 
 <template>
@@ -175,73 +179,11 @@ const flag = css({ cursor: 'help' })
           </div>
         </div>
 
-        <MpText weight="semiBold" :class="css({ mb: '3', display: 'block' })" data-test="grid-title">Grid view · {{ filtered.length }}</MpText>
-        <AsyncState :empty="filtered.length === 0" empty-text="No initiatives match these filters.">
-          <div :class="ui.panel">
-            <MpTableContainer>
-              <MpTable is-hoverable :class="ui.table">
-                <MpTableHead>
-                  <MpTableRow>
-                    <MpTableCell as="th">Initiative</MpTableCell>
-                    <MpTableCell as="th">Squad</MpTableCell>
-                    <MpTableCell as="th">Owner</MpTableCell>
-                    <MpTableCell as="th">Progress</MpTableCell>
-                    <MpTableCell as="th">Delivery</MpTableCell>
-                    <MpTableCell as="th">Links</MpTableCell>
-                    <MpTableCell as="th">To resolve</MpTableCell>
-                    <MpTableCell v-if="isAdmin" as="th" />
-                  </MpTableRow>
-                </MpTableHead>
-                <MpTableBody>
-                  <MpTableRow v-for="r in shown" :key="r.id" data-row>
-                    <MpTableCell>
-                      <div :class="titleCell">
-                        <MpText weight="semiBold">{{ r.title }}</MpText>
-                        <div :class="metaRow">
-                          <MpText size="label-small" color="text.secondary">{{ r.jiraKey }}</MpText>
-                          <MpBadge size="sm" variant="subtle" :variant-color="STATUS_COLOR[r.statusCategory]">{{ r.projectStatus || r.epicStatus }}</MpBadge>
-                          <MpBadge v-if="r.needsReview" size="sm" variant="subtle" variant-color="orange">Needs review</MpBadge>
-                        </div>
-                        <MpText v-if="remarkOf(r)" size="label-small" color="text.secondary" :class="remark">{{ remarkOf(r) }}</MpText>
-                      </div>
-                    </MpTableCell>
-                    <MpTableCell>
-                      <div :class="titleCell">
-                        <MpText size="label">{{ r.squad ?? 'Unassigned' }}</MpText>
-                        <div v-if="r.criticality"><MpBadge size="sm" variant="subtle" :variant-color="r.criticality === 'Strategic' ? 'blue' : 'gray'">{{ r.criticality }}</MpBadge></div>
-                      </div>
-                    </MpTableCell>
-                    <MpTableCell>{{ r.ownerName ?? '-' }}</MpTableCell>
-                    <MpTableCell>{{ progress(r) }}</MpTableCell>
-                    <MpTableCell>
-                      <div :class="titleCell">
-                        <MpText size="label">Est. {{ r.estDeliveryDate ? formatDate(r.estDeliveryDate) : '-' }}</MpText>
-                        <MpText v-if="r.actualDeliveryDate" size="label-small" color="text.secondary">Actual {{ formatDate(r.actualDeliveryDate) }}</MpText>
-                      </div>
-                    </MpTableCell>
-                    <MpTableCell>
-                      <div :class="links">
-                        <a v-if="r.prdUrl && isHttpUrl(r.prdUrl)" :href="r.prdUrl" target="_blank" rel="noopener noreferrer" :class="ui.link">PRD</a>
-                        <a v-if="r.rfcUrl && isHttpUrl(r.rfcUrl)" :href="r.rfcUrl" target="_blank" rel="noopener noreferrer" :class="ui.link">RFC</a>
-                        <span v-if="!r.prdUrl && !r.rfcUrl">-</span>
-                      </div>
-                    </MpTableCell>
-                    <MpTableCell>
-                      <MpBadge v-if="r.anomalies.length" size="sm" variant="subtle" variant-color="orange" :class="flag" :title="r.anomalies.join('\n')" data-test="anomaly-badge">
-                        {{ r.anomalies.length }} open
-                      </MpBadge>
-                      <span v-else>-</span>
-                    </MpTableCell>
-                    <MpTableCell v-if="isAdmin">
-                      <MpButton size="sm" variant="ghost" left-icon="edit" data-test="edit-initiative" @click="openEdit(r)">Edit</MpButton>
-                    </MpTableCell>
-                  </MpTableRow>
-                </MpTableBody>
-              </MpTable>
-            </MpTableContainer>
-            <PaginationBar v-model:page="page" v-model:page-size="pageSize" :shown="shown.length" :total="filtered.length" :has-next="hasNext" />
-          </div>
-        </AsyncState>
+        <SegmentedControl v-model="tab" :options="tabs" label="View" :class="css({ mb: '4' })" data-test="view-tabs" />
+        <TimelineBoard v-if="tab === 'timeline' && current" :rows="filtered" :year="current.year" :quarter="current.quarter" :today="today" :can-edit="isAdmin" @edit="openEdit" />
+        <KanbanBoard v-else-if="tab === 'kanban'" :rows="filtered" :can-edit="isAdmin" @edit="openEdit" />
+        <InitiativesGrid v-else-if="tab === 'grid'" :rows="filtered" :can-edit="isAdmin" @edit="openEdit" />
+        <HealthBoard v-else-if="tab === 'health'" :rows="filtered" :can-edit="isAdmin" @edit="openEdit" />
       </template>
     </AsyncState>
   </AsyncState>

@@ -551,12 +551,53 @@ await step('Timelines dashboard: quarter, KPIs, filters, grid, and admin add / e
   await page.goto(`${APP}/timelines`)
   await clean()
   const seed = (o: Record<string, unknown>) => api('POST', '/api/initiatives', { year: YEAR, quarter: 4, criticality: 'Strategic', ...o })
-  await seed({ jiraKey: 'MESIGN-98001', title: 'E2E signing flow', squad: 'Escape', epicStatus: 'In Progress', ownerName: 'Synthetic Owner', estDeliveryDate: `${YEAR}-11-30`, doneItems: 3, totalItems: 10, remarkProposed: 'Tail is in QA.' })
-  await seed({ jiraKey: 'MESIGN-98002', title: 'E2E stamp tool', squad: 'Intact', criticality: 'BaU', epicStatus: 'Done', ownerName: 'Synthetic Owner', estDeliveryDate: `${YEAR}-10-16`, actualDeliveryDate: `${YEAR}-10-19`, doneItems: 5, totalItems: 5, prdUrl: 'https://docs.example.test/prd', rfcUrl: 'https://docs.example.test/rfc' })
+  await seed({ jiraKey: 'MESIGN-98001', title: 'E2E signing flow', squad: 'Escape', epicStatus: 'In Progress', ownerName: 'Synthetic Owner', estDeliveryDate: `${YEAR}-11-30`, doneItems: 3, totalItems: 10, remarkProposed: 'Tail is in QA.', milestones: [{ kind: 'self_test', date: `${YEAR}-11-16` }, { kind: 'release', date: `${YEAR}-11-30` }] })
+  await seed({ jiraKey: 'MESIGN-98002', title: 'E2E stamp tool', squad: 'Intact', criticality: 'BaU', epicStatus: 'Done', ownerName: 'Synthetic Owner', estDeliveryDate: `${YEAR}-10-16`, actualDeliveryDate: `${YEAR}-10-19`, doneItems: 5, totalItems: 5, prdUrl: 'https://docs.example.test/prd', rfcUrl: 'https://docs.example.test/rfc', milestones: [{ kind: 'release', date: `${YEAR}-10-19` }] })
   await seed({ jiraKey: 'MESIGN-98003', title: 'E2E backlog item', squad: 'Utmost', epicStatus: 'To Do', needsReview: true })
   await page.goto(`${APP}/timelines`)
 
-  await text(page, 'Grid view · 3')
+  // Delivery timeline (the default view): 12 weeks, markers in the week their date falls in.
+  await page.locator('[data-test="view-timeline"]').waitFor()
+  if ((await page.locator('[data-week]').count()) !== 12) throw new Error('The timeline does not show 12 weeks')
+  const firstMonday = (() => { const d = new Date(Date.UTC(YEAR, 9, 1)); return Date.UTC(YEAR, 9, 1 + ((8 - d.getUTCDay()) % 7)) })()
+  const weekOf = (iso: string) => Math.floor((Date.parse(iso) - firstMonday) / (7 * 86_400_000))
+  for (const [key, kind, iso, shown] of [
+    ['MESIGN-98001', 'self_test', `${YEAR}-11-16`, '16 Nov'], ['MESIGN-98001', 'release', `${YEAR}-11-30`, '30 Nov'], ['MESIGN-98002', 'release', `${YEAR}-10-19`, '19 Oct'],
+  ] as const) {
+    const marker = page.locator(`[data-cell="${key}:${weekOf(iso)}"] [data-marker="${kind}"]`)
+    if ((await marker.count()) !== 1 || !(await marker.innerText()).includes(shown)) throw new Error(`${kind} marker for ${key} is not in week ${weekOf(iso) + 1} (${shown})`)
+  }
+  if ((await page.locator('[data-marker]').count()) !== 3) throw new Error('The timeline shows markers that were not seeded')
+  await text(page, 'Goal risk')
+  await shot('02g-timeline')
+
+  // Kanban: one column per epic status, a card per initiative.
+  await page.getByRole('button', { name: 'Kanban board' }).click()
+  await page.locator('[data-test="view-kanban"]').waitFor()
+  for (const [column, title] of [['To Do', 'E2E backlog item'], ['In Progress', 'E2E signing flow'], ['Done', 'E2E stamp tool']] as const) {
+    const cards = page.locator(`[data-column="${column}"] [data-card]`)
+    if ((await cards.count()) !== 1 || !(await cards.innerText()).includes(title)) throw new Error(`Kanban column ${column} should hold only "${title}"`)
+  }
+  await shot('02h-kanban')
+
+  // Health: only initiatives with something to resolve, and the badge count matches the list.
+  await page.getByRole('button', { name: /^Health & anomalies/ }).click()
+  await page.locator('[data-test="view-health"]').waitFor()
+  await text(page, 'Health & anomalies (1)')
+  if ((await page.locator('[data-test="view-health"] [data-row]').count()) !== 1) throw new Error('Health should list exactly the one initiative with anomalies')
+  await text(page, 'No epic owner (assignee).')
+  await shot('02i-health')
+  await page.getByRole('button', { name: /^All initiatives/ }).click()
+  if ((await page.locator('[data-test="view-health"] [data-row]').count()) !== 3) throw new Error('Health "All initiatives" should list all 3')
+  const url = new URL(page.url())
+  if (url.searchParams.get('tab') !== 'health') throw new Error(`The chosen view is not kept in the URL: ${page.url()}`)
+  await page.reload()
+  await page.locator('[data-test="view-health"]').waitFor()
+
+  // Grid
+  await page.getByRole('button', { name: /^Grid view/ }).click()
+  await page.locator('[data-test="view-grid"]').waitFor()
+  await text(page, 'Grid view (3)')
   const kpi = async (id: string) => (await page.locator(`[data-test="${id}"]`).innerText()).replace(/\s+/g, ' ')
   for (const [id, expected] of [['kpi-total', '3'], ['kpi-done', '1'], ['kpi-active', '1'], ['kpi-review', '1']] as const) {
     if (!(await kpi(id)).includes(` ${expected} `) && !(await kpi(id)).match(new RegExp(`\\b${expected}\\b`))) throw new Error(`KPI ${id} is not ${expected}: ${await kpi(id)}`)
@@ -570,23 +611,23 @@ await step('Timelines dashboard: quarter, KPIs, filters, grid, and admin add / e
 
   const pick = (id: string, value: string) => page.locator(`select[data-test="${id}"], [data-test="${id}"] select`).first().selectOption(value)
   await pick('f-squad', 'Intact')
-  await text(page, 'Grid view · 1')
+  await text(page, 'Grid view (1)')
   await pick('f-squad', '')
   await pick('f-status', 'Done')
-  await text(page, 'Grid view · 1')
+  await text(page, 'Grid view (1)')
   await pick('f-status', '')
   await pick('f-criticality', 'BaU')
-  await text(page, 'Grid view · 1')
+  await text(page, 'Grid view (1)')
   await pick('f-criticality', '')
   await pick('f-month', `${YEAR}-11`)
-  await text(page, 'Grid view · 1')
+  await text(page, 'Grid view (1)')
   await pick('f-month', '')
   await page.getByPlaceholder('Search initiatives').fill('backlog')
-  await text(page, 'Grid view · 1')
+  await text(page, 'Grid view (1)')
   await page.getByPlaceholder('Search initiatives').fill('nothing matches this')
   await text(page, 'No initiatives match these filters.')
   await page.getByPlaceholder('Search initiatives').fill('')
-  await text(page, 'Grid view · 3')
+  await text(page, 'Grid view (3)')
 
   // add
   await page.locator('[data-test="new-initiative"]').click()
@@ -595,7 +636,7 @@ await step('Timelines dashboard: quarter, KPIs, filters, grid, and admin add / e
   await page.locator('[data-test="add-marker"]').click()
   await page.locator('[data-test="initiative-form"] input[type="date"]').last().fill(`${YEAR}-12-11`)
   await page.locator('[data-test="save-initiative"]').click()
-  await text(page, 'Grid view · 4')
+  await text(page, 'Grid view (4)')
   await text(page, 'E2E added by form')
   // edit
   await page.locator('[data-row]', { hasText: 'E2E added by form' }).locator('[data-test="edit-initiative"]').click()
@@ -608,7 +649,7 @@ await step('Timelines dashboard: quarter, KPIs, filters, grid, and admin add / e
   await page.locator('[data-row]', { hasText: 'E2E edited by form' }).locator('[data-test="edit-initiative"]').click()
   await page.getByRole('button', { name: 'Delete', exact: true }).click()
   await page.locator('[data-test="confirm-delete-initiative"]').click()
-  await text(page, 'Grid view · 3')
+  await text(page, 'Grid view (3)')
   await clean()
 })
 
