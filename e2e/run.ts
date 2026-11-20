@@ -495,6 +495,50 @@ await step('Timelines menu in the sidebar opens the Timelines page', async () =>
   await shot('02d-timelines')
 })
 
+await step('admin uploads an initiatives .xlsx, previews it, saves it for a chosen year', async () => {
+  const ExcelJS = (await import('exceljs')).default
+  const head = ['Squad', 'Jira Key', 'Initiative', 'Criticality', 'Est. Delivery Date', 'Jira Epic Status', 'Jira Owner Assigned', 'Jira Progress (Done/Total)',
+    ...new Array(12).fill('').map((_, i) => `W${(i % 4) + 1}\n${['5-9 Oct', '12-16 Oct', '19-23 Oct', '26-30 Oct', '2-6 Nov', '9-13 Nov', '16-20 Nov', '23-27 Nov', '30 Nov - 4 Dec', '7-11 Dec', '14-18 Dec', '21-25 Dec'][i]}`)]
+  const wb = new ExcelJS.Workbook()
+  const ws = wb.addWorksheet('26Q4 Initiatives')
+  ws.addRow([])
+  ws.addRow(head)
+  const week = (label: string) => head.findIndex((h) => h.endsWith(label))
+  const a = ['Escape', 'MESIGN-99001', 'E2E signing flow', 'Strategic', '2026-11-30', 'In Progress', 'Synthetic Owner', '3/10', ...new Array(12).fill('')]
+  a[week('19-23 Oct')] = 'Release\n19 Oct'
+  const b = ['Intact', 'MESIGN-99002', 'E2E stamp tool', 'BaU', '', 'To Do', '', '', ...new Array(12).fill('')]
+  b[week('30 Nov - 4 Dec')] = 'Release\n30 Nov'
+  ws.addRow(a)
+  ws.addRow(b)
+  const xlsx = join(OUT, 'e2e-initiatives.xlsx')
+  await wb.xlsx.writeFile(xlsx)
+  const year = 2010 + Math.floor(Math.random() * 89) // a year nothing else uses, so every run starts from an empty quarter
+
+  await page.goto(`${APP}/timelines`)
+  await page.getByRole('link', { name: 'Import initiatives' }).click()
+  await page.waitForURL('**/timelines/import')
+  await page.locator('[data-test="xlsx-file"]').setInputFiles(xlsx)
+  await text(page, 'Read from the sheet name or file name')
+  const prefilled = await page.getByPlaceholder('2026').inputValue()
+  if (prefilled !== '2026') throw new Error(`Year was not read from the sheet name: "${prefilled}"`)
+  await page.getByPlaceholder('2026').fill(String(year))
+  await page.locator('[data-test="import-counts"]').getByText('2 new').waitFor()
+  await text(page, 'MESIGN-99001')
+  await text(page, 'E2E stamp tool')
+  await shot('02e-initiatives-import')
+  await page.locator('[data-test="import-save"]').click()
+  await page.waitForURL('**/timelines')
+  const saved = await page.evaluate(async (y) => (await fetch(`/api/initiatives?year=${y}&quarter=4`, { credentials: 'include' })).json(), year)
+  if (saved.length !== 2) throw new Error(`Expected 2 saved initiatives, got ${saved.length}`)
+  const first = saved.find((r: { jiraKey: string }) => r.jiraKey === 'MESIGN-99001')
+  if (first.milestones[0]?.date !== `${year}-10-19`) throw new Error(`Release marker not saved with the chosen year: ${JSON.stringify(first.milestones)}`)
+  await page.evaluate(async (y) => {
+    for (const r of await (await fetch(`/api/initiatives?year=${y}&quarter=4`, { credentials: 'include' })).json()) {
+      await fetch(`/api/initiatives/${r.id}`, { method: 'DELETE', credentials: 'include', headers: { origin: location.origin } })
+    }
+  }, year)
+})
+
 await step('kanban shows columns and cards', async () => {
   await page.goto(`${APP}/kanban`)
   await text(page, 'Tidy up the signing endpoint')

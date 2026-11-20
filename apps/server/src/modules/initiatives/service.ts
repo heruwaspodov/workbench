@@ -5,8 +5,8 @@ import { AppError, BadRequestError, NotFoundError } from '../../shared/errors'
 import { anomaliesFor, statusCategory, type StatusCategory } from './anomalies'
 import type { InitiativeFilters } from './model'
 
-type Milestone = { kind: 'release' | 'self_test'; date: string; label?: string | null }
-type Fields = Partial<Omit<Initiative, 'id' | 'year' | 'quarter' | 'jiraKey' | 'sourceRef' | 'createdAt' | 'updatedAt'>> & { milestones?: Milestone[] }
+export type Milestone = { kind: 'release' | 'self_test'; date: string; label?: string | null }
+export type Fields = Partial<Omit<Initiative, 'id' | 'year' | 'quarter' | 'jiraKey' | 'sourceRef' | 'createdAt' | 'updatedAt'>> & { milestones?: Milestone[] }
 
 export interface InitiativeView extends Initiative {
   statusCategory: StatusCategory
@@ -16,12 +16,12 @@ export interface InitiativeView extends Initiative {
   milestones: Pick<InitiativeMilestone, 'id' | 'kind' | 'date' | 'label'>[]
 }
 
-const JIRA_KEY = /^[A-Z][A-Z0-9]*-\d+$/
+export const JIRA_KEY = /^[A-Z][A-Z0-9]*-\d+$/
 
 /** Today in Jakarta as YYYY-MM-DD (the team's calendar). */
 const today = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(new Date())
 
-const validDate = (value: string, label: string) => {
+export const validDate = (value: string, label: string) => {
   const d = new Date(`${value}T00:00:00Z`)
   if (Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== value) throw new BadRequestError(`${label} "${value}" is not a real date`)
 }
@@ -35,7 +35,7 @@ const validUrl = (value: string, label: string) => {
   throw new BadRequestError(`${label} must be an http(s) link`)
 }
 
-function clean(fields: Fields): Fields {
+export function clean(fields: Fields): Fields {
   const out: Fields = { ...fields }
   for (const key of ['squad', 'criticality', 'projectStatus', 'ownerName', 'remark', 'remarkProposed'] as const) {
     if (typeof out[key] === 'string') out[key] = out[key]!.trim() || null
@@ -46,6 +46,7 @@ function clean(fields: Fields): Fields {
   }
   if (typeof out.epicStatus === 'string') out.epicStatus = out.epicStatus.trim() || 'To Do'
   for (const key of ['estDeliveryDate', 'actualDeliveryDate'] as const) {
+    if (typeof out[key] === 'string') out[key] = out[key]!.slice(0, 10)
     if (typeof out[key] === 'string') validDate(out[key]!, key === 'estDeliveryDate' ? 'Est. Delivery Date' : 'Actual Delivery Date')
   }
   for (const key of ['prdUrl', 'rfcUrl'] as const) {
@@ -54,11 +55,12 @@ function clean(fields: Fields): Fields {
       if (out[key]) validUrl(out[key]!, key === 'prdUrl' ? 'PRD link' : 'RFC link')
     }
   }
+  if (out.milestones) out.milestones = out.milestones.map((m) => ({ ...m, date: m.date.slice(0, 10) }))
   for (const m of out.milestones ?? []) validDate(m.date, 'Milestone date')
   return out
 }
 
-function checkItems(done: number | null | undefined, total: number | null | undefined) {
+export function checkItems(done: number | null | undefined, total: number | null | undefined) {
   if (done != null && total != null && done > total) throw new BadRequestError('Done items cannot exceed total items')
   if (done != null && total == null) throw new BadRequestError('Total items is required when done items is set')
 }
