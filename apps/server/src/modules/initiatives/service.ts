@@ -37,7 +37,7 @@ const validUrl = (value: string, label: string) => {
 
 export function clean(fields: Fields): Fields {
   const out: Fields = { ...fields }
-  for (const key of ['squad', 'criticality', 'projectStatus', 'ownerName', 'remark', 'remarkProposed'] as const) {
+  for (const key of ['squad', 'criticality', 'projectStatus', 'ownerName', 'remark', 'remarkProposed', 'sheetAnomalies', 'sheetResolution', 'repoNote'] as const) {
     if (typeof out[key] === 'string') out[key] = out[key]!.trim() || null
   }
   if (typeof out.title === 'string') {

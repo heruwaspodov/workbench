@@ -7,8 +7,8 @@ import { ui } from '@/lib/ui'
 import { type Initiative, STATUS_COLOR, statusText } from './types'
 import { atRisk, currentWeekIndex, dayMonth, quarterWeeks, weekIndexOf } from './weeks'
 
-const props = defineProps<{ rows: Initiative[]; year: number; quarter: number; today: string; canEdit: boolean }>()
-const emit = defineEmits<{ edit: [row: Initiative] }>()
+const props = defineProps<{ rows: Initiative[]; year: number; quarter: number; today: string }>()
+const emit = defineEmits<{ open: [row: Initiative] }>()
 
 const layout = computed(() => quarterWeeks(props.year, props.quarter))
 const current = computed(() => currentWeekIndex(layout.value.weeks, props.today))
@@ -78,8 +78,7 @@ const title = css({ display: 'block', textAlign: 'left', cursor: 'pointer', _hov
             <MpTableRow v-for="{ r, marks } in table" :key="r.id" data-row>
               <MpTableCell :class="left">
                 <div :class="stack">
-                  <button v-if="canEdit" type="button" :class="[title, css({ fontWeight: 'semiBold' })]" @click="emit('edit', r)">{{ r.title }}</button>
-                  <MpText v-else weight="semiBold" :class="title">{{ r.title }}</MpText>
+                  <button type="button" :class="[title, css({ fontWeight: 'semiBold' })]" data-test="open-initiative" @click="emit('open', r)">{{ r.title }}</button>
                   <div :class="metaRow">
                     <MpText size="label-small" color="text.secondary">{{ r.jiraKey }}</MpText>
                     <MpBadge size="sm" variant="subtle" :variant-color="STATUS_COLOR[r.statusCategory]">{{ statusText(r) }}</MpBadge>

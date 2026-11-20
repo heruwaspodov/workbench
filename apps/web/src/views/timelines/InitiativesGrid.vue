@@ -6,10 +6,10 @@ import PaginationBar from '@/components/PaginationBar.vue'
 import { isHttpUrl } from '@/lib/clipboard'
 import { formatDate } from '@/lib/format'
 import { ui } from '@/lib/ui'
-import { type Initiative, STATUS_COLOR, progressText, remarkOf, statusText } from './types'
+import { type Initiative, STATUS_COLOR, progressText, remarkOf, resolutionColor, statusText } from './types'
 
 const props = defineProps<{ rows: Initiative[]; canEdit: boolean }>()
-const emit = defineEmits<{ edit: [row: Initiative] }>()
+const emit = defineEmits<{ edit: [row: Initiative]; open: [row: Initiative] }>()
 
 const page = ref(1)
 const pageSize = ref(20)
@@ -23,6 +23,8 @@ const metaRow = css({ display: 'flex', alignItems: 'center', gap: '2', flexWrap:
 const remark = css({ lineClamp: 2 })
 const links = css({ display: 'flex', gap: '3' })
 const flag = css({ cursor: 'help' })
+const titleLink = css({ textAlign: 'left', fontWeight: 'semiBold', cursor: 'pointer', _hover: { textDecoration: 'underline' } })
+const resolveCell = css({ display: 'flex', alignItems: 'center', gap: '2', flexWrap: 'wrap' })
 </script>
 
 <template>
@@ -46,7 +48,7 @@ const flag = css({ cursor: 'help' })
             <MpTableRow v-for="r in shown" :key="r.id" data-row>
               <MpTableCell>
                 <div :class="titleCell">
-                  <MpText weight="semiBold">{{ r.title }}</MpText>
+                  <button type="button" :class="titleLink" data-test="open-initiative" @click="emit('open', r)">{{ r.title }}</button>
                   <div :class="metaRow">
                     <MpText size="label-small" color="text.secondary">{{ r.jiraKey }}</MpText>
                     <MpBadge size="sm" variant="subtle" :variant-color="STATUS_COLOR[r.statusCategory]">{{ statusText(r) }}</MpBadge>
@@ -77,9 +79,12 @@ const flag = css({ cursor: 'help' })
                 </div>
               </MpTableCell>
               <MpTableCell>
-                <MpBadge v-if="r.anomalies.length" size="sm" variant="subtle" variant-color="orange" :class="flag" :title="r.anomalies.join('\n')" data-test="anomaly-badge">
-                  {{ r.anomalies.length }} open
-                </MpBadge>
+                <div v-if="r.sheetResolution || r.anomalies.length" :class="resolveCell">
+                  <MpBadge v-if="r.sheetResolution" size="sm" variant="subtle" :variant-color="resolutionColor(r.sheetResolution)" data-test="sheet-resolution">{{ r.sheetResolution }}</MpBadge>
+                  <MpBadge v-if="r.anomalies.length" size="sm" variant="subtle" variant-color="orange" :class="flag" :title="r.anomalies.join('\n')" data-test="anomaly-badge">
+                    {{ r.anomalies.length }} open
+                  </MpBadge>
+                </div>
                 <span v-else>-</span>
               </MpTableCell>
               <MpTableCell v-if="canEdit">

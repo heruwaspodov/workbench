@@ -199,6 +199,10 @@ export const initiatives = pgTable('initiatives', {
   remark: text('remark'),
   remarkProposed: text('remark_proposed'),
   needsReview: boolean('needs_review').notNull().default(false),
+  /** Owned by the sheet (TPM automation): an import overwrites them. Shown next to the anomalies the app works out itself. */
+  sheetAnomalies: text('sheet_anomalies'),
+  sheetResolution: text('sheet_resolution'),
+  repoNote: text('repo_note'),
   ...timestamps,
 }, (t) => [
   uniqueIndex('initiatives_period_key_uq').on(t.year, t.quarter, t.jiraKey),

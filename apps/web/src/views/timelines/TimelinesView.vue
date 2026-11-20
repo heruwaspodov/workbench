@@ -13,6 +13,7 @@ import { useAsync } from '@/lib/use-async'
 import { useAuth } from '@/stores/auth'
 import HealthBoard from './HealthBoard.vue'
 import InitiativeDrawer from './InitiativeDrawer.vue'
+import InitiativeDetail from './InitiativeDetail.vue'
 import InitiativesGrid from './InitiativesGrid.vue'
 import KanbanBoard from './KanbanBoard.vue'
 import TimelineBoard from './TimelineBoard.vue'
@@ -99,10 +100,14 @@ const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).for
 // ----- add / edit (admin) -----
 const drawer = ref<{ open: boolean; row: Row | null }>({ open: false, row: null })
 const openNew = () => { drawer.value = { open: true, row: null } }
-const openEdit = (row: Row) => { drawer.value = { open: true, row } }
+const openEdit = (row: Row) => { detail.value = null; drawer.value = { open: true, row } }
+/** Read-only detail for everyone; admins edit from inside it. */
+const detail = ref<Row | null>(null)
+const openDetail = (row: Row) => { detail.value = row }
 const closeDrawer = () => { drawer.value = { ...drawer.value, open: false } }
 async function onSaved() {
   closeDrawer()
+  detail.value = null
   await reload()
 }
 const now = new Date()
@@ -180,14 +185,15 @@ const periodBox = css({ minWidth: '140px' })
         </div>
 
         <SegmentedControl v-model="tab" :options="tabs" label="View" :class="css({ mb: '4' })" data-test="view-tabs" />
-        <TimelineBoard v-if="tab === 'timeline' && current" :rows="filtered" :year="current.year" :quarter="current.quarter" :today="today" :can-edit="isAdmin" @edit="openEdit" />
-        <KanbanBoard v-else-if="tab === 'kanban'" :rows="filtered" :can-edit="isAdmin" @edit="openEdit" />
-        <InitiativesGrid v-else-if="tab === 'grid'" :rows="filtered" :can-edit="isAdmin" @edit="openEdit" />
-        <HealthBoard v-else-if="tab === 'health'" :rows="filtered" :can-edit="isAdmin" @edit="openEdit" />
+        <TimelineBoard v-if="tab === 'timeline' && current" :rows="filtered" :year="current.year" :quarter="current.quarter" :today="today" @open="openDetail" />
+        <KanbanBoard v-else-if="tab === 'kanban'" :rows="filtered" @open="openDetail" />
+        <InitiativesGrid v-else-if="tab === 'grid'" :rows="filtered" :can-edit="isAdmin" @open="openDetail" @edit="openEdit" />
+        <HealthBoard v-else-if="tab === 'health'" :rows="filtered" @open="openDetail" />
       </template>
     </AsyncState>
   </AsyncState>
 
+  <InitiativeDetail :row="detail" :can-edit="isAdmin" @close="detail = null" @edit="openEdit" />
   <InitiativeDrawer v-if="isAdmin" :open="drawer.open" :initiative="drawer.row" :year="defaults.year" :quarter="defaults.quarter"
     :statuses="knownStatuses" @close="closeDrawer" @saved="onSaved" />
 </template>

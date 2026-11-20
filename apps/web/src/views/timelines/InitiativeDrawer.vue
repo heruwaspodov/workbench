@@ -29,7 +29,7 @@ interface Marker { kind: 'release' | 'self_test'; date: string }
 const blank = () => ({
   year: String(props.year), quarter: String(props.quarter), jiraKey: '', title: '', squad: '', criticality: '', epicStatus: 'To Do', projectStatus: '',
   ownerName: '', estDeliveryDate: '', actualDeliveryDate: '', doneItems: '', totalItems: '', prdUrl: '', rfcUrl: '', remark: '', remarkProposed: '',
-  needsReview: false, milestones: [] as Marker[],
+  needsReview: false, sheetAnomalies: '', sheetResolution: '', repoNote: '', milestones: [] as Marker[],
 })
 const form = ref(blank())
 const saving = ref(false)
@@ -45,6 +45,7 @@ watch(() => [props.open, props.initiative] as const, ([open, row]) => {
         actualDeliveryDate: isoDay(row.actualDeliveryDate), doneItems: row.doneItems == null ? '' : String(row.doneItems),
         totalItems: row.totalItems == null ? '' : String(row.totalItems), prdUrl: row.prdUrl ?? '', rfcUrl: row.rfcUrl ?? '', remark: row.remark ?? '',
         remarkProposed: row.remarkProposed ?? '', needsReview: row.needsReview,
+        sheetAnomalies: row.sheetAnomalies ?? '', sheetResolution: row.sheetResolution ?? '', repoNote: row.repoNote ?? '',
         milestones: row.milestones.map((m) => ({ kind: m.kind as Marker['kind'], date: isoDay(m.date) })),
       }
     : blank()
@@ -83,6 +84,7 @@ async function save() {
     projectStatus: text(f.projectStatus), ownerName: text(f.ownerName), estDeliveryDate: text(f.estDeliveryDate), actualDeliveryDate: text(f.actualDeliveryDate),
     doneItems: count(f.doneItems), totalItems: count(f.totalItems), prdUrl: text(f.prdUrl), rfcUrl: text(f.rfcUrl),
     remark: text(f.remark), remarkProposed: text(f.remarkProposed), needsReview: f.needsReview,
+    sheetAnomalies: text(f.sheetAnomalies), sheetResolution: text(f.sheetResolution), repoNote: text(f.repoNote),
     milestones: f.milestones.map((m) => ({ kind: m.kind, date: m.date })),
   }
   saving.value = true
@@ -165,6 +167,9 @@ const spacer = css({ flex: 1 })
           <MpFormControl><MpFormLabel>Key info / remark</MpFormLabel><MpTextarea v-model="form.remark" :rows="3" /></MpFormControl>
           <MpFormControl><MpFormLabel>Key info / remark (proposed)</MpFormLabel><MpTextarea v-model="form.remarkProposed" :rows="3" /></MpFormControl>
           <label :class="check"><input v-model="form.needsReview" type="checkbox" /><MpText size="label">Needs review</MpText></label>
+          <MpFormControl><MpFormLabel>Anomalies / to resolve (from the sheet)</MpFormLabel><MpTextarea v-model="form.sheetAnomalies" :rows="3" /></MpFormControl>
+          <MpFormControl><MpFormLabel>Resolution status (from the sheet)</MpFormLabel><MpInput v-model="form.sheetResolution" placeholder="Open" /></MpFormControl>
+          <MpFormControl><MpFormLabel>Repo note</MpFormLabel><MpInput v-model="form.repoNote" placeholder="01-tribes/esign/squads/..." /></MpFormControl>
         </div>
 
         <MpText weight="semiBold" :class="css({ mb: '3', display: 'block' })">Release and self test</MpText>

@@ -551,7 +551,7 @@ await step('Timelines dashboard: quarter, KPIs, filters, grid, and admin add / e
   await page.goto(`${APP}/timelines`)
   await clean()
   const seed = (o: Record<string, unknown>) => api('POST', '/api/initiatives', { year: YEAR, quarter: 4, criticality: 'Strategic', ...o })
-  await seed({ jiraKey: 'MESIGN-98001', title: 'E2E signing flow', squad: 'Escape', epicStatus: 'In Progress', ownerName: 'Synthetic Owner', estDeliveryDate: `${YEAR}-11-30`, doneItems: 3, totalItems: 10, remarkProposed: 'Tail is in QA.', milestones: [{ kind: 'self_test', date: `${YEAR}-11-16` }, { kind: 'release', date: `${YEAR}-11-30` }] })
+  await seed({ jiraKey: 'MESIGN-98001', title: 'E2E signing flow', squad: 'Escape', epicStatus: 'In Progress', ownerName: 'Synthetic Owner', estDeliveryDate: `${YEAR}-11-30`, doneItems: 3, totalItems: 10, remarkProposed: 'Tail is in QA.', remark: 'Full TPM remark line one.\nLine two stays visible in the detail panel.', sheetAnomalies: '1) Epic reads Done but 8 child item(s) are still open.', sheetResolution: 'Open', repoNote: '01-tribes/esign/squads/escape/initiatives/26q4/e2e-signing-flow.md', milestones: [{ kind: 'self_test', date: `${YEAR}-11-16` }, { kind: 'release', date: `${YEAR}-11-30` }] })
   await seed({ jiraKey: 'MESIGN-98002', title: 'E2E stamp tool', squad: 'Intact', criticality: 'BaU', epicStatus: 'Done', ownerName: 'Synthetic Owner', estDeliveryDate: `${YEAR}-10-16`, actualDeliveryDate: `${YEAR}-10-19`, doneItems: 5, totalItems: 5, prdUrl: 'https://docs.example.test/prd', rfcUrl: 'https://docs.example.test/rfc', milestones: [{ kind: 'release', date: `${YEAR}-10-19` }] })
   await seed({ jiraKey: 'MESIGN-98003', title: 'E2E backlog item', squad: 'Utmost', epicStatus: 'To Do', needsReview: true })
   await page.goto(`${APP}/timelines`)
@@ -606,7 +606,7 @@ await step('Timelines dashboard: quarter, KPIs, filters, grid, and admin add / e
   if (period !== `${YEAR}-4`) throw new Error(`Newest quarter is not selected: ${period}`)
   // The server refuses non-http links outright (see the server tests), so here only the http ones appear.
   if ((await page.getByRole('link', { name: 'PRD' }).count()) !== 1 || (await page.getByRole('link', { name: 'RFC' }).count()) !== 1) throw new Error('The PRD / RFC links are missing')
-  await text(page, 'Tail is in QA.')
+  await text(page, 'Full TPM remark line one.') // the grid shows the TPM remark first (the proposed one is in the detail panel)
   await shot('02f-timelines-grid')
 
   const pick = (id: string, value: string) => page.locator(`select[data-test="${id}"], [data-test="${id}"] select`).first().selectOption(value)
@@ -628,6 +628,70 @@ await step('Timelines dashboard: quarter, KPIs, filters, grid, and admin add / e
   await text(page, 'No initiatives match these filters.')
   await page.getByPlaceholder('Search initiatives').fill('')
   await text(page, 'Grid view (3)')
+
+  // Detail panel (everyone): opens from every view, shows the full remark, the sheet's anomalies and the app's own, and the repo note.
+  const expectDetail = async (p: Page, admin: boolean) => {
+    const detail = p.locator('[data-test="initiative-detail"]')
+    await detail.waitFor()
+    await p.waitForTimeout(600) // let the drawer finish sliding in (screenshots and reads)
+    for (const [id, want] of [
+      ['detail-remark', 'Line two stays visible in the detail panel.'], ['detail-remark-proposed', 'Tail is in QA.'],
+      ['detail-sheet-anomalies', 'Epic reads Done but 8 child item(s) are still open.'], ['detail-sheet-resolution', 'Sheet: Open'],
+      ['detail-app-resolution', 'Workbench: Nothing to resolve'], ['detail-repo-note', 'e2e-signing-flow.md'],
+    ] as const) {
+      const got = await detail.locator(`[data-test="${id}"]`).innerText()
+      if (!got.includes(want)) throw new Error(`Detail ${id} should contain "${want}", got "${got}"`)
+    }
+    const edit = await p.locator('[data-test="detail-edit"]').count()
+    if (admin && edit !== 1) throw new Error('An admin should see Edit in the detail panel')
+    if (!admin && edit !== 0) throw new Error('A member must not see Edit in the detail panel')
+  }
+  const closeDetail = async (p: Page) => { await p.getByRole('button', { name: 'Close', exact: true }).first().click(); await p.locator('[data-test="initiative-detail"]').waitFor({ state: 'detached' }) }
+  await page.getByRole('button', { name: 'Delivery timeline & releases' }).click()
+  await page.locator('[data-test="view-timeline"] [data-test="open-initiative"]', { hasText: 'E2E signing flow' }).click()
+  await expectDetail(page, true)
+  await page.screenshot({ path: join(OUT, '02k-detail.png') })
+  await closeDetail(page)
+  await page.getByRole('button', { name: 'Kanban board' }).click()
+  await page.locator('[data-column="In Progress"] [data-card]').click()
+  await expectDetail(page, true)
+  await closeDetail(page)
+  await page.getByRole('button', { name: /^Health & anomalies/ }).click()
+  await page.getByRole('button', { name: /^All initiatives/ }).click()
+  await page.locator('[data-test="view-health"] [data-row]', { hasText: 'E2E signing flow' }).locator('[data-test="open-initiative"]').click()
+  await expectDetail(page, true)
+  await page.locator('[data-test="detail-edit"]').click() // admin: Edit opens the form, with the sheet columns in it
+  await page.locator('[data-test="initiative-form"]').waitFor()
+  const formText = await page.locator('[data-test="initiative-form"]').innerText()
+  if (!formText.includes('Repo note')) throw new Error('The form has no Repo note field')
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click()
+  await page.getByRole('button', { name: /^Grid view/ }).click()
+  const gridRow = page.locator('[data-test="view-grid"] [data-row]', { hasText: 'E2E signing flow' })
+  if (!(await gridRow.locator('[data-test="sheet-resolution"]').innerText()).includes('Open')) throw new Error('Grid should show the resolution written in the sheet')
+  await gridRow.locator('[data-test="open-initiative"]').click()
+  await expectDetail(page, true)
+  await closeDetail(page)
+
+  // A member sees the same panel, without Edit and without write buttons.
+  const viewer = await AuthService.upsertUser({ subject: 'e2e-viewer', email: 'e2e-viewer@mekari.com', name: 'E2E Viewer' })
+  const viewerSession = await AuthService.createSession(viewer.id)
+  const viewerContext = await browser.newContext({ viewport: { width: 1440, height: 900 } })
+  try {
+    await viewerContext.addCookies([{ name: 'od_session', value: viewerSession.token, url: APP }])
+    const vp = await viewerContext.newPage()
+    vp.on('console', (m) => { if (m.type() === 'error' && !ignorable(m.text() + (m.location().url ?? ''))) jsErrors.push(`member console: ${m.text()}`) })
+    await vp.goto(`${APP}/timelines?tab=grid`)
+    await vp.locator('[data-test="view-grid"] [data-test="open-initiative"]', { hasText: 'E2E signing flow' }).click()
+    await expectDetail(vp, false)
+    if ((await vp.locator('[data-test="new-initiative"]').count()) !== 0 || (await vp.locator('[data-test="edit-initiative"]').count()) !== 0) throw new Error('A member must not see write buttons')
+    await vp.screenshot({ path: join(OUT, '02l-detail-member.png') })
+  } finally {
+    await viewerContext.close()
+    const { db: appDb } = await import('../apps/server/src/db/client')
+    const { users: usersTable } = await import('../apps/server/src/db/schema')
+    const { eq: eqOp } = await import('drizzle-orm')
+    await appDb.delete(usersTable).where(eqOp(usersTable.id, viewer.id))
+  }
 
   // add
   await page.locator('[data-test="new-initiative"]').click()

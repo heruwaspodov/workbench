@@ -3,7 +3,8 @@
  *
  *  - The header row is found by its labels ("Jira Key" + "Initiative"), not by position, and every column is
  *    mapped by its label, so extra or reordered columns do not matter.
- *  - Anomalies, Resolution Status, Note Status and the repo path are ignored: Workbench derives them.
+ *  - Anomalies, Resolution Status and Repo Note are the sheet's own words and are kept as written (the app also works
+ *    out anomalies itself and shows both). Note Status is ignored.
  *  - Week columns ("W1 5-9 Oct") hold markers like "Release 19 Oct" or "Self Test". They become milestones that
  *    carry month and day only; the year is applied when the admin saves, because it is the admin's choice.
  */
@@ -26,6 +27,9 @@ export interface ParsedInitiative {
   remark: string | null
   remarkProposed: string | null
   needsReview: boolean
+  sheetAnomalies: string | null
+  sheetResolution: string | null
+  repoNote: string | null
   milestones: ParsedMilestone[]
 }
 
@@ -53,6 +57,9 @@ const HEADERS: [Col, RegExp][] = [
   ['remarkProposed', /remark.*proposed/],
   ['remark', /^key info ?\/ ?remark$/],
   ['needsReview', /^needs review$/],
+  ['sheetAnomalies', /^anomalies( ?\/ ?to resolve)?$/],
+  ['sheetResolution', /^resolution status$/],
+  ['repoNote', /^repo note$/],
 ]
 
 const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec']
@@ -187,6 +194,9 @@ export function parseInitiativeSheet(rows: string[][], links: string[][] = []): 
       remark: cell('remark') || null,
       remarkProposed: cell('remarkProposed') || null,
       needsReview: /^(yes|y|true)$/i.test(cell('needsReview')),
+      sheetAnomalies: cell('sheetAnomalies') || null,
+      sheetResolution: cell('sheetResolution') || null,
+      repoNote: cell('repoNote') || null,
       milestones,
     })
   }

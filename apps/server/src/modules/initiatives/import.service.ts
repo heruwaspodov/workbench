@@ -12,7 +12,7 @@ const READ_LIMITS = { maxRows: 1000, maxCols: 60 }
 /** Fields compared on re-import. `remark` is handled separately because it belongs to the TPM. */
 const COMPARED = [
   'squad', 'title', 'criticality', 'epicStatus', 'projectStatus', 'ownerName', 'estDeliveryDate', 'actualDeliveryDate',
-  'doneItems', 'totalItems', 'prdUrl', 'rfcUrl', 'remarkProposed', 'needsReview',
+  'doneItems', 'totalItems', 'prdUrl', 'rfcUrl', 'remarkProposed', 'needsReview', 'sheetAnomalies', 'sheetResolution', 'repoNote',
 ] as const
 type Compared = typeof COMPARED[number]
 

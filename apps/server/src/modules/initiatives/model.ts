@@ -29,6 +29,9 @@ const baseFields = {
   remark: t.Optional(t.Nullable(text(4000))),
   remarkProposed: t.Optional(t.Nullable(text(4000))),
   needsReview: t.Optional(t.Boolean()),
+  sheetAnomalies: t.Optional(t.Nullable(text(4000))),
+  sheetResolution: t.Optional(t.Nullable(text(60))),
+  repoNote: t.Optional(t.Nullable(text(300))),
 }
 const fields = { ...baseFields, milestones: t.Optional(t.Array(milestone, { maxItems: 40 })) }
 

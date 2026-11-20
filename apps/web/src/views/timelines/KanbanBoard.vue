@@ -6,8 +6,8 @@ import { formatDate } from '@/lib/format'
 import { ui } from '@/lib/ui'
 import { type Initiative, STATUS_COLOR, progressText } from './types'
 
-const props = defineProps<{ rows: Initiative[]; canEdit: boolean }>()
-const emit = defineEmits<{ edit: [row: Initiative] }>()
+const props = defineProps<{ rows: Initiative[] }>()
+const emit = defineEmits<{ open: [row: Initiative] }>()
 
 /** Usual order first; any other status the data uses follows alphabetically. */
 const ORDER = ['to do', 'backlog', 'open', 'in progress', 'development', 'in testing', 'done']
@@ -34,8 +34,7 @@ const meta = css({ display: 'flex', alignItems: 'center', gap: '2', flexWrap: 'w
           <MpText weight="semiBold">{{ c.status }}</MpText>
           <MpBadge size="sm" variant="subtle" variant-color="gray">{{ c.items.length }}</MpBadge>
         </div>
-        <component :is="canEdit ? 'button' : 'div'" v-for="r in c.items" :key="r.id" :type="canEdit ? 'button' : undefined" :class="[card, canEdit && clickable]" data-card
-          @click="canEdit && emit('edit', r)">
+        <button v-for="r in c.items" :key="r.id" type="button" :class="[card, clickable]" data-card @click="emit('open', r)">
           <MpText weight="semiBold">{{ r.title }}</MpText>
           <div :class="meta">
             <MpText size="label-small" color="text.secondary">{{ r.jiraKey }}</MpText>
@@ -51,7 +50,7 @@ const meta = css({ display: 'flex', alignItems: 'center', gap: '2', flexWrap: 'w
             <MpBadge v-if="r.anomalies.length" size="sm" variant="subtle" variant-color="orange">{{ r.anomalies.length }} open</MpBadge>
             <MpBadge v-if="r.needsReview" size="sm" variant="subtle" variant-color="orange">Needs review</MpBadge>
           </div>
-        </component>
+        </button>
       </section>
     </div>
   </AsyncState>

@@ -12,3 +12,6 @@ export const progressText = (r: Pick<Initiative, 'doneItems' | 'totalItems'>) =>
   r.totalItems ? `${r.doneItems ?? 0}/${r.totalItems} · ${Math.round(((r.doneItems ?? 0) / r.totalItems) * 100)}%` : '-'
 
 export const remarkOf = (r: Pick<Initiative, 'remark' | 'remarkProposed'>) => r.remark || r.remarkProposed || ''
+
+/** Colour for a resolution status written in the sheet ("Open", "Resolved", "In progress", "Won't fix"). */
+export const resolutionColor = (text: string) => (/resolved|closed|done/i.test(text) ? 'green' : /open/i.test(text) ? 'orange' : 'gray') as 'green' | 'orange' | 'gray'

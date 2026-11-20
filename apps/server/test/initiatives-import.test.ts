@@ -38,7 +38,7 @@ async function workbook(mutate?: (ws: ExcelJS.Worksheet) => void, name = '26Q4.x
     Squad: 'Escape', 'Jira Key': 'MESIGN-90001', Initiative: 'Synthetic editor', Criticality: 'Strategic', 'Note Status': 'draft',
     'Est. Delivery Date': '2026-10-16', 'Actual Delivery Date': '2026-10-19', PRD: 'PRD', 'Jira Epic Status': 'Done', 'Project Status': 'Done',
     'Jira Owner Assigned': 'Synthetic Owner One', 'Jira Progress (Done/Total)': '58/58', 'Jira Progress %': '100%',
-    'Anomalies / To Resolve': 'derived text that must be ignored', 'Resolution Status': 'Open', 'Repo Note': 'repo/path.md',
+    'Anomalies / To Resolve': '1) Epic reads Done but 2 child item(s) are still open.', 'Resolution Status': 'Open', 'Repo Note': 'repo/path.md',
   }, { 'W3 19-23 Oct': 'Release\n19 Oct' }))
   ws.getRow(3).getCell(8).value = { text: 'PRD', hyperlink: 'https://docs.example.test/prd-1' }
   ws.addRow(row({
@@ -64,13 +64,16 @@ describe('sheet parser', () => {
     links = book.get('26Q4 Initiatives')!.links
   })
 
-  test('finds the header by its labels and ignores derived columns', () => {
+  test('finds the header by its labels; the sheet-owned columns are kept as written and Note Status is ignored', () => {
     expect(isInitiativeSheet(rows)).toBe(true)
     expect(isInitiativeSheet([['Item', 'Description'], ['Scope', 'x']])).toBe(false)
     const { items } = parseInitiativeSheet(rows, links)
     expect(items.map((i) => i.jiraKey)).toEqual(['MESIGN-90001', 'MESIGN-90002', 'MESIGN-90003'])
-    expect(JSON.stringify(items)).not.toContain('derived text')
-    expect(JSON.stringify(items)).not.toContain('repo/path.md')
+    expect(items[0]).toMatchObject({
+      sheetAnomalies: '1) Epic reads Done but 2 child item(s) are still open.', sheetResolution: 'Open', repoNote: 'repo/path.md',
+    })
+    expect(items[1]).toMatchObject({ sheetAnomalies: null, sheetResolution: null, repoNote: null }) // empty cells
+    expect(JSON.stringify(items)).not.toContain('"draft"') // Note Status is not imported
   })
 
   test('maps fields, progress, links and flags', () => {
@@ -291,6 +294,26 @@ describe('initiatives upload API', () => {
     expect(after).toHaveLength(before.length) // nothing was deleted
     expect(after.find((r) => r.jiraKey === 'MESIGN-90003')).toMatchObject({ remark: 'Edited by the TPM in Workbench', epicStatus: 'In Progress' })
     expect(after.find((r) => r.jiraKey === 'MESIGN-90002')!.remarkProposed).toBe('New proposal')
+  })
+
+  test('the sheet-owned columns are saved, and a different value from a later upload overwrites them and shows as a change', async () => {
+    const withSheet = items.map((i) => i.jiraKey === 'MESIGN-90001' ? { ...i, sheetAnomalies: 'Old anomaly', sheetResolution: 'Open', repoNote: 'a/b.md' } : i)
+    const first = await run({ items: withSheet.slice(0, 1) })
+    expect(first.status).toBe(200)
+    const saved = (await listed()).find((r) => r.jiraKey === 'MESIGN-90001') as unknown as { sheetAnomalies: string; sheetResolution: string; repoNote: string }
+    expect(saved).toMatchObject({ sheetAnomalies: 'Old anomaly', sheetResolution: 'Open', repoNote: 'a/b.md' })
+
+    const newer = withSheet.map((i) => i.jiraKey === 'MESIGN-90001' ? { ...i, sheetAnomalies: null, sheetResolution: 'Resolved', repoNote: 'a/c.md' } : i)
+    const dry = await run({ items: newer.slice(0, 1), dryRun: true })
+    expect(dry.json.rows[0].changes.sort()).toEqual(['repoNote', 'sheetAnomalies', 'sheetResolution'])
+    await run({ items: newer.slice(0, 1) })
+    const after = (await listed()).find((r) => r.jiraKey === 'MESIGN-90001') as unknown as { sheetAnomalies: string | null; sheetResolution: string; repoNote: string }
+    expect(after).toMatchObject({ sheetAnomalies: null, sheetResolution: 'Resolved', repoNote: 'a/c.md' })
+    expect((await run({ items: newer.slice(0, 1) })).json).toMatchObject({ changed: 0, unchanged: 1 })
+
+    const tooLong = await run({ items: [{ jiraKey: 'MESIGN-90050', title: 'X', sheetResolution: 'x'.repeat(61) }] })
+    expect(tooLong.status).toBe(422)
+    await run({ items: items.slice(0, 1) }) // put the row back to what the file said, so the next test starts from it
   })
 
   test('a moved milestone is a change; the first quarter of a year may start in the previous December', async () => {
