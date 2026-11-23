@@ -3,12 +3,15 @@ import { db } from '../../db/client'
 import { initiativeMilestones, initiatives, type Initiative, type InitiativeMilestone } from '../../db/schema'
 import { AppError, BadRequestError, NotFoundError } from '../../shared/errors'
 import { anomaliesFor, statusCategory, type StatusCategory } from './anomalies'
+import { normalizeEmail } from './email'
 import type { InitiativeFilters } from './model'
 
 export type Milestone = { kind: 'release' | 'self_test'; date: string; label?: string | null }
-export type Fields = Partial<Omit<Initiative, 'id' | 'year' | 'quarter' | 'jiraKey' | 'sourceRef' | 'jiraSyncedAt' | 'createdAt' | 'updatedAt'>> & { milestones?: Milestone[] }
+export type Fields = Partial<Omit<Initiative, 'id' | 'year' | 'quarter' | 'jiraKey' | 'sourceRef' | 'jiraSyncedAt' | 'ownerEmail' | 'createdAt' | 'updatedAt'>> & { milestones?: Milestone[] }
 
-export interface InitiativeView extends Initiative {
+/** What the API returns. The owner's address stays on the server: only the verdict for the signed-in user (`isMine`) goes out. */
+export interface InitiativeView extends Omit<Initiative, 'ownerEmail'> {
+  isMine: boolean
   statusCategory: StatusCategory
   anomalies: string[]
   /** Derived: "Open" while there is anything to act on, otherwise null. */
@@ -35,8 +38,10 @@ const validUrl = (value: string, label: string) => {
   throw new BadRequestError(`${label} must be an http(s) link`)
 }
 
-export function clean(fields: Fields): Fields {
-  const out: Fields = { ...fields }
+/** `ownerEmail` is not an admin-editable field; only the import sets it, so it is accepted here and nowhere else. */
+export function clean(fields: Fields & { ownerEmail?: string | null }): Fields & { ownerEmail?: string | null } {
+  const out: Fields & { ownerEmail?: string | null } = { ...fields }
+  if ('ownerEmail' in out) out.ownerEmail = normalizeEmail(out.ownerEmail)
   for (const key of ['squad', 'criticality', 'projectStatus', 'ownerName', 'remark', 'remarkProposed', 'sheetAnomalies', 'sheetResolution', 'repoNote'] as const) {
     if (typeof out[key] === 'string') out[key] = out[key]!.trim() || null
   }
@@ -65,7 +70,7 @@ export function checkItems(done: number | null | undefined, total: number | null
   if (done != null && total == null) throw new BadRequestError('Total items is required when done items is set')
 }
 
-async function view(rows: Initiative[]): Promise<InitiativeView[]> {
+async function view(rows: Initiative[], viewerEmail?: string): Promise<InitiativeView[]> {
   if (rows.length === 0) return []
   const marks = await db.select().from(initiativeMilestones)
     .where(inArray(initiativeMilestones.initiativeId, rows.map((r) => r.id)))
@@ -77,16 +82,17 @@ async function view(rows: Initiative[]): Promise<InitiativeView[]> {
     byInitiative.set(m.initiativeId, list)
   }
   const now = today()
-  return rows.map((r) => {
+  const me = normalizeEmail(viewerEmail)
+  return rows.map(({ ownerEmail, ...r }) => {
     const anomalies = anomaliesFor(r, now)
-    return { ...r, statusCategory: statusCategory(r.epicStatus), anomalies, resolution: anomalies.length ? 'Open' : null, milestones: byInitiative.get(r.id) ?? [] }
+    return { ...r, isMine: me !== null && ownerEmail === me, statusCategory: statusCategory(r.epicStatus), anomalies, resolution: anomalies.length ? 'Open' : null, milestones: byInitiative.get(r.id) ?? [] }
   })
 }
 
 const likeEscape = (s: string) => s.replace(/[\\%_]/g, (c) => `\\${c}`)
 
 export abstract class InitiativesService {
-  static async list(f: InitiativeFilters): Promise<InitiativeView[]> {
+  static async list(f: InitiativeFilters, viewerEmail?: string): Promise<InitiativeView[]> {
     const where: (SQL | undefined)[] = [eq(initiatives.year, f.year), eq(initiatives.quarter, f.quarter)]
     if (f.squad) where.push(eq(initiatives.squad, f.squad))
     if (f.criticality) where.push(eq(initiatives.criticality, f.criticality))
@@ -98,7 +104,7 @@ export abstract class InitiativesService {
       where.push(or(ilike(initiatives.title, pattern), ilike(initiatives.jiraKey, pattern), ilike(initiatives.ownerName, pattern), ilike(initiatives.remark, pattern)))
     }
     const rows = await db.select().from(initiatives).where(and(...where)).orderBy(asc(initiatives.squad), asc(initiatives.jiraKey))
-    return view(rows)
+    return view(rows, viewerEmail)
   }
 
   /** Quarters that have data, newest first (feeds the Year + Quarter selector). */
@@ -133,13 +139,13 @@ export abstract class InitiativesService {
     }
   }
 
-  static async get(id: string): Promise<InitiativeView> {
+  static async get(id: string, viewerEmail?: string): Promise<InitiativeView> {
     const [row] = await db.select().from(initiatives).where(eq(initiatives.id, id))
     if (!row) throw new NotFoundError('Initiative')
-    return (await view([row]))[0]!
+    return (await view([row], viewerEmail))[0]!
   }
 
-  static async create(input: { year: number; quarter: number; jiraKey: string; sourceRef?: string | null } & Fields & { title: string }) {
+  static async create(input: { year: number; quarter: number; jiraKey: string; sourceRef?: string | null } & Fields & { title: string }, viewerEmail?: string) {
     const jiraKey = input.jiraKey.trim().toUpperCase()
     if (!JIRA_KEY.test(jiraKey)) throw new BadRequestError(`"${input.jiraKey}" is not a Jira key (example: MESIGN-123)`)
     const { year, quarter, sourceRef, ...rest } = input
@@ -154,11 +160,11 @@ export abstract class InitiativesService {
       if (milestones?.length) await tx.insert(initiativeMilestones).values(milestones.map((m) => ({ initiativeId: row.id, kind: m.kind, date: m.date, label: m.label?.trim() || null })))
       return row.id
     })
-    return this.get(id)
+    return this.get(id, viewerEmail)
   }
 
-  static async update(id: string, patch: Fields) {
-    const current = await this.get(id)
+  static async update(id: string, patch: Fields, viewerEmail?: string) {
+    const current = await this.get(id, viewerEmail)
     const { milestones, ...rest } = clean(patch)
     if (Object.keys(rest).length === 0 && milestones === undefined) throw new BadRequestError('Nothing to update')
     checkItems('doneItems' in rest ? rest.doneItems : current.doneItems, 'totalItems' in rest ? rest.totalItems : current.totalItems)
@@ -171,7 +177,7 @@ export abstract class InitiativesService {
         if (milestones.length) await tx.insert(initiativeMilestones).values(milestones.map((m) => ({ initiativeId: id, kind: m.kind, date: m.date, label: m.label?.trim() || null })))
       }
     })
-    return this.get(id)
+    return this.get(id, viewerEmail)
   }
 
   static async remove(id: string) {

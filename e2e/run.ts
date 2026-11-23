@@ -867,6 +867,73 @@ await step('Sync from Jira: stale rows are refreshed, the sheet-owned text is ke
   await clean()
 })
 
+await step('Timelines: "Only mine" keeps the initiatives whose owner email is the signed-in user, in every view, and survives a reload', async () => {
+  const YEAR = 2096 // quarters of its own, so the other Timelines steps are unaffected
+  const call = (method: string, path: string, body?: unknown) => page.evaluate(async ([m, u, b]) => {
+    const res = await fetch(u as string, { method: m as string, credentials: 'include', headers: b ? { 'content-type': 'application/json' } : {}, body: b ? JSON.stringify(b) : undefined })
+    return { status: res.status, json: await res.json().catch(() => null) }
+  }, [method, path, body] as const)
+  const clean = async () => {
+    for (const q of [3, 4]) for (const r of (await call('GET', `/api/initiatives?year=${YEAR}&quarter=${q}`)).json ?? []) await call('DELETE', `/api/initiatives/${r.id}`)
+  }
+  await page.goto(`${APP}/timelines`)
+  await clean()
+  // The owner email only arrives through the import (the sheet column) or a Jira sync; the list never returns it.
+  const imported = await call('POST', '/api/initiatives/import/xlsx', { year: YEAR, quarter: 4, items: [
+    { jiraKey: 'MESIGN-95001', title: 'E2E mine one', squad: 'Escape', ownerName: 'Synthetic Owner', ownerEmail: EMAIL.toUpperCase() },
+    { jiraKey: 'MESIGN-95002', title: 'E2E someone else', squad: 'Intact', ownerName: 'Synthetic Other', ownerEmail: 'synthetic.other@example.test' },
+    { jiraKey: 'MESIGN-95003', title: 'E2E no owner email', squad: 'Utmost' },
+  ] })
+  if (imported.status !== 200) throw new Error(`Import failed: ${imported.status}`)
+  await call('POST', '/api/initiatives/import/xlsx', { year: YEAR, quarter: 3, items: [{ jiraKey: 'MESIGN-95004', title: 'E2E other quarter', ownerEmail: 'synthetic.other@example.test' }] })
+  const listed = await call('GET', `/api/initiatives?year=${YEAR}&quarter=4`)
+  if (JSON.stringify(listed.json).includes('@') || JSON.stringify(listed.json).includes('ownerEmail')) throw new Error('The list must not carry the owner email')
+
+  const period = (v: string) => page.locator('select[data-test="period-select"], [data-test="period-select"] select').first().selectOption(v)
+  const rows = page.locator('[data-test="view-grid"] [data-test="open-initiative"]')
+  const until = async (check: () => Promise<boolean>, what: string) => {
+    for (let i = 0; i < 40; i++) { if (await check()) return; await page.waitForTimeout(100) }
+    throw new Error(`Timed out: ${what}`)
+  }
+  await page.goto(`${APP}/timelines?tab=grid`)
+  await period(`${YEAR}-4`)
+  await until(async () => (await rows.count()) === 3, 'three initiatives before filtering')
+
+  await page.locator('[data-test="f-mine"] label').click()
+  await until(async () => (await rows.count()) === 1, 'only mine shows one initiative')
+  await text(page, 'E2E mine one')
+  if (!page.url().includes('mine=1')) throw new Error(`The filter should be in the URL: ${page.url()}`)
+  if ((await page.locator('[data-test="f-mine"] [role="checkbox"]').getAttribute('aria-checked')) !== 'true') throw new Error('The toggle should read as on')
+  await page.waitForTimeout(400) // let the toggle finish sliding
+  await shot('02p-timelines-only-mine')
+
+  // The other views use the same rows, and the filter survives a tab switch and a reload.
+  await page.getByRole('button', { name: /^Kanban board/ }).click()
+  await page.locator('[data-test="view-kanban"]').waitFor()
+  const kanban = await page.locator('[data-test="view-kanban"]').innerText()
+  if (!kanban.includes('E2E mine one') || kanban.includes('E2E someone else') || kanban.includes('E2E no owner email')) throw new Error('Kanban should show only my initiative')
+  if (!page.url().includes('mine=1') || !page.url().includes('tab=kanban')) throw new Error(`Tab and filter should both be in the URL: ${page.url()}`)
+  await page.reload()
+  await period(`${YEAR}-4`)
+  await page.locator('[data-test="view-kanban"]').waitFor()
+  if ((await page.locator('[data-test="view-kanban"]').innerText()).includes('E2E someone else')) throw new Error('The filter should still apply after a reload')
+  await page.getByRole('button', { name: /^Grid view/ }).click()
+  await until(async () => (await rows.count()) === 1, 'still one initiative after reload')
+
+  // Off again: everything is back and the URL is clean.
+  await page.locator('[data-test="f-mine"] label').click()
+  await until(async () => (await rows.count()) === 3, 'three initiatives after turning it off')
+  if (page.url().includes('mine=')) throw new Error(`The filter should leave the URL: ${page.url()}`)
+
+  // A quarter where nothing is matched to me explains why; switching quarter keeps the toggle on.
+  await page.locator('[data-test="f-mine"] label').click()
+  await period(`${YEAR}-3`)
+  if (!page.url().includes('mine=1')) throw new Error(`Changing quarter should keep Only mine: ${page.url()}`)
+  await page.locator('[data-test="mine-none"]').waitFor()
+  await text(page, 'None of this quarter')
+  await clean()
+})
+
 await step('Users page: make someone admin, see it apply, remove it again', async () => {
   const db = postgres(DB_URL, { max: 1 })
   const email = `e2e-member-${Math.random().toString(36).slice(2, 8)}@test.local`

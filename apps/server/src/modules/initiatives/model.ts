@@ -73,6 +73,8 @@ export const InitiativesModel = {
     items: t.Array(t.Object({
       jiraKey: t.String({ minLength: 3, maxLength: 40 }),
       ...baseFields,
+      /** Read from the sheet; normalized and validated on the server, never editable in the form. */
+      ownerEmail: t.Optional(t.Nullable(text(254))),
       milestones: t.Optional(t.Array(importMilestone, { maxItems: 40 })),
     }), { minItems: 1, maxItems: 500 }),
   }),

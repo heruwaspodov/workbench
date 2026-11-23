@@ -8,6 +8,8 @@
  *  - Week columns ("W1 5-9 Oct") hold markers like "Release 19 Oct" or "Self Test". They become milestones that
  *    carry month and day only; the year is applied when the admin saves, because it is the admin's choice.
  */
+import { normalizeEmail } from './email'
+
 export interface ParsedMilestone { kind: 'release' | 'self_test'; month: number; day: number; label: string }
 
 export interface ParsedInitiative {
@@ -18,6 +20,8 @@ export interface ParsedInitiative {
   epicStatus: string
   projectStatus: string | null
   ownerName: string | null
+  /** Lowercase address from "Jira Owner Assigned Email", else from "Jira Owner" when that cell holds an address. */
+  ownerEmail: string | null
   estDeliveryDate: string | null
   actualDeliveryDate: string | null
   doneItems: number | null
@@ -47,7 +51,9 @@ const HEADERS: [Col, RegExp][] = [
   ['criticality', /^criticality$/],
   ['epicStatus', /^jira epic status$/],
   ['projectStatus', /^project status$/],
-  ['ownerName', /^jira owner/],
+  // The email column must be matched before ownerName, whose pattern would otherwise swallow "Jira Owner Assigned Email".
+  ['ownerEmail', /^jira owner.*e-?mail/],
+  ['ownerName', /^jira owner(?!.*e-?mail)/],
   ['estDeliveryDate', /^est\.? delivery date$/],
   ['actualDeliveryDate', /^actual delivery date$/],
   ['progress', /^jira progress \(done\/total\)$/],
@@ -116,6 +122,7 @@ export function parseInitiativeSheet(rows: string[][], links: string[][] = []): 
   const items: ParsedInitiative[] = []
   const seen = new Set<string>()
   let skippedMarkers = 0
+  let badOwnerEmails = 0
   let recoveredFromDates = 0
 
   for (let r = header.row + 1; r < rows.length; r++) {
@@ -178,6 +185,11 @@ export function parseInitiativeSheet(rows: string[][], links: string[][] = []): 
       milestones.push({ kind, month: at.month, day: at.day, label: kind === 'release' ? 'Release' : 'Self Test' })
     }
 
+    // Email: the dedicated column first, else a Jira Owner cell that is itself an address. An unusable value is skipped, never echoed.
+    const emailCell = cell('ownerEmail')
+    const ownerEmail = normalizeEmail(emailCell) ?? normalizeEmail(cell('ownerName'))
+    if (emailCell && !normalizeEmail(emailCell)) badOwnerEmails++
+
     items.push({
       jiraKey,
       squad: cell('squad') || null,
@@ -186,6 +198,7 @@ export function parseInitiativeSheet(rows: string[][], links: string[][] = []): 
       epicStatus: cell('epicStatus') || 'To Do',
       projectStatus: cell('projectStatus') || null,
       ownerName: cell('ownerName') || null,
+      ownerEmail,
       estDeliveryDate: date('estDeliveryDate', 'Est. Delivery Date'),
       actualDeliveryDate: date('actualDeliveryDate', 'Actual Delivery Date'),
       doneItems, totalItems,
@@ -202,6 +215,7 @@ export function parseInitiativeSheet(rows: string[][], links: string[][] = []): 
   }
 
   if (recoveredFromDates) warnings.push(`${recoveredFromDates} progress cell(s) were dates (Google Sheets turns "5/5" into 5 May) and were read back as Done/Total.`)
+  if (badOwnerEmails) warnings.push(`${badOwnerEmails} owner email cell(s) are not a valid address and were ignored.`)
   if (skippedMarkers) warnings.push(`${skippedMarkers} week cell(s) are neither Release nor Self Test (for example "runs on") and were skipped.`)
   if (!items.length) warnings.push('No initiative rows were found under the header.')
   return { items, warnings }

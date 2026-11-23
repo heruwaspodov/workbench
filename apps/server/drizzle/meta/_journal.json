@@ -71,6 +71,13 @@
       "when": 1795182992541,
       "tag": "0009_initiatives_jira_synced_at",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1795424464398,
+      "tag": "0010_initiatives_owner_email",
+      "breakpoints": true
     }
   ]
 }

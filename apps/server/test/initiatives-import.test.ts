@@ -143,6 +143,32 @@ describe('sheet parser', () => {
     expect(items[0]).toMatchObject({ jiraKey: 'MESIGN-90010', title: 'Reordered', squad: 'Escape' })
   })
 
+  test('owner email: the email column first, else a Jira Owner cell that is an address; a name gives none', () => {
+    const head = ['Jira Key', 'Initiative', 'Jira Owner Assigned', 'Jira Owner Assigned Email']
+    const grid = (...rows: string[][]) => parseInitiativeSheet([head, ...rows])
+    const { items, warnings } = grid(
+      ['MESIGN-90101', 'A', 'Synthetic One', 'Synthetic.One@Example.test'], // email column wins, stored lowercase
+      ['MESIGN-90102', 'B', 'synthetic.two@example.test', ''], // no email column value: the owner cell is itself an address
+      ['MESIGN-90103', 'C', 'Synthetic Three', ''], // a plain name gives none
+      ['MESIGN-90104', 'D', 'synthetic.four@example.test', 'Synthetic Four'], // an unusable email cell falls back to the owner cell
+    )
+    expect(items.map((i) => i.ownerEmail)).toEqual(['synthetic.one@example.test', 'synthetic.two@example.test', null, 'synthetic.four@example.test'])
+    // The email header is not read as the owner name, and the name column keeps its text.
+    expect(items[0]!.ownerName).toBe('Synthetic One')
+    expect(items[2]!.ownerName).toBe('Synthetic Three')
+    // The warning counts the unusable cell and never prints it.
+    expect(warnings.join(' ')).toContain('1 owner email cell(s)')
+    expect(warnings.join(' ')).not.toContain('Synthetic Four')
+  })
+
+  test('owner email: a sheet with only the Jira Owner column keeps working, and one without any email column gives none', () => {
+    const only = parseInitiativeSheet([['Jira Key', 'Initiative', 'Jira Owner'], ['MESIGN-90105', 'A', 'Synthetic Five'], ['MESIGN-90106', 'B', 'synthetic.six@example.test']])
+    expect(only.items.map((i) => [i.ownerName, i.ownerEmail])).toEqual([['Synthetic Five', null], ['synthetic.six@example.test', 'synthetic.six@example.test']])
+    // Column order: the email column before the owner column is still the email column.
+    const swapped = parseInitiativeSheet([['Jira Key', 'Initiative', 'Jira Owner Assigned Email', 'Jira Owner Assigned'], ['MESIGN-90107', 'A', 'synthetic.seven@example.test', 'Synthetic Seven']])
+    expect(swapped.items[0]).toMatchObject({ ownerName: 'Synthetic Seven', ownerEmail: 'synthetic.seven@example.test' })
+  })
+
   test('a grid without the headers is rejected', () => {
     expect(() => parseInitiativeSheet([['Item', 'Description']])).toThrow('Jira Key')
   })
@@ -349,5 +375,47 @@ describe('initiatives upload API', () => {
     expect((await run({ items: [{ jiraKey: 'MESIGN-90031', title: 'X' }, { jiraKey: 'mesign-90031', title: 'Y' }] })).status).toBe(400)
     expect((await run({ items: [] })).status).toBe(422)
     expect((await listed()).some((r) => r.jiraKey === 'MESIGN-90030' || r.jiraKey === 'MESIGN-90031')).toBe(false)
+  })
+  test('owner email is stored lowercase, never returned, and only fills or replaces; isMine is worked out for the signed-in user', async () => {
+    const Q = { quarter: 2 }
+    const mine = `${tag}-admin@test.local`
+    const list = async (token: string) => send(`/api/initiatives?year=${YEAR}&quarter=2`, token, { method: 'GET' })
+    const byKey = (res: { json: { jiraKey: string; isMine: boolean }[] }, key: string) => res.json.find((r) => r.jiraKey === key)!
+
+    const first = await run({ ...Q, items: [
+      { jiraKey: 'MESIGN-90701', title: 'Mine', ownerEmail: mine.toUpperCase() },
+      { jiraKey: 'MESIGN-90702', title: 'Someone else', ownerEmail: 'synthetic.other@example.test' },
+      { jiraKey: 'MESIGN-90703', title: 'No email', ownerEmail: 'not-an-email' },
+    ] })
+    expect(first.status).toBe(200)
+    expect((await ctx.db.select().from(S.initiatives).where(eq(S.initiatives.jiraKey, 'MESIGN-90701')))[0]!.ownerEmail).toBe(mine)
+    expect((await ctx.db.select().from(S.initiatives).where(eq(S.initiatives.jiraKey, 'MESIGN-90703')))[0]!.ownerEmail).toBeNull() // unusable: ignored
+
+    const asAdmin = await list(adminToken)
+    expect(['MESIGN-90701', 'MESIGN-90702', 'MESIGN-90703'].map((k) => byKey(asAdmin, k).isMine)).toEqual([true, false, false])
+    const asMember = await list(memberToken)
+    expect(['MESIGN-90701', 'MESIGN-90702', 'MESIGN-90703'].map((k) => byKey(asMember, k).isMine)).toEqual([false, false, false])
+    // The address itself is in no response, in any field.
+    for (const res of [asAdmin, asMember]) {
+      expect(JSON.stringify(res.json)).not.toContain('ownerEmail')
+      expect(JSON.stringify(res.json)).not.toContain('@')
+    }
+
+    // A sheet without an email never blanks the stored one; a different valid one replaces it and shows as a change.
+    const blank = await run({ ...Q, items: [{ jiraKey: 'MESIGN-90701', title: 'Mine', ownerEmail: null }] })
+    expect(blank.json).toMatchObject({ changed: 0, unchanged: 1 })
+    expect((await ctx.db.select().from(S.initiatives).where(eq(S.initiatives.jiraKey, 'MESIGN-90701')))[0]!.ownerEmail).toBe(mine)
+    const dry = await run({ ...Q, dryRun: true, items: [{ jiraKey: 'MESIGN-90701', title: 'Mine', ownerEmail: 'synthetic.new@example.test' }] })
+    expect(dry.json.rows[0].changes).toEqual(['ownerEmail'])
+    expect(JSON.stringify(dry.json)).not.toContain('synthetic.new')
+
+    // Edits and creates by an admin answer without the address too.
+    const id = byKey(asAdmin, 'MESIGN-90701') as unknown as { id: string }
+    const patched = await send(`/api/initiatives/${id.id}`, adminToken, { method: 'PATCH', json: { remark: 'x' } })
+    expect(patched.status).toBe(200)
+    expect(patched.json.isMine).toBe(true)
+    expect(JSON.stringify(patched.json)).not.toContain('ownerEmail')
+    expect(JSON.stringify(patched.json)).not.toContain('@')
+    await ctx.db.delete(S.initiatives).where(eq(S.initiatives.quarter, 2))
   })
 })

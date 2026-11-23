@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { MpButton, MpSelect, MpText, css } from '@mekari/pixel3'
+import { MpButton, MpSelect, MpText, MpToggle, css } from '@mekari/pixel3'
 import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import AsyncState from '@/components/AsyncState.vue'
@@ -59,6 +59,7 @@ const squad = ref('')
 const status = ref('')
 const criticality = ref('')
 const month = ref('')
+/** Runs when the quarter changes: the squad, status and month options belong to a quarter. "Only mine" belongs to the person, so it stays. */
 function resetFilters() { q.value = squad.value = status.value = criticality.value = month.value = '' }
 
 const rows = computed<Row[]>(() => board.data.value?.rows ?? [])
@@ -69,6 +70,9 @@ const statusOptions = computed(() => uniq(rows.value.map((r) => r.epicStatus)))
 const criticalityOptions = computed(() => uniq(rows.value.flatMap((r) => (r.criticality ? [r.criticality] : []))))
 const monthOptions = computed(() => uniq(rows.value.flatMap((r) => (r.estDeliveryDate ? [isoDay(r.estDeliveryDate).slice(0, 7)] : []))))
 
+/** Nothing in this quarter is matched to the signed-in user (owner emails come from Jira or the sheet, so a fresh import has none until it is synced). */
+const noneMine = computed(() => rows.value.length > 0 && !rows.value.some((r) => r.isMine))
+
 const filtered = computed(() => {
   const needle = q.value.trim().toLowerCase()
   return rows.value.filter((r) =>
@@ -76,6 +80,7 @@ const filtered = computed(() => {
     && (!status.value || r.epicStatus === status.value)
     && (!criticality.value || r.criticality === criticality.value)
     && (!month.value || isoDay(r.estDeliveryDate).slice(0, 7) === month.value)
+    && (!mine.value || r.isMine)
     && (!needle || [r.title, r.jiraKey, r.ownerName, r.remark, r.remarkProposed].some((v) => v?.toLowerCase().includes(needle))))
 })
 
@@ -87,6 +92,12 @@ const router = useRouter()
 const asTab = (v: unknown): Tab => (TABS.includes(v as Tab) ? (v as Tab) : 'timeline')
 const tab = ref<Tab>(asTab(route.query.tab))
 watch(tab, (t) => { router.replace({ query: { ...route.query, tab: t } }) })
+/** "Only mine": the server marks each row `isMine` from the owner's email, so the address itself never reaches the browser. Kept in the URL (?mine=1). */
+const mine = ref(route.query.mine === '1')
+watch(mine, (on) => {
+  const { mine: _drop, ...rest } = route.query
+  router.replace({ query: on ? { ...rest, mine: '1' } : rest })
+})
 const openCount = computed(() => filtered.value.filter((r) => r.resolution === 'Open').length)
 const tabs = computed(() => [
   { value: 'timeline' as const, label: 'Delivery timeline & releases' },
@@ -145,6 +156,8 @@ const kpiCard = `${ui.card} ${css({ display: 'flex', flexDirection: 'column', ga
 const kpiRow = css({ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '3' })
 const filters = `${ui.toolbar} ${css({ mb: '4' })}`
 const search = css({ flex: '1 1 260px', minWidth: '220px', maxWidth: '420px' })
+const viewRow = css({ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '3', mb: '4' })
+const mineBox = css({ display: 'inline-flex', alignItems: 'center' })
 const periodBox = css({ minWidth: '140px' })
 </script>
 
@@ -200,7 +213,14 @@ const periodBox = css({ minWidth: '140px' })
           </div>
         </div>
 
-        <SegmentedControl v-model="tab" :options="tabs" label="View" :class="css({ mb: '4' })" data-test="view-tabs" />
+        <MpText v-if="mine && noneMine" size="label" color="text.secondary" :class="css({ display: 'block', mb: '3' })" data-test="mine-none">
+          None of this quarter's initiatives is matched to you. Owners are matched by email, which comes from Jira{{ isAdmin ? ' (use Sync from Jira)' : '' }} or the sheet's "Jira Owner Assigned Email" column.
+        </MpText>
+
+        <div :class="viewRow">
+          <SegmentedControl v-model="tab" :options="tabs" label="View" data-test="view-tabs" />
+          <div :class="mineBox" data-test="f-mine"><MpToggle id="f-mine" v-model:is-checked="mine">Only mine</MpToggle></div>
+        </div>
         <TimelineBoard v-if="tab === 'timeline' && current" :rows="filtered" :year="current.year" :quarter="current.quarter" :today="today" @open="openDetail" />
         <KanbanBoard v-else-if="tab === 'kanban'" :rows="filtered" @open="openDetail" />
         <InitiativesGrid v-else-if="tab === 'grid'" :rows="filtered" :can-edit="isAdmin" @open="openDetail" @edit="openEdit" />

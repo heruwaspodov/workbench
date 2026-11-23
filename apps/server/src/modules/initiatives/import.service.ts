@@ -18,7 +18,7 @@ type Compared = typeof COMPARED[number]
 
 /** A week-cell marker without a year; the year comes from the quarter chosen at import. */
 export interface ImportMilestone { kind: 'release' | 'self_test'; month: number; day: number; label?: string | null }
-export interface ImportItem extends Omit<Fields, 'milestones'> { jiraKey: string; title: string; milestones?: ImportMilestone[] }
+export interface ImportItem extends Omit<Fields, 'milestones'> { jiraKey: string; title: string; ownerEmail?: string | null; milestones?: ImportMilestone[] }
 export interface ImportInput { year: number; quarter: number; sourceRef?: string | null; items: ImportItem[]; dryRun?: boolean }
 export interface ImportRow { jiraKey: string; title: string; action: 'new' | 'changed' | 'unchanged'; changes: string[] }
 
@@ -103,6 +103,8 @@ export abstract class InitiativesImportService {
         const next = f === 'needsReview' ? item.needsReview ?? false : f === 'epicStatus' ? item.epicStatus ?? 'To Do' : item[f] ?? null
         if (!same(next, current[f])) { patch[f] = next; changes.push(f) }
       }
+      // The owner's email only ever fills or replaces: a sheet without one never blanks what Jira or an earlier upload provided.
+      if (item.ownerEmail && item.ownerEmail !== current.ownerEmail) { patch.ownerEmail = item.ownerEmail; changes.push('ownerEmail') }
       if (!current.remark?.trim() && item.remark) { patch.remark = item.remark; changes.push('remark') }
       const a = (marksOf.get(current.id) ?? []).map(markKey).sort().join(';')
       const b = item.milestones.map(markKey).sort().join(';')

@@ -12,7 +12,7 @@ const emit = defineEmits<{ close: [] }>()
 
 const LABEL: Record<string, string> = {
   epicStatus: 'Epic status', projectStatus: 'Project status', ownerName: 'Owner', estDeliveryDate: 'Est. delivery', actualDeliveryDate: 'Actual delivery',
-  criticality: 'Criticality', progress: 'Progress',
+  criticality: 'Criticality', progress: 'Progress', ownerEmail: 'Owner email',
 }
 const names = (changes: string[]) => changes.map((c) => LABEL[c] ?? c).join(', ')
 

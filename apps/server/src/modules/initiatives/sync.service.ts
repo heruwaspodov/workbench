@@ -4,6 +4,7 @@ import { db } from '../../db/client'
 import { initiatives, type Initiative } from '../../db/schema'
 import { jira, jiraConfigured, type JiraIssue } from '../../integrations/jira.client'
 import { AppError } from '../../shared/errors'
+import { normalizeEmail } from './email'
 
 /** Children fetched per group of epics, as in the PGP epic suggestions: Jira pages at 100 and a group stops at this many. */
 const CHILD_CAP = 6000
@@ -92,10 +93,16 @@ export abstract class InitiativesSyncService {
       if (!epic) { missing.push(row.jiraKey); continue }
       checkedIds.push(row.id)
 
+      const ownerName = typeof epic.fields.assignee?.displayName === 'string' ? epic.fields.assignee.displayName.trim() || null : null
       const next: Partial<Record<keyof Initiative, unknown>> = {
         epicStatus: String(epic.fields.status?.name ?? '').trim() || row.epicStatus,
-        ownerName: typeof epic.fields.assignee?.displayName === 'string' ? epic.fields.assignee.displayName.trim() || null : null,
+        ownerName,
       }
+      // Owner email: Jira's address wins when it returns one (it may hide it). Without one, the value from the sheet stays,
+      // unless the epic now has a different owner (or none), because then it would point at the previous person.
+      const jiraEmail = normalizeEmail(epic.fields.assignee?.emailAddress)
+      if (jiraEmail) next.ownerEmail = jiraEmail
+      else if (row.ownerEmail && (ownerName === null || (row.ownerName !== null && row.ownerName.trim().toLowerCase() !== ownerName.toLowerCase()))) next.ownerEmail = null
       if (j.projectStatusField) next.projectStatus = option(epic.fields[j.projectStatusField])
       if (j.estDeliveryField) next.estDeliveryDate = day(epic.fields[j.estDeliveryField])
       if (j.deliveryDateField) next.actualDeliveryDate = day(epic.fields[j.deliveryDateField])

@@ -255,4 +255,58 @@ describe('sync from Jira', () => {
     expect(res.json).toMatchObject({ checked: 0, updated: 0, unchanged: 0, missing: [], skipped: [], rows: [] })
     expect(hits).toHaveLength(0)
   })
+  describe('owner email', () => {
+    const emailOf = async (key: string) => (await row(key)).ownerEmail
+    const run = async (key: string, assignee: Record<string, unknown> | null, seedEmail: string | null = null, ownerName: string | null = 'Old Owner') => {
+      await seed(key, { ownerEmail: seedEmail, ownerName })
+      EPICS[key] = epic(key, { assignee })
+      CHILDREN[key] = [child(key, 1, 'done')]
+      return sync()
+    }
+
+    test('Jira\'s address is stored lowercase, replaces the sheet\'s, and is reported as a change by name only', async () => {
+      const res = await run('EM-1', { displayName: 'Old Owner', emailAddress: 'Synthetic.Owner@Example.test' }, 'sheet.value@example.test')
+      expect(await emailOf('EM-1')).toBe('synthetic.owner@example.test')
+      expect(res.json.rows[0].changes).toContain('ownerEmail')
+      expect(JSON.stringify(res.json)).not.toContain('@')
+      // Nothing new at Jira = nothing to report.
+      EPICS['EM-1'] = epic('EM-1', { assignee: { displayName: 'Old Owner', emailAddress: 'synthetic.owner@example.test' } })
+      expect((await sync()).json.rows.flatMap((r: { changes: string[] }) => r.changes)).not.toContain('ownerEmail')
+    })
+
+    test('when Jira hides the address, the sheet\'s stays for the same owner (names compared ignoring case)', async () => {
+      await run('EM-2', { displayName: 'old owner' }, 'sheet.value@example.test')
+      expect(await emailOf('EM-2')).toBe('sheet.value@example.test')
+      await ctx.db.delete(S.initiatives).where(eq(S.initiatives.year, YEAR))
+      await run('EM-2', { displayName: 'Old Owner' }, 'sheet.value@example.test', null) // a row whose sheet had an email but no owner name
+      expect(await emailOf('EM-2')).toBe('sheet.value@example.test')
+    })
+
+    test('a different owner (or none) with no address from Jira clears the old address, so it never points at the previous person', async () => {
+      await run('EM-3', { displayName: 'Another Person' }, 'sheet.value@example.test')
+      expect(await emailOf('EM-3')).toBeNull()
+      await ctx.db.delete(S.initiatives).where(eq(S.initiatives.year, YEAR))
+      await run('EM-3', null, 'sheet.value@example.test')
+      expect(await emailOf('EM-3')).toBeNull()
+    })
+
+    test('an unusable address from Jira is treated as none', async () => {
+      await run('EM-4', { displayName: 'Old Owner', emailAddress: 'not an address' }, 'sheet.value@example.test')
+      expect(await emailOf('EM-4')).toBe('sheet.value@example.test')
+    })
+
+    test('the list answers isMine for the signed-in user from that address, and never carries the address', async () => {
+      const [admin] = await ctx.db.select().from(S.users).where(eq(S.users.email, `${tag}-admin@test.local`))
+      await run('EM-5', { displayName: 'Old Owner', emailAddress: admin!.email.toUpperCase() })
+      await seed('EM-6', { ownerEmail: 'synthetic.other@example.test' })
+      await seed('EM-7', { ownerEmail: null })
+      const get = (token: string) => call('GET', `/api/initiatives?year=${YEAR}&quarter=4`, token)
+      const mark = (res: { json: { jiraKey: string; isMine: boolean }[] }) => Object.fromEntries(res.json.map((r) => [r.jiraKey, r.isMine]))
+      const asAdmin = await get(adminToken)
+      expect(mark(asAdmin)).toEqual({ 'EM-5': true, 'EM-6': false, 'EM-7': false })
+      expect(mark(await get(memberToken))).toEqual({ 'EM-5': false, 'EM-6': false, 'EM-7': false })
+      expect(JSON.stringify(asAdmin.json)).not.toContain('ownerEmail')
+      expect(JSON.stringify(asAdmin.json)).not.toContain('@')
+    })
+  })
 })
